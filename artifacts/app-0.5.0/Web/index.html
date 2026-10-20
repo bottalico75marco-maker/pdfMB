@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' blob:; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>PDF MB</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div id="workspace">
+    <aside id="pages-panel" aria-label="Gestione pagine" hidden>
+      <div class="panel-heading"><h2>Gestisci pagine</h2><button id="panel-close" class="secondary" aria-label="Chiudi pannello pagine">×</button></div>
+      <p id="edit-reason" class="notice" role="status" hidden></p>
+      <p id="selection-count" role="status">0 pagine selezionate</p>
+      <small class="selection-help">Tasto destro: comandi · Ctrl/Maiusc+clic: selezione</small>
+      <div id="page-list" role="listbox" aria-label="Pagine del documento" aria-multiselectable="true"></div>
+    </aside>
+    <main id="viewer" aria-label="Visualizzatore PDF"></main>
+  </div>
+  <div id="page-menu" popover="auto" role="menu" aria-labelledby="page-menu-title" tabindex="-1">
+    <div id="page-menu-title" class="page-menu-title"></div>
+    <button type="button" role="menuitem" data-operation="rotate-left">Ruota a sinistra</button>
+    <button type="button" role="menuitem" data-operation="rotate-right">Ruota a destra</button>
+    <button type="button" role="menuitem" data-operation="delete" class="delete-page">Elimina</button>
+    <button type="button" role="menuitem" data-operation="move">Sposta…</button>
+    <hr role="separator">
+    <button type="button" role="menuitem" data-operation="insert">Inserisci…</button>
+    <button type="button" role="menuitem" data-operation="extract">Estrai pagine…</button>
+  </div>
+  <section id="welcome" aria-labelledby="welcome-title">
+    <div class="file-icon" aria-hidden="true">PDF</div>
+    <p class="eyebrow">PDF MB · DOCUMENTI</p>
+    <h1 id="welcome-title">Il tuo documento, qui.</h1>
+    <p>Apri un PDF per consultare pagine, miniature e testo.</p>
+    <button id="open" disabled>Apri documento</button>
+    <small id="hint" role="status">Avvio del motore PDF…</small>
+  </section>
+  <div id="fatal" role="alert" hidden><span id="error-text"></span><button id="dismiss-error" class="secondary" aria-label="Chiudi messaggio">×</button></div>
+  <dialog id="move-dialog" aria-labelledby="move-title" aria-describedby="move-description">
+    <h2 id="move-title">Sposta pagine</h2>
+    <p id="move-description"></p>
+    <label for="move-position">Posizione finale</label>
+    <input id="move-position" type="number" min="1" step="1" required>
+    <div class="dialog-actions"><button data-cancel-dialog class="secondary">Annulla</button><button id="move-confirm">Sposta</button></div>
+  </dialog>
+  <dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-description">
+    <h2 id="delete-title">Elimina pagine</h2>
+    <p id="delete-description"></p>
+    <div class="dialog-actions"><button id="delete-cancel" data-cancel-dialog class="secondary">Annulla</button><button id="delete-confirm" class="danger">Elimina</button></div>
+  </dialog>
+  <dialog id="text-dialog" aria-labelledby="text-page-label">
+    <form id="text-form">
+      <h2 id="text-page-label">Testo</h2>
+      <div class="text-layout">
+        <div class="text-controls">
+          <label for="text-existing">Testi inseriti in questa pagina</label>
+          <select id="text-existing"><option value="">Nuovo testo</option></select>
+          <fieldset class="character-bar"><legend>Carattere</legend>
+            <label>Font<select id="text-font"><option>Helvetica</option><option>Times</option><option>Courier</option></select></label>
+            <label>Dimensione (pt)<input id="text-size" type="number" min="6" max="144" step="0.5" value="12" required></label>
+            <div class="character-buttons">
+              <button type="button" id="text-smaller" class="secondary" aria-label="Riduci dimensione" title="Riduci dimensione">A−</button>
+              <button type="button" id="text-larger" class="secondary" aria-label="Aumenta dimensione" title="Aumenta dimensione">A+</button>
+              <button type="button" id="text-bold" class="secondary" aria-pressed="false" aria-label="Grassetto" title="Grassetto"><b>G</b></button>
+              <button type="button" id="text-italic" class="secondary" aria-pressed="false" aria-label="Corsivo" title="Corsivo"><i>C</i></button>
+              <label>Colore<input id="text-color" type="color" value="#202020"></label>
+            </div>
+          </fieldset>
+          <label for="text-content">Testo — Ctrl+C / Ctrl+V</label>
+          <textarea id="text-content" rows="7" maxlength="10000" required spellcheck="false" placeholder="Scrivi o incolla il testo…"></textarea>
+          <small>Lo stile si applica a tutta la casella. Puoi selezionare e copiare anche singole parole.</small>
+          <fieldset class="text-position"><legend>Posizione e dimensioni (mm)</legend>
+            <label>Da sinistra<input id="text-x" type="number" min="0" step="any" required></label>
+            <label>Dall’alto<input id="text-y" type="number" min="0" step="any" required></label>
+            <label>Larghezza<input id="text-width" type="number" min="4.3" step="any" required></label>
+            <label>Altezza<input id="text-height" type="number" min="4.3" step="any" required></label>
+          </fieldset>
+          <small>Il testo segue la rotazione permanente della pagina. L’anteprima mostra il risultato PDF.</small>
+        </div>
+        <div class="text-preview-area">
+          <p>Clicca sulla pagina per posizionare la casella.</p>
+          <div class="text-preview-scroll"><div class="text-preview-paper"><canvas id="text-page-preview" aria-label="Anteprima pagina per il posizionamento del testo"></canvas><div id="text-outline" aria-hidden="true"></div></div></div>
+          <button type="button" id="text-preview-update" class="secondary">Aggiorna anteprima</button>
+        </div>
+      </div>
+      <p id="text-message" role="status" aria-live="polite"></p>
+      <div class="dialog-actions"><button type="button" id="text-delete" class="danger" disabled>Elimina testo</button><button type="button" id="text-cancel" class="secondary">Annulla</button><button type="submit">Applica</button></div>
+    </form>
+  </dialog>
+  <script type="module" src="app.mjs"></script>
+</body>
+</html>

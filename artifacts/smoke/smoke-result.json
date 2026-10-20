@@ -1,0 +1,42 @@
+{
+  "success": true,
+  "opening": {
+    "page": 1,
+    "pageCount": 4,
+    "zoom": 0.869,
+    "widthMm": 216,
+    "heightMm": 279,
+    "thumbnails": 10,
+    "sidebarOpen": true
+  },
+  "search": {
+    "page": 1,
+    "pageCount": 4,
+    "zoom": 0.869,
+    "widthMm": 216,
+    "heightMm": 279,
+    "matches": 19,
+    "thumbnails": 10,
+    "sidebarOpen": true
+  },
+  "navigation": {
+    "page": 2,
+    "pageCount": 4,
+    "zoom": 1.25,
+    "widthMm": 216,
+    "heightMm": 279,
+    "thumbnails": 11,
+    "sidebarOpen": true
+  },
+  "afterFailure": {
+    "page": 2,
+    "pageCount": 4,
+    "zoom": 1.25,
+    "widthMm": 216,
+    "heightMm": 279,
+    "thumbnails": 11,
+    "sidebarOpen": true
+  },
+  "copyIdentical": true,
+  "closed": true
+}

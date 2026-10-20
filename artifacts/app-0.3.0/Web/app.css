@@ -1,0 +1,51 @@
+:root { font-family: "Segoe UI", system-ui, sans-serif; color: #203047; background: #eef1f5; }
+* { box-sizing: border-box; }
+html, body, #workspace { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+#workspace { display: flex; }
+#viewer { flex: 1; height: 100%; min-width: 0; overflow: hidden; }
+embedpdf-container { display: block; height: 100%; }
+[hidden] { display: none !important; }
+#welcome { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f6f8fb; }
+.file-icon { display: grid; place-items: center; width: 72px; height: 88px; border: 1px solid #cbd5e1; border-radius: 10px; color: #1d5eaa; font-size: 17px; font-weight: 700; background: white; box-shadow: 0 8px 24px #2030470a; margin-bottom: 24px; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .16em; color: #66778f; }
+h1 { font-size: 30px; letter-spacing: -.025em; margin: 6px 0; font-weight: 600; }
+p { color: #63738a; font-size: 14px; }
+button { font: inherit; padding: 11px 24px; border-radius: 6px; border: 0; background: #1d5eaa; color: white; cursor: pointer; margin: 16px 0; }
+button:hover { background: #174d8c; }
+button:disabled { opacity: .55; cursor: wait; }
+button:focus-visible { outline: 3px solid #80ade0; outline-offset: 3px; }
+small { color: #728198; font-size: 12px; }
+#fatal { position: fixed; inset: auto 24px 24px; background: #fff0ee; border: 1px solid #e5b9b3; color: #902d23; padding: 16px; border-radius: 8px; }
+#fatal { display: flex; align-items: center; justify-content: space-between; gap: 16px; z-index: 5; }
+#fatal button { margin: 0; padding: 4px 10px; }
+h2 { font-size: 17px; font-weight: 600; margin: 0; }
+#pages-panel { width: 292px; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid #cbd5e1; background: #f6f8fb; }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: white; }
+.panel-heading button { margin: 0; padding: 2px 9px; font-size: 20px; }
+.secondary { background: #fff; color: #203047; border: 1px solid #cbd5e1; }
+.secondary:hover { background: #e7edf5; }
+.danger { background: #a12e24; }
+.danger:hover { background: #842319; }
+#selection-count { margin: 12px 12px 5px; font-size: 12px; font-weight: 600; }
+.selection-help { margin: 0 12px 12px; font-size: 11px; }
+.notice { margin: 10px 12px 0; padding: 10px; background: #fff4dd; border: 1px solid #e5d0a2; color: #6f5220; font-size: 12px; }
+#page-list { flex: 1; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-content: start; padding: 12px; min-height: 0; }
+.page-tile { align-self: start; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; margin: 0; padding: 7px; border: 2px solid transparent; background: transparent; color: #203047; font-size: 12px; border-radius: 5px; }
+.page-tile:hover { background: #e4ebf5; }
+.page-tile.selected { border-color: #1d5eaa; background: #dfebfb; }
+#page-menu { position: fixed; inset: auto; margin: 0; padding: 5px; width: min(230px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow-y: auto; background: white; color: #203047; border: 1px solid #c4cfdd; border-radius: 7px; box-shadow: 0 6px 22px #152b4b33; }
+.page-menu-title { padding: 8px 10px; color: #63738a; font-size: 12px; border-bottom: 1px solid #e4eaf1; margin-bottom: 4px; }
+#page-menu button { display: block; width: 100%; margin: 0; padding: 9px 10px; text-align: left; font-size: 13px; border-radius: 4px; background: transparent; color: #203047; }
+#page-menu button:hover, #page-menu button:focus-visible { background: #e4edfa; }
+#page-menu button:disabled { opacity: .45; cursor: default; background: transparent; }
+#page-menu .delete-page { color: #a12e24; }
+#page-menu hr { border: 0; border-top: 1px solid #e4eaf1; margin: 4px 5px; }
+.page-preview { width: 100%; background: white; box-shadow: 0 1px 4px #20304722; overflow: hidden; }
+.page-preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+dialog { width: min(440px, calc(100vw - 40px)); padding: 24px; border: 1px solid #b8c6d8; border-radius: 10px; color: #203047; box-shadow: 0 12px 48px #152b4b33; }
+dialog::backdrop { background: #152b4b55; }
+dialog p { line-height: 1.5; }
+dialog label { display: block; font-size: 13px; margin: 16px 0 6px; }
+dialog input { width: 100%; padding: 9px; border: 1px solid #879bb5; border-radius: 5px; font: inherit; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.dialog-actions button { margin: 0; }
