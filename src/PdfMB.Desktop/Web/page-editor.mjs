@@ -244,10 +244,33 @@ export class PageEditor {
     this.future = [];
     await this.releaseUnusedSources();
   }
-  async highlightContext(pageIndex) {
+  async highlightList(pageIndex) {
     if (!this.canText) throw new Error('Annotazioni non consentite.');
     const buffer = this.bytes.slice(0);
-    return this.worker.request('highlight-context', { buffer, pageIndex }, [buffer]);
+    return this.worker.request('highlight-list', { buffer, pageIndex }, [buffer]);
+  }
+  async changeHighlights({ token, revision, selections, color }) {
+    if (!this.canText || token !== this.token || revision !== this.revision)
+      throw new Error('Documento cambiato o annotazioni non consentite.');
+    if (!Array.isArray(selections) || !selections.length || selections.length > this.pages.length)
+      throw new Error('Selezione del testo non valida.');
+    const before = this.snapshot(), target = this.snapshot(), seen = new Set();
+    for (const { pageIndex, rects } of selections) {
+      const page = target.pages[pageIndex];
+      if (!Number.isInteger(pageIndex) || !page || seen.has(pageIndex)) throw new Error('Pagina selezionata non valida.');
+      seen.add(pageIndex);
+      const input = { id: 'pdfmb-h-' + crypto.randomUUID(), rects, color };
+      const buffer = this.bytes.slice(0);
+      const { value } = await this.worker.request('highlight-change', { buffer, pageIndex, pageId: page.id, input }, [buffer]);
+      page.highlightChanges = [...(page.highlightChanges ?? []), { id: input.id, value }];
+      page.highlightChanges.sort((a, b) => a.id.localeCompare(b.id));
+    }
+    target.focus = target.pages[selections[0].pageIndex].id;
+    await this.apply(target);
+    this.past.push(before);
+    if (this.past.length > 100) this.past.shift();
+    this.future = [];
+    await this.releaseUnusedSources();
   }
   async changeHighlight({ pageIndex, token, revision, input, remove = false }) {
     if (!this.canText || token !== this.token || revision !== this.revision || !this.pages[pageIndex])

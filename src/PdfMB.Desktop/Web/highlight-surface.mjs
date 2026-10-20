@@ -1,112 +1,103 @@
-export function nearestCharacter(chars, x, y) {
-  let best = null, distance = Infinity;
-  for (const char of chars) {
-    const p = char.position;
-    const d = Math.max(p.x - x, 0, x - p.x - p.width) ** 2 + Math.max(p.y - y, 0, y - p.y - p.height) ** 2;
-    if (d < distance) { distance = d; best = char; }
-  }
-  return distance <= 400 ? best : null;
+// Uses the viewer's text selection: no overlay, canvas or duplicate document.
+export function captureSelection(selection) {
+  return selection.map(({ pageIndex, segmentRects }) => ({ pageIndex,
+    rects: segmentRects.map(segment => ({ origin: { ...segment.origin }, size: { ...segment.size } }))
+  })).filter(page => page.rects.length);
+}
+
+export function markerCursor(color) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M5 22 19 8l7 7-14 14H5z" fill="${color}" stroke="#222" stroke-width="2"/><path d="m19 8 4-4 7 7-4 4M5 24l-3 6 7-2" fill="#333" stroke="#222"/><path d="m10 19 7 7" stroke="#fff" stroke-width="2"/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 2 30, crosshair`;
 }
 
 export class HighlightSurface {
-  constructor({ editor, run, notify }) {
-    Object.assign(this, { editor, run, notify });
-    this.dialog = document.querySelector('#highlight-dialog');
-    this.canvas = document.querySelector('#highlight-canvas');
-    this.status = document.querySelector('#highlight-status');
-    this.color = document.querySelector('#highlight-color');
-    this.list = document.querySelector('#highlight-list');
-    this.add = document.querySelector('#highlight-add');
-    this.remove = document.querySelector('#highlight-remove');
-    this.dialog.querySelector('[data-highlight-close]').onclick = () => this.close();
-    this.dialog.addEventListener('cancel', event => { event.preventDefault(); if (!this.busy) this.close(); });
-    this.canvas.onpointerdown = event => {
-      if (this.busy || event.button !== 0) return;
-      const char = this.hit(event);
-      if (!char) return;
-      this.canvas.setPointerCapture(event.pointerId);
-      this.drag = event.pointerId; this.start = this.end = char.index; this.paint();
-    };
-    this.canvas.onpointermove = event => {
-      if (this.drag !== event.pointerId) return;
-      const char = this.hit(event);
-      if (char) { this.end = char.index; this.paint(); }
-    };
-    this.canvas.onpointerup = event => { if (this.drag === event.pointerId) { this.drag = null; this.paint(); } };
-    this.canvas.onpointercancel = () => { this.drag = null; this.start = this.end = null; this.paint(); };
-    this.canvas.onkeydown = event => {
-      if (!this.data?.chars.length || this.busy) return;
-      const chars = this.data.chars;
-      let index = chars.findIndex(c => c.index === this.end);
-      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
-        event.preventDefault();
-        index = Math.max(0, Math.min(chars.length - 1, index + (event.key === 'ArrowRight' ? 1 : -1)));
-        this.end = chars[index].index;
-        if (!event.shiftKey || this.start === null) this.start = this.end;
-        this.paint();
-      }
-    };
-    this.list.onchange = () => { this.remove.disabled = !this.list.value; };
-    this.add.onclick = () => {
-      if (this.start === null || this.end === null || this.drag !== null) return;
-      this.commit({ id: 'pdfmb-h-' + crypto.randomUUID(), start: Math.min(this.start, this.end),
-        end: Math.max(this.start, this.end), color: this.color.value });
-    };
-    this.remove.onclick = () => { if (this.list.value) this.commit({ id: this.list.value }, true); };
+  constructor({ editor, plugin, session, run, notify, unavailable, showError }) {
+    Object.assign(this, { editor, plugin, session, run, notify, unavailable, showError });
+    this.active = false;
+    this.color = '#ffff00';
+    this.disposers = [];
+    this.deleteMenu = document.querySelector('#highlight-delete-menu');
+    this.deleteList = document.querySelector('#highlight-delete-list');
+    this.deleteMenu.querySelector('[data-highlight-dismiss]').onclick = () => this.deleteMenu.hidePopover();
+    this.deleteMenu.querySelector('[data-highlight-remove]').onclick = () => this.removeSelected();
   }
-  close() { this.dialog.close(); this.data = null; this.drag = null; }
-  hit(event) {
-    const box = this.canvas.getBoundingClientRect();
-    return nearestCharacter(this.data.chars, (event.clientX - box.left) * this.data.width / box.width,
-      (event.clientY - box.top) * this.data.height / box.height);
+  setColor(color) {
+    if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error('Colore evidenziatore non valido.');
+    this.color = color.toLowerCase();
+    this.updateCursor();
   }
-  async open(pageIndex) {
+  toggle(force) {
+    if (!this.editor()?.canText) return;
+    this.active = force ?? !this.active;
+    this.gesture = null;
+    this.sync();
+    if (this.active) this.selection?.clear();
+  }
+  suspend() { this.gesture = null; this.selection?.clear(); this.deleteMenu.hidePopover(); }
+  async showDelete(pageIndex) {
     const editor = this.editor();
-    this.pageIndex = Math.max(0, Math.min(pageIndex, editor.pages.length - 1));
-    this.token = editor.token; this.revision = editor.revision;
-    this.data = await editor.highlightContext(this.pageIndex);
-    this.refresh();
-    this.dialog.showModal(); this.canvas.focus();
+    const items = await editor.highlightList(pageIndex);
+    this.deleteTarget = { token: editor.token, revision: editor.revision, pageIndex };
+    this.deleteList.replaceChildren(new Option(items.length ? 'Seleziona un’evidenziazione' : 'Nessuna evidenziazione PDF MB nella pagina', ''));
+    items.forEach((item, index) => this.deleteList.add(new Option('Evidenziazione ' + (index + 1), item.id)));
+    this.deleteMenu.showPopover();
   }
-  refresh() {
-    this.start = this.end = this.drag = null;
-    const { image } = this.data;
-    this.canvas.width = image.width; this.canvas.height = image.height;
-    this.list.replaceChildren(new Option('Seleziona un’evidenziazione', ''));
-    this.data.highlights.forEach((h, i) => this.list.add(new Option('Evidenziazione ' + (i + 1), h.id)));
-    this.remove.disabled = true;
-    this.paint();
+  removeSelected() {
+    const id = this.deleteList.value;
+    if (!id || this.pending || this.unavailable()) return;
+    const target = { ...this.deleteTarget };
+    this.pending = true;
+    this.deleteMenu.hidePopover();
+    this.run(() => this.editor().changeHighlight({ ...target, input: { id }, remove: true }))
+      .catch(this.showError).finally(() => { this.pending = false; this.notify(); });
   }
-  paint() {
-    const { image, chars } = this.data;
-    const ctx = this.canvas.getContext('2d');
-    ctx.putImageData(new ImageData(new Uint8ClampedArray(image.pixels), image.width, image.height), 0, 0);
-    const selected = this.start === null ? [] : chars.filter(c => c.index >= Math.min(this.start, this.end) && c.index <= Math.max(this.start, this.end));
-    ctx.fillStyle = '#3388ff55';
-    for (const { position: p } of selected) ctx.fillRect(p.x * image.width / this.data.width, p.y * image.height / this.data.height,
-      p.width * image.width / this.data.width, p.height * image.height / this.data.height);
-    this.add.disabled = !selected.length || this.busy || this.drag !== null;
-    this.status.textContent = selected.length ? selected.map(c => c.text).join('') :
-      chars.length ? 'Trascina sul testo. Da tastiera: frecce e Maiusc+frecce.' : 'Nessun testo selezionabile: la pagina può richiedere OCR.';
+  unbind() {
+    this.disposers.forEach(dispose => dispose()); this.disposers = [];
+    try { this.interaction?.removeCursor('pdfmb-highlight'); } catch { /* Document already closed. */ }
+    this.selection = this.interaction = null;
   }
-  async commit(input, remove = false) {
-    if (this.busy) return;
-    this.busy = true;
-    this.dialog.querySelectorAll('button,input,select').forEach(el => { el.disabled = true; });
-    try {
-      await this.run(async () => {
-        const editor = this.editor();
-        await editor.changeHighlight({ pageIndex: this.pageIndex, token: this.token, revision: this.revision, input, remove });
-        this.revision = editor.revision;
-        this.data = await editor.highlightContext(this.pageIndex);
-      });
-      this.refresh();
-    } catch (error) { this.status.textContent = error.message; }
-    finally {
-      this.busy = false;
-      this.dialog.querySelectorAll('button,input,select').forEach(el => { el.disabled = false; });
-      this.add.disabled = this.start === null; this.remove.disabled = !this.list.value;
-      this.notify();
+  sync() {
+    const editor = this.editor();
+    if (this.token !== editor?.token) { this.active = false; this.gesture = null; this.token = editor?.token; }
+    if (!editor?.canText) this.active = false;
+    const id = this.session.currentId;
+    if (id !== this.documentId) {
+      this.deleteMenu.hidePopover();
+      this.unbind(); this.gesture = null; this.documentId = id;
+      if (id && editor) {
+        this.selection = this.plugin('selection').forDocument(id);
+        this.interaction = this.plugin('interaction-manager').forDocument(id);
+        this.disposers.push(this.selection.onBeginSelection(() => {
+          if (!this.active || this.pending || this.unavailable()) return;
+          this.gesture = { token: editor.token, revision: editor.revision, documentId: id, color: this.color };
+        }));
+        this.disposers.push(this.selection.onEndSelection(() => this.finish()));
+      }
     }
+    this.updateCursor();
+  }
+  updateCursor() {
+    if (!this.interaction) return;
+    if (this.active) {
+      this.interaction.activate('pointerMode');
+      this.selection.setMarqueeEnabled(false);
+      this.interaction.setCursor('pdfmb-highlight', markerCursor(this.color), 100);
+    } else {
+      this.selection.setMarqueeEnabled(true);
+      this.interaction.removeCursor('pdfmb-highlight');
+    }
+  }
+  finish() {
+    const gesture = this.gesture; this.gesture = null;
+    if (!gesture || !this.active || this.pending || this.unavailable() || gesture.documentId !== this.session.currentId) return;
+    const selections = captureSelection(this.selection.getFormattedSelection());
+    if (!selections.length) return;
+    // Snapshot rectangles and color now, before a queued host command or new view can change them.
+    this.pending = true;
+    this.selection.clear();
+    this.run(async () => {
+      if (!this.active || gesture.documentId !== this.session.currentId) return;
+      await this.editor().changeHighlights({ ...gesture, selections });
+    }).catch(this.showError).finally(() => { this.pending = false; this.notify(); });
   }
 }

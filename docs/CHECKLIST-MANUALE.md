@@ -219,12 +219,15 @@ Sottolineato, barrato, apice/pedice, evidenziazione dei caratteri, maiuscole/min
 
 ## Evidenziatore 0.7.0
 
-- Aprire un PDF testuale, selezionare una parola e un intervallo su più righe; applicare giallo e un secondo colore. Il testo deve restare leggibile e selezionabile in consultazione.
-- Provare selezione da destra verso sinistra, frecce e Maiusc+frecce, pagine con CropBox diverso dall’origine, rotazioni permanenti 90/180/270°, colonne e testo ruotato. Verificare allineamento tra selezione e risultato.
-- Aprire una scansione: segnalazione di assenza di testo, nessuna modifica al documento.
-- Annullare/ripetere aggiunta ed eliminazione. Eliminare l’unica evidenziazione appena creata: lo stato torna pulito se non ci sono altre modifiche.
+- Premere il pulsante Evidenziatore: deve risultare attivo e il cursore sul PDF deve diventare un pennarello. Il viewer deve conservare pagina, zoom, scorrimento e rotazione; non si apre una finestra di lavoro alternativa.
+- Cambiare colore dal select accanto al pulsante (Giallo/Verde/Azzurro/Rosa/Arancione), trascinare sul testo selezionabile e rilasciare: il tratto deve applicarsi subito. Ripetere più volte senza riattivare il pulsante. La scelta del colore da sola non deve sporcare il documento.
+- Premere di nuovo Evidenziatore o Esc: ritorno alla selezione normale; selezionare/copiare testo non deve produrre annotazioni.
+- Selezionare parole, più righe, più pagine e in direzione inversa. Ogni trascinamento deve contare come una sola azione Annulla/Ripeti, anche su più pagine.
+- Provare zoom diversi, rotazione della vista e rotazioni permanenti 90/180/270°, CropBox diverso dall’origine, colonne e testo ruotato: selezione e annotazioni salvate devono coincidere.
+- Trascinare su una scansione senza testo o sullo sfondo: nessuna evidenziazione a rettangolo libero e nessuna modifica al documento.
+- Eliminare una evidenziazione della pagina corrente con Elimina evidenziazione…; verificare Annulla/Ripeti. Eliminare l’unica evidenziazione appena creata: ritorno allo stato pulito se non ci sono altre modifiche.
 - Salvare, chiudere, riaprire e verificare aspetto in PDF MB e in un lettore esterno. Eliminare dall’elenco una evidenziazione riaperta, salvare e controllare che resti eliminata. Conservare le annotazioni estranee.
 - Alternare evidenziazioni, caselle, rotazione, spostamento, inserimento ed estrazione delle pagine; verificare anche Annulla/Ripeti dopo Salva.
-- Provare PDF firmati, cifrati e senza permessi di annotazione: comando disabilitato. Un errore di caricamento/salvataggio deve mantenere il lavoro e lo stato non salvato.
-- Aprire Evidenziatore durante la modifica di una casella: la bozza deve applicarsi prima dell’apertura. Apri/Salva/Chiudi dalla finestra principale devono chiudere la finestra di selezione senza applicare selezioni pendenti.
+- Provare PDF firmati, cifrati e senza permessi di annotazione: comandi disabilitati. Un errore di caricamento/salvataggio deve mantenere lavoro, cronologia e stato non salvato.
+- Attivare Evidenziatore mentre si modifica una casella: la bozza deve applicarsi prima. Attivare Testo deve spegnere il pennarello. Apri/Salva/Chiudi devono interrompere i gesti pendenti; cambiando documento il pulsante torna inattivo.
 - Compilare e pubblicare su Windows con SDK .NET 10 e asset EmbedPDF 2.15.1; la barra deve mostrare 0.7.0. Non distribuire la cartella 0.6.5 come 0.7.0.

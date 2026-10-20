@@ -291,9 +291,7 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
       });
     } else if (type === 'rebuild' && source) result = rebuild(payload);
     else if (['text-context', 'text-change'].includes(type) && source) result = textRequest(type, payload);
-    else if (type === 'highlight-context' && source) result = withPage(payload.buffer, payload.pageIndex, page => ({
-      ...textTools.geometry(page), image: textTools.render(page), chars: highlightTools.characters(page), highlights: highlightTools.list(page)
-    }));
+    else if (type === 'highlight-list' && source) result = withPage(payload.buffer, payload.pageIndex, page => highlightTools.list(page));
     else if (type === 'highlight-change' && source) {
       const policy = withDocument(handle => protection(handle));
       if (!policy.canAnnotate) throw new Error('Annotazioni non consentite.');

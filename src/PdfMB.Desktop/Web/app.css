@@ -95,8 +95,6 @@ dialog input { width: 100%; padding: 9px; border: 1px solid #879bb5; border-radi
 #text-context-menu button:disabled { opacity: .45; cursor: default; background: transparent; }
 
 
-#highlight-dialog { width: min(1100px, 94vw); max-width: 94vw; }
-.highlight-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.highlight-page { overflow: auto; max-height: 65vh; background: #e8ebef; text-align: center; }
-#highlight-canvas { display: block; width: 100%; height: auto; background: white; cursor: text; touch-action: none; }
-#highlight-status { max-height: 4em; overflow: auto; white-space: pre-wrap; }
+
+#highlight-delete-menu { inset: 12px 12px auto auto; padding: 16px; border: 1px solid #ccd2da; border-radius: 8px; }
+#highlight-delete-menu button { margin-left: 8px; }

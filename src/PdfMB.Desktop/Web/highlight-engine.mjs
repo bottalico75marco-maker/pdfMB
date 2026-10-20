@@ -36,42 +36,23 @@ export function createHighlightTools(api, textTools) {
     }
     return result;
   }
-  function characters(page) {
-    const text = api.FPDFText_LoadPage(page); check(text);
-    const p = alloc(32);
-    try {
-      const count = api.FPDFText_CountChars(text); check(count >= 0 && count <= 100000, 'La pagina contiene troppo testo.');
-      const chars = [];
-      for (let i = 0; i < count; i++) {
-        const code = api.FPDFText_GetUnicode(text, i);
-        if (!code || code <= 32 || code > 0x10ffff) continue;
-        if (!api.FPDFText_GetCharBox(text, i, p, p + 8, p + 16, p + 24)) continue;
-        const [left, right, bottom, top] = api.pdfium.HEAPF64.slice(p / 8, p / 8 + 4);
-        const position = textTools.screenRect(page, [left, top, right, bottom]);
-        if (position.width > 0 && position.height > 0) chars.push({ index: i, text: String.fromCodePoint(code), position });
-      }
-      return chars;
-    } finally { free(p); api.FPDFText_ClosePage(text); }
-  }
-  function prepare(page, { id, start, end, color }) {
+  function prepare(page, { id, rects, color }) {
     check(/^pdfmb-h-[0-9a-f-]{36}$/.test(id) && /^#[0-9a-f]{6}$/i.test(color), 'Evidenziazione non valida.');
-    const text = api.FPDFText_LoadPage(page); check(text);
-    const p = alloc(32);
-    try {
-      const count = api.FPDFText_CountChars(text);
-      check(Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end >= start && end < count && end - start < 10000,
-        'Selezionare da 1 a 10.000 caratteri della pagina.');
-      const n = api.FPDFText_CountRects(text, start, end - start + 1);
-      check(n > 0 && n <= 1000, 'Nessun testo selezionabile. I PDF scansiti richiedono OCR.');
-      const quads = [];
-      for (let i = 0; i < n; i++) {
-        check(api.FPDFText_GetRect(text, i, p, p + 8, p + 16, p + 24));
-        const [left, top, right, bottom] = api.pdfium.HEAPF64.slice(p / 8, p / 8 + 4);
-        check([left, top, right, bottom].every(Number.isFinite) && right > left && top > bottom);
-        quads.push([left, top, right, top, left, bottom, right, bottom]);
-      }
-      return { id, color: color.toLowerCase(), quads };
-    } finally { free(p); api.FPDFText_ClosePage(text); }
+    check(Array.isArray(rects) && rects.length > 0 && rects.length <= 1000, 'Selezionare il testo del PDF.');
+    const { width, height } = textTools.geometry(page);
+    const quads = rects.map(({ origin, size }) => {
+      check(origin && size && [origin.x, origin.y, size.width, size.height].every(Number.isFinite) &&
+        origin.x >= -.5 && origin.y >= -.5 && size.width > 0 && size.height > 0 &&
+        origin.x + size.width <= width + .5 && origin.y + size.height <= height + .5,
+        'La selezione del testo non corrisponde alla pagina.');
+      // The viewer reports unscaled page rectangles, including permanent rotation.
+      // PDFium converts every corner back to native PDF coordinates (CropBox included).
+      return [textTools.point(page, origin.x, origin.y),
+        textTools.point(page, origin.x + size.width, origin.y),
+        textTools.point(page, origin.x, origin.y + size.height),
+        textTools.point(page, origin.x + size.width, origin.y + size.height)].flat();
+    });
+    return { id, color: color.toLowerCase(), quads };
   }
   function apply(page, changes) {
     check(Array.isArray(changes) && changes.length <= 1000, 'Troppe evidenziazioni nella pagina.');
@@ -104,5 +85,5 @@ export function createHighlightTools(api, textTools) {
     }
     check(api.FPDFPage_GenerateContent(page));
   }
-  return { list, characters, prepare, apply };
+  return { list, prepare, apply };
 }

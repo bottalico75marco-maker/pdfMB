@@ -26,7 +26,7 @@ function editorState() {
     canEdit: false, canText: false, canUndo: false, canRedo: false, blockedReason: '' }),
     dirty: !!editor?.state().dirty || !!textSurface?.changed(),
     busy: locked || working || !!textSurface?.busy, textEditing: !!textSurface?.textEditing,
-    textMode: !!textSurface?.active,
+    textMode: !!textSurface?.active, highlightMode: !!highlightSurface?.active,
     editorOpen: panelOpen && !!editor };
 }
 function viewerState() {
@@ -47,6 +47,7 @@ function viewerState() {
   return { page: 0, pageCount: 0, zoom: 1 };
 }
 function notify() {
+  highlightSurface?.sync();
   const state = editorState();
   document.querySelector('#workspace').inert = locked || working;
   document.querySelector('#text-toolbar').inert = locked || working;
@@ -124,23 +125,32 @@ try {
   const handlers = {
     'editor.lock': async () => {
       if (textSurface && !await textSurface.flush()) throw new Error('Correggere o annullare la modifica alla casella prima di continuare.');
-      highlightSurface?.close();
+      highlightSurface?.suspend();
       panel.cancelDialogs(); locked = true; return notify();
     },
     'editor.unlock': () => { locked = false; return notify(); },
     'editor.toggle': togglePanel,
     'editor.text': () => withWorking(async () => {
       if (!locked || !editor?.canText) throw new Error('Il documento non consente l’inserimento di testo.');
+      highlightSurface.toggle(false);
       textSurface.toggle(undefined, true);
       return notify();
     }),
     'editor.highlight': () => withWorking(async () => {
       if (!locked || !editor?.canText) throw new Error('Annotazioni non consentite.');
-      const pageIndex = Math.max(0, viewerState().page - 1);
       if (textSurface.active) textSurface.toggle(false, true);
-      await highlightSurface.open(pageIndex);
+      highlightSurface.toggle();
       return notify();
     }),
+    'editor.highlightDelete': () => withWorking(async () => {
+      if (!locked || !editor?.canText) throw new Error('Annotazioni non consentite.');
+      await highlightSurface.showDelete(Math.max(0, viewerState().page - 1));
+      return notify();
+    }),
+    'editor.highlightColor': payload => {
+      highlightSurface.setColor(payload.color);
+      return notify();
+    },
     'editor.change': payload => withWorking(async () => { if (editor) await editor.change(payload); return editorState(); }),
     'editor.undo': () => withWorking(async () => { if (editor) await editor.undo(); return editorState(); }),
     'editor.redo': () => withWorking(async () => { if (editor) await editor.redo(); return editorState(); }),
@@ -244,7 +254,9 @@ try {
     },
     onView: () => bridge.emit('viewer.state', viewerState())
   });
-  highlightSurface = new HighlightSurface({ editor: () => editor, run: action => enqueue(() => withWorking(action)), notify });
+  highlightSurface = new HighlightSurface({ editor: () => editor, plugin, session,
+    run: action => enqueue(() => withWorking(action)), notify,
+    unavailable: () => locked || working || !!textSurface?.active, showError });
   plugin('scroll').onLayoutReady(event => layouts.add(event.documentId));
   plugin('document-manager').onDocumentClosed(id => layouts.delete(id));
   plugin('scroll').onStateChange(state => { strategy = state.strategy; });
@@ -259,6 +271,9 @@ try {
     if (event.key === 'Enter') { event.preventDefault(); document.querySelector('#move-confirm').click(); }
   };
   document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && highlightSurface.active && !locked && !working) {
+      highlightSurface.toggle(false); notify(); return;
+    }
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
     const key = event.key.toLowerCase();
     if (!['o', 's', 'z', 'y'].includes(key)) return;

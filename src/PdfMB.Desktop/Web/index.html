@@ -74,18 +74,11 @@
     <p id="delete-description"></p>
     <div class="dialog-actions"><button id="delete-cancel" data-cancel-dialog class="secondary">Annulla</button><button id="delete-confirm" class="danger">Elimina</button></div>
   </dialog>
-  <dialog id="highlight-dialog" aria-labelledby="highlight-title">
-    <h2 id="highlight-title">Evidenziatore · pagina corrente</h2>
-    <div class="highlight-controls">
-      <label>Colore <input id="highlight-color" type="color" value="#ffff00"></label>
-      <button id="highlight-add">Evidenzia selezione</button>
-      <label>Evidenziazioni PDF MB <select id="highlight-list"></select></label>
-      <button id="highlight-remove" disabled>Elimina selezionata</button>
-      <button data-highlight-close class="secondary">Chiudi</button>
-    </div>
-    <p id="highlight-status" role="status"></p>
-    <div class="highlight-page"><canvas id="highlight-canvas" tabindex="0" aria-label="Seleziona testo da evidenziare con trascinamento o frecce; Maiusc estende la selezione"></canvas></div>
-  </dialog>
+  <div id="highlight-delete-menu" popover="auto" aria-label="Elimina evidenziazione dalla pagina corrente">
+    <label>Evidenziazioni PDF MB <select id="highlight-delete-list"></select></label>
+    <button data-highlight-remove>Elimina selezionata</button>
+    <button data-highlight-dismiss>Chiudi</button>
+  </div>
   <script type="module" src="app.mjs"></script>
 </body>
 </html>
