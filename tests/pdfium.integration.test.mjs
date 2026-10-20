@@ -153,3 +153,35 @@ test('production Worker composes notes, text edits, permanent rotation, redactio
   const extracted = await request('extract', { buffer: bytes, pageIndexes: [0] });
   reopen(extracted, (_, page) => assert.equal(api.FPDFPage_CountObjects(page), 1));
 });
+
+test('form field appearances are present in captures and preserved outside a redacted area', () => {
+  const appearance = 'q 0 0 1 rg 0 0 140 40 re f Q';
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [4 0 R] /DR << /Font << /F1 6 0 R >> >> /DA (/F1 14 Tf 0 g) >> >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 240 200] /Resources << /Font << /F1 6 0 R >> >> /Annots [4 0 R] >>',
+    '<< /Type /Annot /Subtype /Widget /FT /Tx /T (field) /V (FORM) /Rect [20 100 160 140] /F 4 /P 3 0 R /AP << /N 5 0 R >> /DA (/F1 14 Tf 0 g) >>',
+    `<< /Type /XObject /Subtype /Form /BBox [0 0 140 40] /Resources << >> /Length ${appearance.length} >>\nstream\n${appearance}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+  ];
+  let pdf = '%PDF-1.7\n', offsets = [0];
+  objects.forEach((value, i) => { offsets.push(Buffer.byteLength(pdf)); pdf += `${i + 1} 0 obj\n${value}\nendobj\n`; });
+  const xref = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${offsets.length}\n0000000000 65535 f \n` + offsets.slice(1).map(offset => String(offset).padStart(10, '0') + ' 00000 n \n').join('');
+  pdf += `trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  const buffer = Uint8Array.from(Buffer.from(pdf)).buffer;
+  reopen(buffer, (doc, page) => {
+    assert.equal(api.FPDF_GetFormType(doc), 1);
+    const image = textTools.render(page, 1400, 2, doc), pixels = new Uint8Array(image.pixels);
+    const offset = (Math.round(70 * image.height / 200) * image.width + Math.round(40 * image.width / 240)) * 4;
+    assert.deepEqual([...pixels.slice(offset, offset + 4)], [0, 0, 255, 255]);
+    const clean = tools.rasterizeRedacted(doc, page, { x: 0, y: 0, width: 10, height: 10 });
+    try {
+      reopen(save(clean), (_, savedPage) => {
+        const saved = textTools.render(savedPage), bytes = new Uint8Array(saved.pixels);
+        assert.deepEqual([...bytes.slice(offset, offset + 4)], [0, 0, 255, 255]);
+        assert.equal(api.FPDFPage_GetAnnotCount(savedPage), 0);
+      });
+    } finally { api.FPDF_CloseDocument(clean); }
+  });
+});

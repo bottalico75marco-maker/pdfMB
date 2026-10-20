@@ -205,14 +205,14 @@ export function createTextTools(api) {
       bitmap = api.FPDFBitmap_CreateEx(w, h, 4, ptr, w * 4);
       checked(bitmap);
       api.FPDFBitmap_FillRect(bitmap, 0, 0, w, h, 0xffffffff);
-      api.FPDF_RenderPageBitmap(bitmap, page, 0, 0, w, h, 0, 17);
+      api.FPDF_RenderPageBitmap(bitmap, page, 0, 0, w, h, 0, 1); // BGRA; converted once below
       if (document && api.FPDF_GetFormType(document)) {
         const info = api.PDFiumExt_OpenFormFillInfo(); checked(info);
         let form = 0;
         try {
           form = api.PDFiumExt_InitFormFillEnvironment(document, info); checked(form, 'Impossibile renderizzare i moduli della pagina.');
           api.FORM_OnAfterLoadPage(page, form);
-          try { api.FPDF_FFLDraw(form, bitmap, page, 0, 0, w, h, 0, 17); }
+          try { api.FPDF_FFLDraw(form, bitmap, page, 0, 0, w, h, 0, 1); }
           finally { api.FORM_OnBeforeClosePage(page, form); }
         } finally { if (form) api.PDFiumExt_ExitFormFillEnvironment(form); api.PDFiumExt_CloseFormFillInfo(info); }
       }
