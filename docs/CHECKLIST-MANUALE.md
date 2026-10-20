@@ -1,3 +1,71 @@
+# Prova unica PDF MB 0.8.0
+
+Questo è il riferimento per provare insieme evidenziatore e nuovi punti 2–5. Le prove delle caselle della 0.6.5 sono già state completate dall’utente; sotto si controllano soltanto le interazioni con i nuovi strumenti. Usare copie dei propri PDF, conservando gli originali per il confronto.
+
+## Preparazione
+
+- [ ] Scaricare l’artefatto **PDF-MB-0.8.0-win-x64** dalla workflow **Verifica e build Windows** del commit della PR. Estrarre tutta la cartella e avviare PdfMB.Desktop.exe. Devono essere installati .NET Desktop Runtime 10 e WebView2 Runtime.
+- [ ] Verificare la versione 0.8.0 nella barra. Non usare l’EXE storico della 0.6.5.
+- [ ] Preparare: PDF testuale di almeno 3 pagine; PDF con immagini e tracciati; scansione senza testo; pagina con CropBox/rotazioni; PDF con note/moduli/link/segnalibri; PDF firmato/cifrato/con permessi ridotti. Per l’oscuramento usare una parola di prova univoca e una zona di immagine riconoscibile.
+- [ ] Registrare per ogni problema file, pagina, comando, risultato atteso/osservato e screenshot. Non inviare referti o altri dati personali se non necessari: si possono riprodurre i casi su dati di prova.
+
+## 1. Evidenziatore nel PDF
+
+- [ ] Pulsante attivo → cursore a pennarello sul PDF; select del colore adiacente con Giallo/Verde/Azzurro/Rosa/Arancione. Nessuna finestra alternativa.
+- [ ] Trascinare sul testo selezionabile; al rilascio compare il colore scelto. Ripetere più tratti e cambiare colore. Lo strumento resta attivo.
+- [ ] Provare selezione inversa, più righe e più pagine, zoom e rotazioni. Ogni gesto deve essere un solo Annulla/Ripeti e corrispondere alla selezione.
+- [ ] Secondo clic/Esc → selezione e copia normali, senza evidenziare. Sfondo e scansione senza OCR non devono produrre rettangoli liberi.
+- [ ] Eliminare un’evidenziazione, annullare/ripetere, salvare e riaprire; verificare anche con lettore esterno.
+
+## 2. Note e disegni
+
+- [ ] Strumenti → Nota adesiva: scrivere testo con accenti, cliccare sulla pagina, applicare. Deve comparire una nota nel PDF e nell’elenco.
+- [ ] Selezionare la nota dall’elenco, cambiare contenuto, applicare; salvare/riaprire e rileggere il contenuto. Eliminare e usare Annulla/Ripeti.
+- [ ] Disegnare rettangolo, ellisse, linea (anche orizzontale, verticale e con pendenza inversa) e penna; provare colore/spessore. Dopo Applica e riapertura devono restare nello stesso punto e poter essere eliminati dall’elenco.
+- [ ] Spostarsi tra pagine con i pulsanti degli strumenti; le modifiche applicate restano. Con una bozza, Chiudi/cambio strumento chiede se scartarla; annullando la domanda, la bozza deve restare.
+- [ ] Aprire un PDF con annotazioni di altri programmi: devono restare inalterate, senza possibilità di cancellarle dall’elenco delle annotazioni PDF MB.
+
+## 3. Stampa e cattura
+
+- [ ] Con modifiche applicate ma non salvate, Stampa… o Ctrl+P deve mostrare il risultato corrente su tutte le pagine. Confrontare anteprima e PDF.
+- [ ] Scegliere stampante/stampa PDF, intervallo, copie, orientamento e scala. Provare fogli verticali/orizzontali, dimensioni diverse e una pagina con campi modulo compilati. Controllare che nulla sia tagliato o perso.
+- [ ] Annullare il dialogo di stampa: documento, cronologia, percorso e dirty invariati. Provare il messaggio oltre 500 pagine/36 MB e ristampare intervalli estratti.
+- [ ] Strumenti → Cattura PNG: senza area salva la pagina intera; con trascinamento salva solo l’area. Verificare PNG, colore, orientamento e annotazioni.
+- [ ] Annullare Salva cattura; cambiare destinazione; tentare una destinazione PDF: il PDF aperto non deve essere sovrascritto. La cattura non cambia Recenti né dirty.
+
+## 4. Testo e oggetti originali
+
+- [ ] Strumenti → Modifica testo e oggetti: scegliere sulla pagina e dall’elenco un oggetto Testo. Sostituire il contenuto con Helvetica/Times/Courier, dimensione 6–144, e applicare.
+- [ ] Cercare/copiare il nuovo testo dopo salvataggio/riapertura; il vecchio oggetto deve essere stato rimosso, senza una semplice copertura. Controllare posizione, larghezza, colore e sovrapposizioni: non c’è ricomposizione dei paragrafi.
+- [ ] Provare lettere accentate e €. Un carattere non supportato o testo su più righe deve produrre un errore esplicito senza cambiare il PDF.
+- [ ] Su testo, immagine, tracciato e gruppo: provare spostamento X/Y, scala, rotazione ed eliminazione. Le trasformazioni si applicano all’oggetto selezionato; i gruppi sono unità intere.
+- [ ] Controllare Annulla/Ripeti dopo ogni operazione e dopo Salva. Verificare documenti complessi, contenuti ritagliati, link, segnalibri e moduli sulle pagine ricostruite.
+
+## 5. Oscuramento effettivo
+
+- [ ] Selezionare l’area della parola di prova e una porzione di immagine. Leggere la conferma: l’intera pagina diventa immagine, perde testo selezionabile e oggetti/moduli/annotazioni modificabili; metadati, allegati e segnalibri del documento vengono esclusi.
+- [ ] Annullare la conferma: nessuna modifica. Ripetere e applicare: l’area è nera, il resto resta leggibile e orientato correttamente. Provare zoom, CropBox e rotazioni 90/180/270°.
+- [ ] Salvare con un nome nuovo, chiudere e riaprire in PDF MB e in un lettore esterno. Cercare/copiare la parola dalla pagina oscurata: non deve esserci un livello testuale. Tentare selezione/modifica/rimozione del riquadro: non deve rivelare il contenuto originale.
+- [ ] Ispezionare il PDF risultante: la pagina oscurata ha solo l’immagine ricostruita; assenza di allegati/metadati/segnalibri originali. I dati ripetuti su altre pagine non selezionate possono restare: verificare tutte le aree che si desidera oscurare.
+- [ ] Nella sessione ancora aperta provare Annulla/Ripeti e Salva dopo Annulla: il contenuto ripristinato deve essere considerato nuovamente presente. Condividere soltanto la versione salvata dopo l’oscuramento.
+- [ ] Aggiungere una nuova nota/casella/evidenziazione dopo l’oscuramento, salvare e riaprire: il contenuto originale non deve ricomparire. Ruotare/spostare/estrarre la pagina e ripetere il controllo.
+
+## 6. Prova incrociata e protezioni
+
+- [ ] Sullo stesso documento: evidenzia → nota → forma → modifica testo → sposta/ruota pagina → casella → cattura → stampa → oscuramento → salva/riapri. Annulla/Ripeti deve attraversare tutte le modifiche, con un’azione per comando e dirty coerente.
+- [ ] Su PDF firmato/cifrato: nessuna modifica e copia originale conservata. Stampa/cattura devono rispettare i rispettivi permessi. Senza permesso annotazioni: note/forme/evidenziatore disabilitati; senza permesso modifica: oggetti/oscuramento disabilitati.
+- [ ] Provare pagine importate con permessi diversi: nessuna operazione deve aggirare i permessi della sorgente. Provare anche inserimento, eliminazione ed estrazione dopo una modifica di contenuto.
+- [ ] File destinazione modificato da un altro programma, errore di scrittura, risultato oltre 64 MB o sorgenti/cronologia oltre 128 MB: lavoro precedente recuperabile, dirty non cancellato e nessuna scrittura parziale.
+- [ ] Scala Windows 100/125/150/200%, finestra ridotta e monitor diversi: comandi raggiungibili, selezioni allineate e dialoghi utilizzabili.
+
+## Verifiche automatiche disponibili
+
+Eseguire dalla radice: `npm ci`, `npm run assets`, `npm test`, `dotnet build PdfMB.sln -c Release`. Per il browser: `npx playwright install chromium`, `npm run test:browser`. La workflow GitHub esegue le stesse verifiche e pubblica la cartella Windows come artefatto.
+
+Le suite coprono cronologia/sorgenti immutabili/errori/permessi, coordinate e sostituzione dei pixel, PDFium reale con note e forme, testo/oggetti, oscuramento e riapertura, Worker completo e un flusso Chromium con trasporto WebView2 simulato. La prova della finestra Windows, del dialogo stampante e dei documenti reali resta da segnare sopra. Le sezioni storiche sotto restano come riferimento per casi più dettagliati.
+
+---
+
 # Prove manuali — gestione pagine base
 
 Le prove sul programma sono affidate all'utente. È stata effettuata la compilazione Release e la verifica sintattica dei moduli JavaScript; questi controlli non verificano il comportamento dell'applicazione.

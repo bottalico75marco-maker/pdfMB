@@ -23,6 +23,10 @@ internal sealed class MainForm : Form
     };
     private static readonly string[] HighlightColors = ["#ffff00", "#92e897", "#86d6ff", "#ffabc8", "#ffc078"];
     private readonly ToolStripButton _text = new("Testo") { ToolTipText = "Modifica le caselle di testo direttamente sulla pagina" };
+    private readonly ToolStripDropDownButton _tools = new("Strumenti");
+    private readonly ToolStripButton _print = new("Stampa…");
+    private bool _canContent, _canPrint, _canCapture;
+    private long _revision;
     private readonly ToolStripButton _undo = new("Annulla") { ToolTipText = "Annulla (Ctrl+Z)" };
     private readonly ToolStripButton _redo = new("Ripeti") { ToolTipText = "Ripeti (Ctrl+Y)" };
     private readonly ToolStripButton _close = new("Chiudi documento");
@@ -77,7 +81,7 @@ internal sealed class MainForm : Form
         };
         toolbar.Items.AddRange([new ToolStripLabel(AppTitle) { Font = new Font("Segoe UI", 12, FontStyle.Bold) },
             new ToolStripSeparator(), _open, _recent, _save, _saveAs, new ToolStripSeparator(),
-            _manage, _text, _highlight, _highlightColor, _highlightDelete, _undo, _redo, new ToolStripSeparator(), _close, _mode]);
+            _manage, _text, _highlight, _highlightColor, _highlightDelete, _tools, _print, _undo, _redo, new ToolStripSeparator(), _close, _mode]);
         var statusBar = new StatusStrip { BackColor = Color.White, SizingGrip = false };
         statusBar.Items.AddRange([_status, _pages]);
         _fileHeader.Controls.AddRange([_fileName, _unsavedFile]);
@@ -101,6 +105,16 @@ internal sealed class MainForm : Form
         _highlightDelete.Click += async (_, _) => await EditorCommandAsync("editor.highlightDelete");
         _highlight.Click += async (_, _) => await EditorCommandAsync("editor.highlight");
         _text.Click += async (_, _) => await EditorCommandAsync("editor.text");
+        foreach (var tool in new (string Name, string Mode)[] { ("Nota adesiva", "note"), ("Rettangolo", "square"), ("Ellisse", "circle"), ("Linea", "line"), ("Penna", "ink"), ("Modifica testo e oggetti", "objects"), ("Cattura PNG", "capture"), ("Oscuramento effettivo", "redact") })
+        {
+            var item = new ToolStripMenuItem(tool.Name) { Tag = tool.Mode };
+            item.Click += async (_, _) => await RunHostAsync(async () =>
+            {
+                if (_document is not null) ReadEditorState(await _bridge!.RequestAsync("editor.tools", new { mode = (string)item.Tag! }));
+            });
+            _tools.DropDownItems.Add(item);
+        }
+        _print.Click += async (_, _) => await RunHostAsync(PrintCoreAsync);
         _undo.Click += async (_, _) => await EditorCommandAsync("editor.undo");
         _redo.Click += async (_, _) => await EditorCommandAsync("editor.redo");
         _close.Click += async (_, _) => await RunHostAsync(CloseDocumentCoreAsync);
@@ -167,6 +181,8 @@ internal sealed class MainForm : Form
                 case "host.save": await RunHostAsync(async () => { await SaveCoreAsync(false); }); break;
                 case "host.saveAs": await RunHostAsync(async () => { await SaveCoreAsync(true); }); break;
                 case "host.insert": await RunHostAsync(InsertPagesCoreAsync); break;
+                case "host.print": await RunHostAsync(PrintCoreAsync); break;
+                case "host.capture": await RunHostAsync(() => CaptureCoreAsync(payload)); break;
                 case "host.extract": await RunHostAsync(ExtractPagesCoreAsync); break;
                 case "viewer.state":
                     int count = payload.GetProperty("pageCount").GetInt32();
@@ -188,6 +204,10 @@ internal sealed class MainForm : Form
         _readOnly = state.GetProperty("readOnly").GetBoolean();
         _canEdit = state.GetProperty("canEdit").GetBoolean();
         _canText = state.GetProperty("canText").GetBoolean();
+        _canContent = state.TryGetProperty("canContent", out var content) && content.GetBoolean();
+        _canPrint = state.TryGetProperty("canPrint", out var print) && print.GetBoolean();
+        _canCapture = state.TryGetProperty("canCapture", out var capture) && capture.GetBoolean();
+        _revision = state.GetProperty("revision").GetInt64();
         _textEditing = state.GetProperty("textEditing").GetBoolean();
         _text.Checked = state.GetProperty("textMode").GetBoolean();
         _highlight.Checked = state.GetProperty("highlightMode").GetBoolean();
@@ -213,6 +233,10 @@ internal sealed class MainForm : Form
         _saveAs.Text = _readOnly ? "Salva copia…" : "Salva con nome…";
         _undo.Enabled = hasDocument && _canUndo;
         _text.Enabled = hasDocument && _canText;
+        _print.Enabled = hasDocument && _canPrint;
+        _tools.Enabled = hasDocument && (_canText || _canContent || _canCapture);
+        foreach (ToolStripMenuItem item in _tools.DropDownItems)
+            item.Enabled = (string)item.Tag! switch { "objects" or "redact" => _canContent, "capture" => _canCapture, _ => _canText };
         _highlight.Enabled = _highlightColor.Enabled = _highlightDelete.Enabled = hasDocument && _canText;
         _text.ToolTipText = _canText ? "Modifica le caselle di testo direttamente sulla pagina" : "Testo non disponibile: controllare i permessi del documento";
         _redo.Enabled = hasDocument && _canRedo;
@@ -281,8 +305,36 @@ internal sealed class MainForm : Form
         if (_document is not null) ReadEditorState(await _bridge!.RequestAsync(command));
     });
 
+    private async Task PrintCoreAsync()
+    {
+        if (_document is null || !_canPrint) return;
+        var result = await _bridge!.RequestAsync("output.print");
+        if (result.GetProperty("token").GetString() != _token) throw new InvalidOperationException("Il documento è cambiato.");
+        using var preview = new PrintPreviewForm(result.GetProperty("pages"), Path.Combine(_dataDirectory, "WebView2"));
+        preview.ShowDialog(this);
+    }
+
+    private async Task CaptureCoreAsync(JsonElement payload)
+    {
+        if (_document is null || !_canCapture || payload.GetProperty("token").GetString() != _token || payload.GetProperty("revision").GetInt64() != _revision)
+            throw new InvalidOperationException("La cattura non corrisponde al documento corrente.");
+        byte[] bytes = PngFile.Decode(payload.GetProperty("base64").GetString()!);
+        using var dialog = new SaveFileDialog { Filter = "Immagine PNG|*.png", DefaultExt = "png", AddExtension = true,
+            FileName = Path.GetFileNameWithoutExtension(_document.Name) + $" - pagina {payload.GetProperty("page").GetInt32()}.png" };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        string destination = Path.GetFullPath(dialog.FileName);
+        if (!destination.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(destination, _document.Path, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(destination, _openedPath, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Scegliere un percorso PNG diverso dal PDF aperto.");
+        var expected = await PdfFile.GetStampAsync(destination);
+        await PngFile.WriteAtomicAsync(destination, bytes, expected);
+        _status.Text = "Cattura PNG salvata";
+    }
+
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        if (keyData == (Keys.Control | Keys.P)) { _ = RunHostAsync(PrintCoreAsync); return true; }
         // The text field keeps its own clipboard and local undo/redo shortcuts.
         if (_textEditing) return base.ProcessCmdKey(ref msg, keyData);
         switch (keyData)
@@ -475,6 +527,7 @@ internal sealed class MainForm : Form
         _document = null;
         _openedPath = _token = null;
         _dirty = _readOnly = _canEdit = _canText = _textEditing = _canUndo = _canRedo = false;
+        _canContent = _canPrint = _canCapture = false;
         _manage.Checked = false;
         _text.Checked = _highlight.Checked = false;
         _mode.Text = "Consultazione";

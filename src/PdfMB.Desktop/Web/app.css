@@ -98,3 +98,15 @@ dialog input { width: 100%; padding: 9px; border: 1px solid #879bb5; border-radi
 
 #highlight-delete-menu { inset: 12px 12px auto auto; padding: 16px; border: 1px solid #ccd2da; border-radius: 8px; }
 #highlight-delete-menu button { margin-left: 8px; }
+
+#tools-dialog { width: min(1250px, 95vw); max-width: 95vw; max-height: 96vh; }
+.tools-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
+.tools-row label { display: flex; gap: 6px; align-items: center; }
+.tools-row input[type=number] { width: 72px; }
+.tools-text { flex: 1; min-width: 250px; }
+.tools-text textarea { flex: 1; }
+.tools-page { max-height: 55vh; overflow: auto; background: #e5e8ed; }
+#tools-canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+#tools-warning { padding: 8px; background: #fff0cb; }
+#tools-items { max-width: 320px; }
+.tools-row[hidden] { display: none; }

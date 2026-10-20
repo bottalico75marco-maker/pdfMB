@@ -48,7 +48,7 @@ class EditingWorker {
   }
 }
 
-const key = pages => JSON.stringify(pages.map(page => [page.id, page.rotation, page.textChanges ?? [], page.highlightChanges ?? []]));
+const key = pages => JSON.stringify(pages.map(page => [page.id, page.rotation, page.textChanges ?? [], page.highlightChanges ?? [], page.override ?? null]));
 // Text records are immutable; snapshots share them and only copy page/array containers.
 const copyPages = pages => pages.map(page => ({ ...page, ...(page.textChanges ? { textChanges: [...page.textChanges] } : {}), ...(page.highlightChanges ? { highlightChanges: [...page.highlightChanges] } : {}) }));
 
@@ -89,7 +89,8 @@ export class PageEditor {
   }
   state() {
     return { token: this.token, revision: this.revision, dirty: this.dirty, readOnly: this.policy.readOnly,
-      canEdit: this.canEdit, canText: this.canText, blockedReason: this.blockedReason,
+      canEdit: this.canEdit, canText: this.canText, canContent: this.canEdit && !!this.policy.canContent,
+      canPrint: !!this.policy.canPrint, canCapture: !!this.policy.canCapture, blockedReason: this.blockedReason,
       canUndo: this.canEdit && this.past.length > 0, canRedo: this.canEdit && this.future.length > 0 };
   }
   snapshot() {
@@ -189,11 +190,14 @@ export class PageEditor {
     } finally { await this.releaseUnusedSources(); }
   }
   async releaseUnusedSources() {
-    if (!this.hasImportedSources || !this.worker?.alive) return;
+    if ((!this.hasImportedSources && !this.hasWorkSources) || !this.worker?.alive) return;
     const ids = new Set(this.pages.map(page => page.id));
     for (const snapshot of [...this.past, ...this.future]) for (const page of snapshot.pages) ids.add(page.id);
     // A cleanup failure must not turn a committed edit into a reported failure.
-    await this.worker.request('retain-pages', [...ids]).catch(() => {});
+    const overrideIds = new Set();
+    for (const snapshot of [{ pages: this.pages }, ...this.past, ...this.future])
+      for (const page of snapshot.pages) if (page.override) overrideIds.add(page.override);
+    await this.worker.request('retain-pages', { ids: [...ids], overrides: [...overrideIds] }).catch(() => {});
   }
   async undo() {
     if (!this.past.length) return;
@@ -231,7 +235,7 @@ export class PageEditor {
       throw new Error('Il documento è cambiato. Riaprire l’editor del testo.');
     const before = this.snapshot(), target = this.snapshot(), page = target.pages[pageIndex];
     const buffer = this.bytes.slice(0);
-    const { baseline, value } = await this.worker.request('text-change', { buffer, pageIndex, pageId: page.id, input, remove }, [buffer]);
+    const { baseline, value } = await this.worker.request('text-change', { buffer, pageIndex, pageId: page.id, pageOverride: page.override, input, remove }, [buffer]);
     page.textChanges = (page.textChanges ?? []).filter(change => change.id !== input.id);
     if (JSON.stringify(baseline) !== JSON.stringify(value)) page.textChanges.push({ id: input.id, value });
     page.textChanges.sort((a, b) => a.id.localeCompare(b.id));
@@ -261,7 +265,7 @@ export class PageEditor {
       seen.add(pageIndex);
       const input = { id: 'pdfmb-h-' + crypto.randomUUID(), rects, color };
       const buffer = this.bytes.slice(0);
-      const { value } = await this.worker.request('highlight-change', { buffer, pageIndex, pageId: page.id, input }, [buffer]);
+      const { value } = await this.worker.request('highlight-change', { buffer, pageIndex, pageId: page.id, pageOverride: page.override, input }, [buffer]);
       page.highlightChanges = [...(page.highlightChanges ?? []), { id: input.id, value }];
       page.highlightChanges.sort((a, b) => a.id.localeCompare(b.id));
     }
@@ -277,7 +281,7 @@ export class PageEditor {
       throw new Error('Documento cambiato o annotazioni non consentite.');
     const before = this.snapshot(), target = this.snapshot(), page = target.pages[pageIndex];
     const buffer = this.bytes.slice(0);
-    const { value, exists } = await this.worker.request('highlight-change', { buffer, pageIndex, pageId: page.id, input, remove }, [buffer]);
+    const { value, exists } = await this.worker.request('highlight-change', { buffer, pageIndex, pageId: page.id, pageOverride: page.override, input, remove }, [buffer]);
     page.highlightChanges = (page.highlightChanges ?? []).filter(change => change.id !== input.id);
     if (value || exists) page.highlightChanges.push({ id: input.id, value });
     page.highlightChanges.sort((a, b) => a.id.localeCompare(b.id));
@@ -289,6 +293,35 @@ export class PageEditor {
     if (this.past.length > 100) this.past.shift();
     this.future = [];
     await this.releaseUnusedSources();
+  }
+  async workbenchContext(pageIndex) {
+    if (!this.pages[pageIndex]) throw new Error('Pagina non disponibile.');
+    const buffer = this.bytes.slice(0);
+    return this.worker.request('workbench-context', { buffer, pageIndex, pageId: this.pages[pageIndex].id }, [buffer]);
+  }
+  async outputPage(pageIndex, kind) {
+    if (!this.pages[pageIndex] || (kind === 'print' ? !this.policy.canPrint : !this.policy.canCapture))
+      throw new Error('Esportazione non consentita.');
+    const buffer = this.bytes.slice(0);
+    return this.worker.request('output-page', { buffer, pageIndex, pageId: this.pages[pageIndex].id, kind }, [buffer]);
+  }
+  async changeWorkbench({ pageIndex, token, revision, input }) {
+    if (token !== this.token || revision !== this.revision || !this.pages[pageIndex]) throw new Error('Il documento è cambiato. Riaprire gli strumenti.');
+    const content = input.operation.startsWith('object-') || input.operation === 'redact';
+    if (content ? !this.canEdit || !this.policy.canContent : !this.canText) throw new Error('Operazione non consentita.');
+    const before = this.snapshot(), target = this.snapshot(), page = target.pages[pageIndex];
+    const buffer = this.bytes.slice(0);
+    this.hasWorkSources = true;
+    try {
+      const { override } = await this.worker.request('workbench-change', { buffer, pageIndex, pageId: page.id, pageOverride: page.override, input }, [buffer]);
+      page.override = override; page.rotation = 0;
+      delete page.textChanges; delete page.highlightChanges;
+      target.focus = page.id;
+      await this.apply(target);
+      this.past.push(before);
+      if (this.past.length > 100) this.past.shift();
+      this.future = [];
+    } finally { await this.releaseUnusedSources(); }
   }
   async export() {
     // Old files contain the text but may have a transparent or invalid AP.

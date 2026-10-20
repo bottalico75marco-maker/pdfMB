@@ -79,6 +79,23 @@
     <button data-highlight-remove>Elimina selezionata</button>
     <button data-highlight-dismiss>Chiudi</button>
   </div>
+  <dialog id="tools-dialog" aria-labelledby="tools-title">
+    <header class="tools-row"><h2 id="tools-title">Strumenti pagina</h2><button id="tools-previous">Pagina precedente</button><button id="tools-next">Pagina successiva</button><button data-tools-close class="secondary">Chiudi</button></header>
+    <div class="tools-row">
+      <label>Strumento<select id="tools-mode"><option value="note">Nota adesiva</option><option value="square">Rettangolo</option><option value="circle">Ellisse</option><option value="line">Linea</option><option value="ink">Penna</option><option value="objects">Testo e oggetti esistenti</option><option value="capture">Cattura PNG</option><option value="redact">Oscuramento effettivo</option></select></label>
+      <label>Elementi<select id="tools-items"><option value="">Nuova selezione</option></select></label>
+      <div id="tools-annotation-controls" class="tools-row"><label>Colore<input id="tools-color" type="color" value="#ffcc00"></label><label>Spessore pt<input id="tools-stroke" type="number" min="0.5" max="20" step="0.5" value="2"></label></div>
+    </div>
+    <div id="tools-object-controls" class="tools-row" hidden>
+      <label>Azione<select id="tools-action"><option value="object-text">Sostituisci il testo dell’oggetto</option><option value="object-transform">Sposta / scala / ruota l’oggetto</option></select></label>
+      <label>Font<select id="tools-font"><option>Helvetica</option><option value="Times-Roman">Times</option><option>Courier</option></select></label><label>pt<input id="tools-size" type="number" min="6" max="144" value="12"></label>
+      <label>Sposta X pt<input id="tools-dx" type="number" min="-2000" max="2000" value="0"></label><label>Sposta Y pt<input id="tools-dy" type="number" min="-2000" max="2000" value="0"></label><label>Scala<input id="tools-scale" type="number" min="0.1" max="10" step="0.1" value="1"></label><label>Ruota °<input id="tools-angle" type="number" min="-360" max="360" value="0"></label>
+    </div>
+    <div class="tools-row"><label class="tools-text">Contenuto nota / nuovo testo dell’oggetto<textarea id="tools-contents" rows="2" maxlength="10000"></textarea></label><button id="tools-apply">Applica</button><button id="tools-delete" class="danger">Elimina selezionato</button></div>
+    <p id="tools-warning" hidden>Oscuramento: la pagina diventa un’immagine, senza testo selezionabile né elementi modificabili. Il file salvato conserva solo il risultato bonificato delle pagine oscurate; allegati, metadati e segnalibri del documento vengono esclusi. Salva prima di condividere.</p>
+    <p id="tools-status" role="status"></p>
+    <div class="tools-page"><canvas id="tools-canvas" tabindex="0" aria-label="Pagina di lavoro: clicca per nota o oggetto, trascina per forma, penna, cattura o oscuramento"></canvas></div>
+  </dialog>
   <script type="module" src="app.mjs"></script>
 </body>
 </html>

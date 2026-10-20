@@ -2,11 +2,11 @@
 
 Applicazione desktop WinForms **.NET 10 + WebView2 + EmbedPDF 2.15.1**, con consultazione PDF, gestione pagine, testo libero e ponte C#↔JavaScript.
 
-La versione dei sorgenti è **PDF MB 0.7.0**, con evidenziatore del testo. L’ultima pubblicazione già inclusa nel repository resta la 0.6.5; la 0.7.0 deve essere compilata e pubblicata su Windows.
+La versione dei sorgenti è **PDF MB 0.8.0**: include evidenziatore nel viewer, note e disegni, stampa e cattura PNG, modifica di testo/oggetti esistenti e oscuramento effettivo. L’ultima cartella binaria storica inclusa nel repository resta la 0.6.5. La workflow **Verifica e build Windows** genera l’artefatto scaricabile `PDF-MB-0.8.0-win-x64`. Estrarre l’intera cartella, non il solo EXE. Sono richiesti .NET Desktop Runtime 10 e WebView2 Runtime.
 
 ## Avvio
 
-Requisiti: Windows, SDK .NET 10, Node.js 22.16 o successivo e Microsoft Edge WebView2 Runtime. Per lavorare dalla soluzione usare una versione di Visual Studio compatibile con .NET 10, con il carico di lavoro per sviluppo desktop .NET.
+Requisiti: Windows, SDK .NET 10, Node.js 22.16 o successivo (Node 24 per le verifiche automatiche) e Microsoft Edge WebView2 Runtime. Per lavorare dalla soluzione usare una versione di Visual Studio compatibile con .NET 10, con il carico di lavoro per sviluppo desktop .NET.
 
 Dalla radice del progetto:
 
@@ -57,7 +57,7 @@ Distribuire **l'intera cartella** di pubblicazione, comprese `Web` e le librerie
 
 **Sposta…** chiede la posizione finale della prima pagina del blocco selezionato. Le pagine mantengono l'ordine che avevano nel documento. Se ci sono `N` pagine e ne sono selezionate `K`, la posizione ammessa è da 1 a `N − K + 1`. Esempio: pagine 2 e 4 spostate alla posizione 1 producono l'ordine **2, 4, 1, 3, 5…**. Il trascinamento non è previsto.
 
-Le modifiche permanenti alle pagine sono distinte dalla rotazione della vista nel viewer. Zoom, ricerca e rotazione della vista non cambiano il PDF. Se ordine, rotazioni permanenti e testo coincidono con lo stato iniziale e non occorre riparare caselle delle versioni precedenti, il salvataggio conserva i byte iniziali. Per i documenti in sola lettura **Salva copia…** conserva sempre i byte originali e richiede un percorso diverso dall'originale e dal file corrente. Gli altri strumenti di annotazione, la modifica del contenuto esistente e la compilazione moduli restano disabilitati.
+Le modifiche permanenti alle pagine sono distinte dalla rotazione della vista nel viewer. Zoom, ricerca e rotazione della vista non cambiano il PDF. Se ordine, rotazioni permanenti e testo coincidono con lo stato iniziale e non occorre riparare caselle delle versioni precedenti, il salvataggio conserva i byte iniziali. Per i documenti in sola lettura **Salva copia…** conserva sempre i byte originali e richiede un percorso diverso dall'originale e dal file corrente. La compilazione dei moduli resta disabilitata. Le annotazioni e la modifica del contenuto sono disponibili tramite Strumenti.
 
 Un inserimento conta come una sola operazione annullabile. Le nuove pagine vengono selezionate e possono essere ruotate, spostate o eliminate come le altre. Il PDF di origine non viene scritto. Annullando uno dei due dialoghi, il documento e la cronologia restano invariati.
 
@@ -66,6 +66,42 @@ L'estrazione crea un documento separato importando solo le pagine selezionate da
 La selezione della casella e quella dei caratteri sono distinte: clic sul bordo per selezionare/copiare l'intera casella; clic sul testo per scrivere e selezionare anche singole parole. Ctrl+C/Ctrl+V dentro il testo usano gli appunti normali; fuori dal campo copiano e duplicano la casella alla posizione del mouse. Incollando testo semplice sulla pagina viene creata una nuova casella con lo stile corrente. Lo stile resta uniforme per tutta la casella. Durante la modifica il testo usa i font di sistema; dopo l'applicazione automatica la pagina è renderizzata dal motore PDF. Apri, Salva, Salva con nome, chiusura e uscita dalla modalità testo applicano prima la bozza corrente. Se la validazione o la ricostruzione fallisce, la bozza resta recuperabile e l’azione viene interrotta. Un trascinamento o un’elaborazione blocca temporaneamente i comandi incompatibili; **Annulla modifica** scarta la bozza dopo conferma. Ctrl+Z/Ctrl+Y mentre si scrive restano locali; dopo l'applicazione automatica la cronologia del documento comprende l'intera modifica. In modalità testo le pagine scorrono in verticale, con zoom dedicato e rotazione della vista mantenuta; disattivando Testo dalla barra principale si torna al viewer di consultazione con le sue impostazioni.
 
 Dalla 0.6.5 l'aspetto viene generato direttamente nell'annotazione del documento di destinazione, senza esportazioni/importazioni intermedie: stream e risorse font restano nello stesso contesto. L'opacità nativa è impostata a 255 (100%). I PDF MB delle versioni precedenti con caselle trasparenti o aspetti non validi vengono rilevati all'apertura e segnalati come da salvare: **Salva** o **Salva con nome** rigenera le caselle, conserva contenuti e geometria e aggiorna il viewer. Non è necessario riscrivere il testo. Solo la scrittura riuscita rimuove l'indicazione di modifiche non salvate. Sorgente iniziale e cronologia restano conservate; documenti protetti e annotazioni estranee sono esclusi dalla riparazione.
+
+## Strumenti 0.8.0
+
+Il menu **Strumenti** apre una superficie di lavoro sulla pagina corrente, con pulsanti per passare alla precedente/successiva. Le selezioni e il testo vengono confermati con **Applica**; una modifica riuscita entra nella cronologia comune ed è conservata nel file con Salva/Salva con nome. Cambiando strumento o chiudendo con una bozza viene chiesto se scartarla.
+
+- **Nota adesiva**: scrivere il contenuto, cliccare sulla pagina e applicare. Le note dell’applicazione si rileggono dall’elenco, si aggiornano o si eliminano anche dopo riapertura.
+- **Rettangolo, ellisse, linea e penna**: scegliere colore/spessore, trascinare e applicare. Sono annotazioni PDF native, modificabili dalla cronologia ed eliminabili dall’elenco. Le annotazioni di altri programmi restano conservate.
+- **Modifica testo e oggetti**: scegliere l’oggetto sulla pagina o dall’elenco. Si può sostituire il testo di un singolo oggetto con Helvetica/Times/Courier (6–144 pt), spostare, scalare, ruotare o eliminare testo, immagini, tracciati e gruppi. Il testo originale viene sostituito, senza rettangoli di copertura. Il PDF non possiede necessariamente paragrafi: il testo può essere suddiviso in molti oggetti e non viene ricomposto automaticamente. I gruppi/Form XObject si trattano come unità; non è incluso l’editing dei loro elementi interni. Non vengono simulati font arbitrari o caratteri mancanti. La sostituzione usa testo occidentale su una riga, fino a 10.000 caratteri; il font standard scelto può cambiare la larghezza rispetto all’originale.
+- **Cattura PNG**: trascinare un’area o lasciare il foglio senza selezione per catturarlo interamente; **Salva cattura PNG** apre il dialogo Windows. Il PDF, il percorso corrente e lo stato non salvato non cambiano. L’immagine usa il rendering della pagina (lato massimo 1.400 px), comprese le annotazioni applicate.
+- **Oscuramento effettivo**: selezionare l’area, applicare e confermare. La pagina viene ricostruita in un nuovo documento come immagine con i pixel dell’area sostituiti: nell’output non rimangono testo, OCR, oggetti, moduli o annotazioni originali della pagina. La parte restante resta leggibile, ma l’intera pagina perde testo selezionabile e oggetti modificabili. Il lato massimo è 2.800 px, fino a 144 dpi. Il risultato viene esportato attraverso un catalogo nuovo: metadati, allegati e segnalibri del documento vengono esclusi. Le altre pagine conservano il loro contenuto. Annulla può ripristinare l’originale nella sessione: condividere soltanto il PDF salvato e riaperto dopo l’oscuramento. Altre copie dello stesso dato fuori dall’area scelta non sono oscurate automaticamente.
+
+**Stampa… / Ctrl+P** prepara il documento corrente, comprese le modifiche applicate non ancora salvate. Si apre un’anteprima separata e poi il dialogo di stampa del browser, con stampante e intervallo. La stampa usa pagine raster fino a 144 dpi (72 dpi se è consentita solo la bassa qualità); non è stampa vettoriale. Controllare carta, orientamento, scala e margini nell’anteprima. Limiti: 500 pagine e 36 MB di immagini per lavoro; estrarre intervalli più piccoli se necessario.
+
+Le annotazioni richiedono il relativo permesso; modifica del contenuto e oscuramento richiedono il permesso di modifica; stampa e cattura verificano separatamente i permessi di stampa e copia. I blocchi già previsti per firme, cifratura e assemblaggio restano applicati. Ogni pagina ammette fino a 2.000 annotazioni/oggetti per l’ispezione; documenti e risultati restano entro 64 MB, sorgenti e cronologia entro 128 MB. Le modifiche di contenuto ricostruiscono la pagina: verificare link interni, segnalibri e moduli sui documenti effettivamente utilizzati.
+
+### Verifiche
+
+```powershell
+npm ci
+npm run assets
+npm test
+dotnet build PdfMB.sln -c Release
+# Facoltativo: prova automatica del viewer, con dati sintetici
+npx playwright install chromium
+npm run test:browser
+```
+
+La [checklist unica 0.8.0](docs/CHECKLIST-MANUALE.md) raccoglie tutte le prove da effettuare in una sola sessione Windows. Le verifiche automatiche includono salvataggio/riapertura con PDFium reale, cronologia e un flusso browser completo. Non sostituiscono la prova della finestra Windows e della stampante.
+
+## Roadmap restante
+
+- Verifica della conformità PDF/A.
+- Conversione da PDF a PDF/A.
+- Ampliamenti della formattazione delle caselle: font aggiuntivi, stili misti e per intervalli, sottolineato, barrato, apice/pedice ed evidenziazione dei caratteri.
+
+Integrazione DMS, sostituzione pagine e verifica CDA R2 non fanno parte della roadmap attuale.
 
 ## Evidenziatore · 0.7.0
 
@@ -111,7 +147,7 @@ Il profilo WebView2 e l'elenco dei dieci file recenti sono in `%LOCALAPPDATA%\Pd
 - Il risultato viene riscritto dal motore PDFium. Controllare i propri documenti con segnalibri, link interni, annotazioni e moduli secondo la checklist; non viene garantita la conformità PDF/A dopo le modifiche.
 - Per questo incremento, anche il PDF di origine di un inserimento deve superare i controlli di firme, cifratura e permessi: i PDF firmati, cifrati o senza permessi di assemblaggio non sono importabili.
 - **Testo** richiede anche il permesso di modifica delle annotazioni. L'editor modifica solo le caselle create da PDF MB, riconosciute da un marcatore dedicato; le altre annotazioni sono conservate. Ogni casella ammette fino a 10.000 caratteri occidentali, accenti e simbolo €, con un massimo di 1.000 modifiche a caselle per pagina nella sessione. Caratteri non supportati vengono rifiutati esplicitamente. Non sono ancora inclusi font arbitrari, stili misti nella stessa casella, sottolineato, barrato, apice/pedice ed evidenziazione dei caratteri. Il testo non viene ridotto automaticamente per entrare nella casella: ridimensionarla con le maniglie o ridurre il carattere. La modifica delle caselle usa una superficie di pagine renderizzate dallo stesso Worker; per selezionare il testo originale del documento, cercare o usare moduli/modalità di lettura, tornare al viewer disattivando Testo nella barra principale.
-- Seguono gli altri strumenti di annotazione (evidenziatore, nota adesiva e successivi), stampa e cattura, editing di testo/oggetti, oscuramento, verifica PDF/A e integrazione DMS. **Sostituisci pagine…** è rinviato in fondo alla roadmap perché non prioritario. Vedere [ARCHITETTURA.md](docs/ARCHITETTURA.md).
+- Verifica e conversione PDF/A restano da implementare. Vedere [ARCHITETTURA.md](docs/ARCHITETTURA.md).
 
 Le prove funzionali sono affidate all'utente: [CHECKLIST-MANUALE.md](docs/CHECKLIST-MANUALE.md).
 

@@ -1,12 +1,14 @@
 import { createHighlightTools } from './highlight-engine.mjs';
+import { createWorkbenchTools } from './workbench-engine.mjs';
 import { init } from './vendor/pdfium-api.js';
 import { createTextTools } from './text-engine.mjs';
 
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_SOURCE_BYTES = 128 * 1024 * 1024;
-let api, textTools, highlightTools, source, sourceCount, nextPageId, pendingImport;
+let api, textTools, highlightTools, workbenchTools, source, sourceCount, nextPageId, pendingImport;
 const imports = new Map();
 const catalog = new Map();
+const overrides = new Map();
 async function initialize() {
   if (api) return;
   const response = await fetch(new URL('./vendor/pdfium.wasm', import.meta.url));
@@ -15,6 +17,7 @@ async function initialize() {
   api.PDFiumExt_Init();
   textTools = createTextTools(api);
   highlightTools = createHighlightTools(api, textTools);
+  workbenchTools = createWorkbenchTools(api, textTools);
 }
 function allocate(length) {
   const pointer = api.pdfium.wasmExports.malloc(length);
@@ -42,7 +45,7 @@ function prepareImport(buffer) {
   pendingImport = null;
   if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < 8 || buffer.byteLength > MAX_BYTES)
     throw new Error('Il PDF di origine deve avere una dimensione massima di 64 MB.');
-  const retainedBytes = [...imports.values()].reduce((total, item) => total + item.buffer.byteLength, source.byteLength);
+  const retainedBytes = retainedSourceBytes();
   if (retainedBytes + buffer.byteLength > MAX_SOURCE_BYTES)
     throw new Error('Le sorgenti mantenute in memoria, inclusa la cronologia, superano 128 MB. Salvare e riaprire il documento prima di inserire altri PDF.');
   const metadata = withDocument(handle => {
@@ -75,7 +78,34 @@ function registerImport({ token, pageIndexes }) {
   pendingImport = null;
   return pages;
 }
-function retainPages(ids) {
+function retainedSourceBytes() {
+  return [...imports.values(), ...overrides.values()].reduce((total, item) => total + item.buffer.byteLength, source.byteLength);
+}
+function originSource(pageId) {
+  const origin = pageOrigin(pageId);
+  if (!origin) throw new Error('Pagina non disponibile.');
+  const buffer = origin.source === 'base' ? source : imports.get(origin.source)?.buffer;
+  if (!buffer) throw new Error('Sorgente non disponibile.');
+  return { buffer, index: origin.index };
+}
+function baselineSource(pageId, override) {
+  if (!override) return originSource(pageId);
+  const item = overrides.get(override);
+  if (!item) throw new Error('Versione della pagina non disponibile.');
+  return { buffer: item.buffer, index: 0 };
+}
+function pagePolicy(pageId) {
+  const origin = originSource(pageId);
+  const base = withDocument(handle => protection(handle));
+  const imported = withDocument(handle => protection(handle), origin.buffer);
+  return { canAnnotate: base.canAnnotate && imported.canAnnotate, canContent: base.canContent && imported.canContent,
+    canCapture: base.canCapture && imported.canCapture, canPrint: base.canPrint && imported.canPrint,
+    canPrintHigh: base.canPrintHigh && imported.canPrintHigh };
+}
+function retainPages(payload) {
+  const ids = Array.isArray(payload) ? payload : payload.ids;
+  const overrideIds = new Set(payload.overrides ?? []);
+  for (const token of overrides.keys()) if (!overrideIds.has(token)) overrides.delete(token);
   if (!Array.isArray(ids)) throw new Error('Cronologia delle pagine non valida.');
   const retained = new Set(ids);
   for (const id of catalog.keys()) if (!retained.has(id)) catalog.delete(id);
@@ -94,7 +124,8 @@ function protection(handle) {
     encrypted ? 'Documento cifrato: disponibile in sola consultazione.' :
     !(permissions & 1024) ? 'Il documento non consente l’assemblaggio delle pagine.' : '';
   return { readOnly: !!reason, blockedReason: reason, signatures, permissions,
-    canAnnotate: !reason && !!(permissions & 32) };
+    canAnnotate: !reason && !!(permissions & 32), canContent: !reason && !!(permissions & 8),
+    canCapture: !!(permissions & 16), canPrint: !!(permissions & 4), canPrintHigh: !!(permissions & 2048) };
 }
 function serialize(handle) {
   const writer = api.PDFiumExt_OpenFileWriter();
@@ -103,7 +134,7 @@ function serialize(handle) {
   try {
     // Use the same writer protocol as the pinned EmbedPDF engine. The writer's
     // size and the subsequent viewer load validate the produced document.
-    api.PDFiumExt_SaveAsCopy(handle, writer);
+    if (!api.FPDF_SaveAsCopy(handle, writer, 2)) throw new Error('Salvataggio PDF non riuscito.');
     const size = api.PDFiumExt_GetFileWriterSize(writer);
     if (!size || size > MAX_BYTES) throw new Error('Il risultato supera il limite di 64 MB o non è valido.');
     pointer = allocate(size);
@@ -167,6 +198,18 @@ function rebuild(pages) {
       } finally { api.pdfium.wasmExports.free(pointer); }
     }
     for (let index = 0; index < pages.length; index++) {
+      if (pages[index].override) {
+        const item = overrides.get(pages[index].override);
+        if (!item) throw new Error('Versione della pagina non disponibile.');
+        withDocument(replacement => {
+          const pointer = allocate(4);
+          try {
+            api.pdfium.HEAP32[pointer / 4] = 0;
+            if (!api.FPDF_ImportPagesByIndex(handle, replacement, pointer, 1, index)) throw new Error('Sostituzione pagina non riuscita.');
+            api.FPDFPage_Delete(handle, index + 1);
+          } finally { api.pdfium.wasmExports.free(pointer); }
+        }, item.buffer);
+      }
       const page = api.FPDF_LoadPage(handle, index);
       if (!page) throw new Error('Pagina non disponibile per la rotazione.');
       try {
@@ -185,6 +228,18 @@ function rebuild(pages) {
         api.FPDFPage_SetRotation(page, (rotation + pages[index].rotation) % 4);
       } finally { api.FPDF_ClosePage(page); }
     }
+    // Export redacted revisions through a fresh catalog: no attachments, metadata
+    // or obsolete source objects are copied into the result.
+    if (pages.some(page => overrides.get(page.override)?.redacted)) {
+      const clean = api.FPDF_CreateNewDocument();
+      if (!clean) throw new Error('Impossibile creare il PDF bonificato.');
+      const pointer = allocate(pages.length * 4);
+      try {
+        api.pdfium.HEAP32.set(pages.map((_, index) => index), pointer / 4);
+        if (!api.FPDF_ImportPagesByIndex(clean, handle, pointer, pages.length, 0)) throw new Error('Bonifica PDF non riuscita.');
+        return serialize(clean);
+      } finally { api.pdfium.wasmExports.free(pointer); api.FPDF_CloseDocument(clean); }
+    }
     return serialize(handle);
   });
 }
@@ -196,26 +251,24 @@ function withPage(buffer, index, action) {
     if (!Number.isInteger(index) || index < 0 || index >= api.FPDF_GetPageCount(handle)) throw new Error('Pagina non valida.');
     const page = api.FPDF_LoadPage(handle, index);
     if (!page) throw new Error('Pagina non leggibile.');
-    try { return action(page); }
+    try { return action(page, handle); }
     finally { api.FPDF_ClosePage(page); }
   }, buffer);
 }
-function textRequest(type, { buffer, pageIndex, pageId, input, remove = false, omitId }) {
-  if (type === 'text-context') return withPage(buffer, pageIndex, page => {
+function textRequest(type, { buffer, pageIndex, pageId, pageOverride, input, remove = false, omitId }) {
+  if (type === 'text-context') return withPage(buffer, pageIndex, (page, document) => {
     const geometry = textTools.geometry(page), notes = textTools.notes(page);
     textTools.repairAppearances(page);
     // Only the temporary rendering copy is changed. This lets an inline editor
     // replace the selected appearance without painting its text twice.
     if (omitId && notes.some(note => note.id === omitId)) textTools.apply(page, [{ id: omitId, value: null }]);
-    return { ...geometry, notes, image: textTools.render(page) };
+    return { ...geometry, notes, image: textTools.render(page, 1400, 2, document) };
   });
   const policy = withDocument(handle => protection(handle));
   if (!policy.canAnnotate) throw new Error('Il documento non consente l’aggiunta o la modifica di annotazioni.');
-  const origin = pageOrigin(pageId);
-  if (!origin) throw new Error('Pagina non più disponibile.');
-  const original = origin.source === 'base' ? source : imports.get(origin.source)?.buffer;
-  if (!original) throw new Error('Sorgente della pagina non disponibile.');
-  const baseline = withPage(original, origin.index, page => {
+  if (!pagePolicy(pageId).canAnnotate) throw new Error('La pagina non consente annotazioni.');
+  const baselineSourceData = baselineSource(pageId, pageOverride);
+  const baseline = withPage(baselineSourceData.buffer, baselineSourceData.index, page => {
     const note = textTools.notes(page).find(note => note.id === input.id);
     if (!note) return null;
     const { position, ...value } = note;
@@ -264,6 +317,53 @@ function extract({ buffer, pageIndexes }) {
   }, buffer);
 }
 
+function workbenchContext({ buffer, pageIndex, pageId }) {
+  const policy = pagePolicy(pageId);
+  return withPage(buffer, pageIndex, (page, document) => ({ ...textTools.geometry(page), ...policy,
+    image: textTools.render(page, 1400, 2, document),
+    objects: policy.canContent ? workbenchTools.objects(page, true) : [],
+    annotations: policy.canAnnotate ? workbenchTools.annotations(page) : [] }));
+}
+function workbenchChange({ buffer, pageIndex, pageId, pageOverride, input }) {
+  const policy = pagePolicy(pageId);
+  const content = input.operation.startsWith('object-') || input.operation === 'redact';
+  if (content ? !policy.canContent : !policy.canAnnotate) throw new Error('Operazione non consentita dal documento.');
+  const single = api.FPDF_CreateNewDocument();
+  if (!single) throw new Error('Impossibile creare la pagina.');
+  let sanitized = 0;
+  try {
+    withDocument(handle => {
+      if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= api.FPDF_GetPageCount(handle)) throw new Error('Pagina non valida.');
+      const p = allocate(4);
+      try {
+        api.pdfium.HEAP32[p / 4] = pageIndex;
+        if (!api.FPDF_ImportPagesByIndex(single, handle, p, 1, 0)) throw new Error('Pagina non importabile.');
+      } finally { api.pdfium.wasmExports.free(p); }
+    }, buffer);
+    if (input.operation === 'redact') {
+      sanitized = withDocument(handle => {
+        const originalPage = api.FPDF_LoadPage(handle, pageIndex);
+        if (!originalPage) throw new Error('Pagina non leggibile.');
+        try { return workbenchTools.rasterizeRedacted(handle, originalPage, input.region); }
+        finally { api.FPDF_ClosePage(originalPage); }
+      }, buffer);
+    }
+    const page = api.FPDF_LoadPage(single, 0);
+    if (!page) throw new Error('Pagina non leggibile.');
+    try {
+      if (input.operation === 'redact') { /* Sanitized from the complete current document, including form appearances. */ }
+      else if (input.operation.startsWith('object-')) workbenchTools.mutateObject(single, page, input);
+      else workbenchTools.mutateAnnotation(page, input);
+    } finally { api.FPDF_ClosePage(page); }
+    const bytes = serialize(sanitized || single);
+    if (retainedSourceBytes() + bytes.byteLength > MAX_SOURCE_BYTES) throw new Error('Cronologia e sorgenti oltre 128 MB: salvare e riaprire prima di continuare.');
+    const override = crypto.randomUUID();
+    const redacted = !!sanitized || !!overrides.get(pageOverride)?.redacted;
+    overrides.set(override, { buffer: bytes, redacted });
+    return { override, redacted };
+  } finally { if (sanitized) api.FPDF_CloseDocument(sanitized); api.FPDF_CloseDocument(single); }
+}
+
 self.onmessage = async ({ data: { id, type, payload } }) => {
   try {
     await initialize();
@@ -272,7 +372,7 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
       if (!(payload instanceof ArrayBuffer) || payload.byteLength < 8 || payload.byteLength > MAX_BYTES)
         throw new Error('Dimensione documento non valida (massimo 64 MB).');
       source = payload;
-      imports.clear(); catalog.clear(); pendingImport = null;
+      imports.clear(); catalog.clear(); overrides.clear(); pendingImport = null;
       result = withDocument(handle => {
         sourceCount = api.FPDF_GetPageCount(handle);
         nextPageId = sourceCount;
@@ -291,17 +391,20 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
       });
     } else if (type === 'rebuild' && source) result = rebuild(payload);
     else if (['text-context', 'text-change'].includes(type) && source) result = textRequest(type, payload);
-    else if (type === 'highlight-list' && source) result = withPage(payload.buffer, payload.pageIndex, page => highlightTools.list(page));
+    else if (type === 'workbench-context' && source) result = workbenchContext(payload);
+    else if (type === 'workbench-change' && source) result = workbenchChange(payload);
+    else if (type === 'output-page' && source) {
+      const policy = pagePolicy(payload.pageId);
+      if (payload.kind === 'print' ? !policy.canPrint : !policy.canCapture) throw new Error('Esportazione non consentita.');
+      result = withPage(payload.buffer, payload.pageIndex, (page, document) => ({ ...textTools.geometry(page), image: textTools.render(page, payload.kind === 'print' && !policy.canPrintHigh ? 1400 : 2800, payload.kind === 'print' && !policy.canPrintHigh ? 1 : 2, document) }));
+    }
+    else if (type === 'highlight-list'  && source) result = withPage(payload.buffer, payload.pageIndex, page => highlightTools.list(page));
     else if (type === 'highlight-change' && source) {
       const policy = withDocument(handle => protection(handle));
       if (!policy.canAnnotate) throw new Error('Annotazioni non consentite.');
-      const origin = pageOrigin(payload.pageId);
-      if (!origin) throw new Error('Pagina non disponibile.');
-      const original = origin.source === 'base' ? source : imports.get(origin.source)?.buffer;
-      if (!original) throw new Error('Sorgente non disponibile.');
-      if (!withDocument(handle => protection(handle), original).canAnnotate)
-        throw new Error('La pagina di origine non consente annotazioni.');
-      const exists = withPage(original, origin.index, page => highlightTools.list(page).some(h => h.id === payload.input.id));
+      if (!pagePolicy(payload.pageId).canAnnotate) throw new Error('La pagina non consente annotazioni.');
+      const original = baselineSource(payload.pageId, payload.pageOverride);
+      const exists = withPage(original.buffer, original.index, page => highlightTools.list(page).some(h => h.id === payload.input.id));
       const current = withPage(payload.buffer, payload.pageIndex, page => {
         if (payload.remove) {
           if (!highlightTools.list(page).some(h => h.id === payload.input.id)) throw new Error('Evidenziazione non disponibile.');

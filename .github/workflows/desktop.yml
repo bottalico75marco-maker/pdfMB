@@ -1,0 +1,48 @@
+name: Verifica e build Windows
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: npm ci
+      - run: npm run assets
+      - run: npm test
+      - run: dotnet build PdfMB.sln -c Release --nologo
+      - run: dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.8.0 --nologo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PDF-MB-0.8.0-win-x64
+          path: artifacts/app-0.8.0/
+          if-no-files-found: error
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run assets
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prova-browser
+          path: artifacts/test/
+          if-no-files-found: ignore

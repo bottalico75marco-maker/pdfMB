@@ -1,3 +1,4 @@
+import { WorkbenchSurface, pngFromImage } from './workbench-surface.mjs';
 import { HighlightSurface } from './highlight-surface.mjs';
 import { createBridge } from './bridge.mjs';
 import { createDocumentSession } from './document-session.mjs';
@@ -9,7 +10,7 @@ import { italian } from './italian.mjs';
 const welcome = document.querySelector('#welcome');
 const openButton = document.querySelector('#open');
 const transport = window.chrome?.webview;
-let bridge, registry, session, editor, panel, textSurface, highlightSurface;
+let bridge, registry, session, editor, panel, textSurface, highlightSurface, workbench;
 let locked = false, working = false, panelOpen = false, nextView = null, strategy = 'vertical';
 let tail = Promise.resolve();
 const layouts = new Set();
@@ -125,6 +126,7 @@ try {
   const handlers = {
     'editor.lock': async () => {
       if (textSurface && !await textSurface.flush()) throw new Error('Correggere o annullare la modifica alla casella prima di continuare.');
+      if (workbench && !workbench.close()) throw new Error('Chiudere o completare gli strumenti pagina.');
       highlightSurface?.suspend();
       panel.cancelDialogs(); locked = true; return notify();
     },
@@ -146,6 +148,27 @@ try {
       if (!locked || !editor?.canText) throw new Error('Annotazioni non consentite.');
       await highlightSurface.showDelete(Math.max(0, viewerState().page - 1));
       return notify();
+    }),
+    'editor.tools': payload => withWorking(async () => {
+      if (!locked || !editor) throw new Error('Documento non disponibile.');
+      highlightSurface.toggle(false);
+      const pageIndex = Math.max(0, viewerState().page - 1);
+      if (textSurface.active) textSurface.toggle(false, true);
+      await workbench.open(pageIndex, payload.mode);
+      return notify();
+    }),
+    'output.print': () => withWorking(async () => {
+      if (!locked || !editor?.policy.canPrint) throw new Error('Stampa non consentita.');
+      if (editor.pages.length > 500) throw new Error('Stampare al massimo 500 pagine per volta: estrarre un intervallo.');
+      const pages = []; let total = 0;
+      for (let index = 0; index < editor.pages.length; index++) {
+        const data = await editor.outputPage(index, 'print');
+        const base64 = pngFromImage(data.image);
+        total += base64.length;
+        if (total > 48 * 1024 * 1024) throw new Error('Anteprima oltre 36 MB. Estrarre un intervallo e stampare separatamente.');
+        pages.push({ base64, widthMm: data.width * 25.4 / 72, heightMm: data.height * 25.4 / 72 });
+      }
+      return { token: editor.token, pages };
     }),
     'editor.highlightColor': payload => {
       highlightSurface.setColor(payload.color);
@@ -254,6 +277,8 @@ try {
     },
     onView: () => bridge.emit('viewer.state', viewerState())
   });
+  workbench = new WorkbenchSurface({ editor: () => editor, run: action => enqueue(() => withWorking(action)),
+    notify, emit: (type, payload) => bridge.emit(type, payload), unavailable: () => locked || working });
   highlightSurface = new HighlightSurface({ editor: () => editor, plugin, session,
     run: action => enqueue(() => withWorking(action)), notify,
     unavailable: () => locked || working || !!textSurface?.active, showError });
@@ -276,13 +301,14 @@ try {
     }
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
     const key = event.key.toLowerCase();
-    if (!['o', 's', 'z', 'y'].includes(key)) return;
+    if (!['o', 's', 'p', 'z', 'y'].includes(key)) return;
     // Text fields keep their own local undo, including the inline page editor.
     const target = event.composedPath()[0];
     if (['z', 'y'].includes(key) && (document.querySelector('dialog[open]') || target?.matches?.('input,textarea'))) return;
     event.preventDefault(); event.stopImmediatePropagation();
     if (locked || working) return;
     if (key === 'o') bridge.emit('host.open');
+    if (key === 'p') bridge.emit('host.print');
     if (key === 's') bridge.emit(event.shiftKey ? 'host.saveAs' : 'host.save');
     if (key === 'z' || key === 'y') enqueue(async () => {
       if (await textSurface.flush()) await withWorking(() => key === 'z' ? editor?.undo() : editor?.redo());
