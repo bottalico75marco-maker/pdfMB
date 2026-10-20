@@ -2,9 +2,9 @@
 
 Le prove sul programma sono affidate all'utente. È stata effettuata la compilazione Release e la verifica sintattica dei moduli JavaScript; questi controlli non verificano il comportamento dell'applicazione.
 
-Avviare `artifacts/app-0.6.3/PdfMB.Desktop.exe`. Usare copie di documenti di prova, compreso un PDF di almeno cinque pagine riconoscibili, un PDF con pagine già ruotate, uno scannerizzato e uno con dimensioni miste. Per l'inserimento preparare un secondo PDF con almeno cinque pagine riconoscibili e diverse dal primo. Tenere una copia iniziale per controllare il risultato.
+Avviare `artifacts/app-0.6.5/PdfMB.Desktop.exe`. Usare copie di documenti di prova, compreso un PDF di almeno cinque pagine riconoscibili, un PDF con pagine già ruotate, uno scannerizzato e uno con dimensioni miste. Per l'inserimento preparare un secondo PDF con almeno cinque pagine riconoscibili e diverse dal primo. Tenere una copia iniziale per controllare il risultato.
 
-La versione aggiornata mostra **PDF MB 0.6.3** nella barra dei comandi e nel titolo della finestra. Il percorso versionato permette di distinguerla dalle pubblicazioni precedenti ancora aperte.
+La versione aggiornata mostra **PDF MB 0.6.5** nella barra dei comandi e nel titolo della finestra. Il percorso versionato permette di distinguerla dalle pubblicazioni precedenti ancora aperte.
 
 ## Selezione e posizione finale
 
@@ -151,7 +151,7 @@ Get-FileHash "C:\documenti\copia.pdf"
 
 Gli hash della copia non modificata devono coincidere. Per un PDF modificato controllare invece le pagine e il contenuto: l'hash normalmente cambia. Il confronto non valida firme digitali né conformità PDF/A.
 
-## Caselle sulla pagina e barra Carattere — Release 0.6.3
+## Caselle sulla pagina e barra Carattere — Release 0.6.5
 
 Attivare **Testo** nella barra principale. Tutti i controlli contestuali sono sotto il nome del file; non devono comparire né il precedente dialogo né il pulsante duplicato Modifica testo. Posizione e dimensioni si impostano direttamente col mouse. La modifica supporta le caselle create da PDF MB, comprese quelle dei PDF salvati con la 0.5.0. Queste prove non sono state eseguite dall'assistente.
 
@@ -159,17 +159,29 @@ Attivare **Testo** nella barra principale. Tutti i controlli contestuali sono so
 | --- | --- |
 | Apri un PDF in consultazione | Barra Carattere nascosta; comando Testo disponibile nella barra principale se consentito dai permessi |
 | Attiva Testo dal comando principale | Barra Carattere visibile sotto il nome e pagine modificabili direttamente; controlli di font, stile, caselle, appunti e zoom senza dialoghi né campi numerici per posizione/dimensioni |
+| Apri il PDF già salvato con le due caselle «prova prova prova», senza modificare il testo | Nome rosso e Salva disponibile per la riparazione; nessuna richiesta di ricreare le caselle |
+| Premi Salva sul file precedente, chiudi e riapri anche in un altro lettore | Entrambe le scritte visibili, opache, nelle posizioni originali; testo e stile ancora modificabili in PDF MB |
+| Ripeti il recupero con Salva con nome e annulla o provoca un errore di scrittura | Il nuovo percorso diventa corrente solo dopo il successo; annullamento/errore lascia il documento da salvare e l’originale intatto |
+| Recupera le caselle precedenti, modifica, salva e usa Annulla/Ripeti fino allo stato iniziale | Nessun ritorno ad aspetti trasparenti o risorse mancanti; contenuto delle caselle e cronologia conservati |
+| Aggiungi nuove caselle con ogni famiglia/font, colore e più righe; salva e riapri in un altro lettore | Testo visibile anche fuori dalla modalità testo; annotazioni con opacità piena e aspetto valido |
+| Controlla la barra testo | Pulsante Applica assente; Annulla modifica ed Elimina disponibili sulla casella selezionata |
+| Scrivi e clicca fuori; rientra con un solo clic e cambia il contenuto più volte prima di Salva | Testo persistente, modificabile e visibile tra un ingresso e l’altro; un’azione annullabile per ogni uscita con modifiche |
+| Scrivi e premi direttamente Salva/Ctrl+S oppure Salva con nome/Ctrl+Maiusc+S senza uscire dal campo | L’ultimo testo entra nel PDF salvato; nome torna normale solo dopo la scrittura riuscita; riapertura con contenuto corretto |
+| Crea una casella vuota e clicca fuori | Casella scartata, nessuna annotazione vuota e nessuna voce di cronologia |
+| Modifica una casella e clicca direttamente su un’altra oppure sceglila dall’elenco | Prima casella applicata e seconda aperta per scrivere, senza perdere selezione o geometria |
+| Cambia font, colore e dimensione mentre scrivi, poi torna al campo | La barra non interrompe la bozza; testo conservato e applicato uscendo dalla casella |
+| Lascia il campo con un testo non valido e prova Salva/Apri/Chiudi | Errore visibile, bozza recuperabile, nessun file salvato e azione interrotta; correggi e riprova |
 | Nuova casella, trascina sulla pagina in tutte le direzioni e scrivi | Rettangolo corrispondente al trascinamento; scrittura direttamente dentro la casella |
 | Trascinamento troppo piccolo, rilascio fuori pagina o annullamento del puntatore | Nessuna casella invalida o trascinamento bloccato; coordinate mantenute entro la pagina |
 | Seleziona una casella con clic o dall'elenco della barra | Bordo e otto maniglie visibili; font e stile della casella caricati nella barra |
 | Trascina una casella, anche selezionandola all'inizio del trascinamento | Movimento con il mouse, senza dover digitare coordinate; nessun duplicato |
 | Trascina ognuna delle otto maniglie, anche verso i bordi della pagina | Posizione/dimensioni aggiornate; minimo 12 × 12 pt e contenimento nella pagina |
-| Doppio clic o Invio sulla casella selezionata, poi seleziona singole parole | Modifica e selezione dei caratteri direttamente nella casella, senza sovrapporre il testo al suo aspetto precedente |
-| Modifica font, dimensione, grassetto, corsivo e colore dalla barra | Stile applicato all'intera casella; aggiornamento visibile durante la modifica e conservato dopo Applica |
-| Applica oppure Ctrl+Invio dopo testo, movimento o ridimensionamento | Una sola operazione annullabile; nome rosso e «file non salvato»; posizione di scorrimento mantenuta e casella nuovamente selezionabile |
-| Scrivi «marco bottalico», Applica, clicca fuori dalla casella e passa a un'altra casella | Il testo rimane visibile anche senza campo attivo; nessun rettangolo vuoto al posto del contenuto |
+| Un solo clic sul testo o Invio sulla casella selezionata, poi seleziona singole parole | Modifica e selezione dei caratteri direttamente nella casella, senza sovrapporre il testo al suo aspetto precedente |
+| Modifica font, dimensione, grassetto, corsivo e colore dalla barra | Stile applicato all'intera casella; aggiornamento visibile durante la modifica e conservato dopo l’applicazione automatica |
+| Esci dalla casella dopo aver scritto; rilascia il mouse dopo movimento o ridimensionamento; prova anche Ctrl+Invio | Una sola operazione annullabile; nome rosso e «file non salvato»; posizione di scorrimento mantenuta e casella nuovamente selezionabile |
+| Scrivi «marco bottalico», clicca fuori dalla casella e passa a un’altra casella | Il testo rimane visibile anche senza campo attivo; nessun rettangolo vuoto al posto del contenuto |
 | Copia la casella con il tasto destro e incollala accanto; seleziona e deseleziona ripetutamente originale e copia | Entrambi i testi restano visibili e indipendenti, anche spostando rapidamente la selezione |
-| Ripeti su un PDF con moduli AcroForm e font già presenti | Aspetto del testo indipendente dai font del documento originale; testo visibile anche in consultazione dopo Applica |
+| Ripeti su un PDF con moduli AcroForm e font già presenti | Aspetto del testo indipendente dai font del documento originale; testo visibile anche in consultazione dopo l’applicazione automatica |
 | Salva il PDF con le due caselle, riaprilo anche in un altro lettore | Originale e copia visibili con font/colore corretti; contenuto ancora modificabile in PDF MB |
 | Apri una copia di un PDF salvato con caselle vuote nelle versioni precedenti, poi modifica una casella e salva | Le caselle PDF MB vengono rigenerate nel rendering e nel risultato ricostruito; contenuti e posizioni conservati |
 | Seleziona una casella applicata, Ctrl+C, sposta il mouse e Ctrl+V | Nuova casella nella posizione del puntatore, con testo, font, dimensione, colore e dimensioni conservati; originale invariato |
@@ -178,7 +190,7 @@ Attivare **Testo** nella barra principale. Tutti i controlli contestuali sono so
 | Dopo Copia: tasto destro nel punto della pagina → Incolla, muovendo il mouse per scegliere la voce | Duplicato nel punto del clic destro originale, non nel punto del menu; testo, stile e dimensioni conservati, originale invariato e un solo Annulla per rimuovere la copia |
 | Menu Incolla su un'altra pagina, vicino ai bordi, con zoom e rotazioni | Posizione riferita alla pagina cliccata; casella contenuta nei bordi e trasformazioni coerenti |
 | Tasto destro sul testo mentre si modifica una casella | Menu per copiare l'intera casella; Ctrl+C dentro il testo continua a copiare solo i caratteri selezionati |
-| Menu sulla pagina senza una casella copiata oppure con bozza non applicata | Incolla disabilitato; nessuna perdita delle modifiche in corso |
+| Menu sulla pagina senza una casella copiata; ripeti con una bozza corrente valida | Incolla disabilitato senza copia; una bozza valida viene applicata prima di aprire il menu sulla pagina |
 | Esc, clic fuori dal menu, scorrimento, ridimensionamento o cambio modalità/documento | Menu chiuso e nessuna operazione; Esc dal menu conserva la selezione senza annullare la bozza |
 | Maiusc+F10/tasto Menu su una casella; frecce, Invio e Spazio nel menu | Menu accessibile da tastiera e comandi disabilitati non attivabili |
 | Incolla senza una posizione del mouse valida sulla pagina | Richiesta di scegliere il punto con un clic, senza inserimenti in posizioni arbitrarie |
@@ -187,8 +199,8 @@ Attivare **Testo** nella barra principale. Tutti i controlli contestuali sono so
 | Seleziona una casella e premi Elimina/Canc oppure Backspace fuori dal campo | Conferma e rimozione della sola casella; Annulla/Ripeti conservati |
 | Aggiungi una casella e poi eliminala; applica una modifica identica all'originale | Stato salvato coerente; nessuna nuova azione per un'applicazione senza cambiamenti |
 | Annulla modifica/Esc durante una bozza o un trascinamento | Ripristino della geometria del trascinamento; conferma prima di scartare testo o stile non applicati |
-| Prova a cambiare selezione, aprire/salvare o usare la cronologia con una bozza non applicata | Bozza conservata e richiesta di applicare o annullare; nessuna perdita silenziosa |
-| Ctrl+Z/Ctrl+Y nel testo, poi dopo Applica dalla barra principale | Cronologia locale mentre scrivi e cronologia del PDF dopo l'applicazione |
+| Cambia casella, apri/salva, chiudi o usa la cronologia con una bozza valida ancora attiva | Applicazione automatica prima dell’azione; nessuna perdita del testo e nessun blocco permanente |
+| Ctrl+Z/Ctrl+Y nel testo, poi dopo l’applicazione automatica dalla barra principale | Cronologia locale mentre scrivi e cronologia del PDF dopo l'applicazione |
 | Salva, chiudi e riapri; attiva Testo, seleziona e copia una casella | Caselle ancora modificabili e duplicabili con il mouse, senza rasterizzazione del contenuto salvato |
 | Zoom testo 50/75/100/125/150/200% e Adatta larghezza; finestra ridimensionata | Bordo, maniglie, puntatore e testo allineati alla pagina; scala della barra di stato coerente |
 | Rotazione permanente e della vista di 90/180/270°, CropBox con origine diversa e pagine di dimensioni miste | Creazione, spostamento, ridimensionamento e copia/incolla corretti anche dopo salvataggio e riapertura |
@@ -197,9 +209,9 @@ Attivare **Testo** nella barra principale. Tutti i controlli contestuali sono so
 | Sposta/elimina pagine con testo, Annulla/Ripeti, inserisci o estrai pagine contenenti caselle PDF MB | Testo associato alle pagine corrette e modificabile anche nel risultato estratto |
 | Accenti, €, virgolette, righe multiple e tabulazioni incollate | Contenuto conservato; tabulazioni normalizzate in spazi |
 | Caratteri non supportati, emoji o più di 10.000 caratteri | Validazione esplicita e bozza recuperabile |
-| Testo troppo grande per la casella | Ridimensionabile con le maniglie; il risultato dopo Applica permette di controllare eventuali tagli |
+| Testo troppo grande per la casella | Ridimensionabile con le maniglie; il risultato dopo l’applicazione automatica permette di controllare eventuali tagli |
 | PDF firmato, cifrato, senza permessi di assemblaggio/annotazione o controlli falliti | Comando Testo disabilitato; copia originale e altre protezioni conservate |
-| Errore del Worker, del caricamento o risultato oltre 64 MB durante Applica | PDF e cronologia precedenti intatti; possibilità di copiare o annullare la bozza e tornare alla consultazione |
+| Errore del Worker, del caricamento o risultato oltre 64 MB durante l’applicazione automatica | PDF e cronologia precedenti intatti; possibilità di copiare o annullare la bozza e tornare alla consultazione |
 | Documento con altre annotazioni e moduli, rete disattivata, scala Windows 125/150/200% | Altre annotazioni conservate; funzionamento locale e barra utilizzabile anche su più righe |
 
 Sottolineato, barrato, apice/pedice, evidenziazione dei caratteri, maiuscole/minuscole, rimozione della formattazione e stili misti sono ancora previsti per incrementi successivi.

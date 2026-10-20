@@ -72,6 +72,7 @@ export class PageEditor {
       this.worker = new EditingWorker();
       const workerSource = source.slice(0);
       this.policy = await this.worker.request('load', workerSource, [workerSource]);
+      this.legacyTextSource = this.textRepairPending = !!this.policy.textRepairNeeded;
     } catch { this.worker?.dispose(); }
   }
   finishOpen(pageCount) {
@@ -80,7 +81,7 @@ export class PageEditor {
     this.selection = new Set([0]);
     this.anchor = 0;
   }
-  get dirty() { return key(this.pages) !== this.savedKey; }
+  get dirty() { return !!this.textRepairPending || key(this.pages) !== this.savedKey; }
   get canEdit() { return !this.policy.readOnly && !!this.worker?.alive; }
   get canText() { return this.canEdit && !!this.policy.canAnnotate; }
   get blockedReason() {
@@ -110,7 +111,7 @@ export class PageEditor {
   }
   async apply(target) {
     if (!this.canEdit) throw new Error(this.blockedReason);
-    const bytes = key(target.pages) === this.initialKey ? this.source : await this.worker.request('rebuild', target.pages);
+    const bytes = key(target.pages) === this.initialKey && !this.legacyTextSource ? this.source : await this.worker.request('rebuild', target.pages);
     if (bytes.byteLength > MAX_BYTES) throw new Error('Il risultato supera il limite di 64 MB.');
     let index = target.pages.findIndex(page => page.id === target.focus);
     if (index < 0) index = Math.min(target.pageIndex, target.pages.length - 1);
@@ -243,10 +244,22 @@ export class PageEditor {
     this.future = [];
     await this.releaseUnusedSources();
   }
-  export() { return { token: this.token, revision: this.revision, base64: encodePdf(this.bytes) }; }
+  async export() {
+    // Old files contain the text but may have a transparent or invalid AP.
+    // Repair even when the user simply reopens and saves, preserving source
+    // bytes and undo history. Only a successful disk write clears the flag.
+    if (this.textRepairPending) {
+      const bytes = await this.worker.request('rebuild', this.pages);
+      if (bytes.byteLength > MAX_BYTES) throw new Error('Il risultato supera il limite di 64 MB.');
+      await this.replaceView(bytes, this.name, Math.max(1, this.currentPage()));
+      this.bytes = bytes;
+    }
+    return { token: this.token, revision: this.revision, base64: encodePdf(this.bytes) };
+  }
   markSaved({ token, revision, name }) {
     if (token !== this.token || revision !== this.revision) throw new Error('Il documento è cambiato durante il salvataggio.');
     this.savedKey = key(this.pages);
+    this.textRepairPending = false;
     this.name = name;
   }
   dispose() { this.worker?.dispose(); }

@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "PdfMB.Desktop/0.6.4": {
+      "PdfMB.Desktop/0.6.5": {
         "dependencies": {
           "Microsoft.Web.WebView2": "1.0.4022.49",
           "Microsoft.Web.WebView2.Core": "1.0.4022.49",
@@ -54,7 +54,7 @@
     }
   },
   "libraries": {
-    "PdfMB.Desktop/0.6.4": {
+    "PdfMB.Desktop/0.6.5": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

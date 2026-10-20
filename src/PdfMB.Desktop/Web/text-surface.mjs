@@ -6,8 +6,8 @@ const inputTarget = target => target instanceof HTMLElement &&
   (target.matches('input,textarea,select') || target.isContentEditable);
 
 export class TextSurface {
-  constructor({ editor, plugin, session, read, apply, notify, unavailable, onPage, onView }) {
-    Object.assign(this, { editor, plugin, session, read, apply, notify, unavailable, onPage, onView });
+  constructor({ editor, plugin, session, read, apply, run, notify, unavailable, onPage, onView }) {
+    Object.assign(this, { editor, plugin, session, read, apply, run, notify, unavailable, onPage, onView });
     this.toolbar = document.querySelector('#text-toolbar');
     this.surface = document.querySelector('#text-surface');
     this.message = document.querySelector('#text-status');
@@ -26,13 +26,12 @@ export class TextSurface {
     this.observer = new IntersectionObserver(entries => {
       for (const entry of entries) if (entry.isIntersecting) this.wantPage(Number(entry.target.dataset.index));
     }, { root: this.surface, rootMargin: '300px' });
-    document.querySelector('#text-new').onclick = () => {
+    document.querySelector('#text-new').onclick = async () => {
       if (!this.active) this.toggle(true);
-      if (!this.deselect()) return;
+      if (!await this.commit(false)) return;
       this.creating = true; this.updateControls();
       this.status('Trascina sulla pagina per disegnare la nuova casella.');
     };
-    document.querySelector('#text-apply').onclick = () => this.commit(false);
     document.querySelector('#text-cancel').onclick = () => this.cancel();
     this.menuCopy.onclick = () => {
       if (!this.menuContext || this.menuContext.generation !== this.generation || this.unavailable()) return;
@@ -68,11 +67,9 @@ export class TextSurface {
     this.bold.onclick = () => this.toggleStyle(this.bold);
     this.italic.onclick = () => this.toggleStyle(this.italic);
     for (const field of [this.family, this.size, this.color]) field.oninput = () => this.styleChanged();
-    this.list.onchange = () => {
-      const note = this.records.get(this.currentPage)?.context?.notes.find(note => note.id === this.list.value);
-      if (this.pending) { this.list.value = this.selected?.input.id ?? ''; this.status('Applica o annulla la modifica corrente.'); return; }
-      if (note) this.select(this.currentPage, note);
-      else this.deselect();
+    this.list.onchange = async () => {
+      const index = this.currentPage, id = this.list.value;
+      await this.leaveAndSelect(index, id);
     };
     this.zoom.onchange = () => { this.cancelDrag(); this.layout(); };
     this.surface.addEventListener('scroll', () => {
@@ -90,6 +87,17 @@ export class TextSurface {
     document.addEventListener('pointerdown', event => {
       if (!this.menu.contains(event.target)) this.hideMenu();
     }, true);
+    // Toolbar and context-menu focus belong to the same editing interaction.
+    // Delay focus checks until pointerdown has established any active drag.
+    const leaveField = () => setTimeout(() => {
+      const focus = document.activeElement;
+      if (!this.active || !this.changed() || this.drag || this.unavailable() || this.menu.matches(':popover-open') ||
+          this.toolbar.contains(focus) || this.selected?.element?.contains(focus)) return;
+      this.commit(false);
+    }, 0);
+    this.surface.addEventListener('focusout', leaveField);
+    this.toolbar.addEventListener('focusout', leaveField);
+    window.addEventListener('blur', leaveField);
     document.addEventListener('copy', event => this.copyEvent(event));
     document.addEventListener('paste', event => this.pasteEvent(event));
     document.addEventListener('keydown', event => this.keydown(event), true);
@@ -97,6 +105,7 @@ export class TextSurface {
   }
   get textEditing() { return this.active; }
   get pending() { return !!this.drag || this.changed(); }
+  get busy() { return !!this.drag || !!this.committing; }
   changed() { return !!this.selected && JSON.stringify(this.selected.input) !== this.selected.initial; }
   status(message) { this.message.textContent = message; }
   sync() {
@@ -105,7 +114,7 @@ export class TextSurface {
     if (token !== this.token || revision !== this.revision) {
       const changedDocument = token !== this.token;
       this.token = token; this.revision = revision;
-      if (changedDocument) { this.active = false; this.pointer = null; this.selected = null; this.afterCommit = null; this.pasting = null; }
+      if (changedDocument) { this.active = false; this.pointer = null; this.selected = null; this.pasting = null; }
       this.invalidate();
     }
     if (!editor?.canText && this.active && !this.selected) this.active = false;
@@ -127,7 +136,7 @@ export class TextSurface {
       this.currentPage = Math.max(0, this.plugin('scroll').forDocument(this.session.currentId).getCurrentPage() - 1);
       this.build();
       requestAnimationFrame(() => this.records.get(this.currentPage)?.element.scrollIntoView({ block: 'start' }));
-      this.status('Nuova casella: trascina sulla pagina. Doppio clic su una casella per scrivere; trascina bordo e maniglie per spostarla o ridimensionarla.');
+      this.status('Trascina per creare una casella. Clicca sul testo per modificarlo; uscendo dalla casella le modifiche si applicano automaticamente. Salva aggiorna il PDF.');
     }
     this.sync(); this.notify();
   }
@@ -136,6 +145,7 @@ export class TextSurface {
     const scrollTop = this.surface.scrollTop, scrollLeft = this.surface.scrollLeft;
     this.cancelDrag(false); this.selected = null; this.pointer = null;
     this.generation++; this.queue = []; this.observer.disconnect();
+    for (const record of this.records.values()) for (const resolve of record.waiters ?? []) resolve(null);
     this.records.clear(); this.surface.replaceChildren();
     if (this.active && this.editor()) {
       this.currentPage = clamp(this.plugin('scroll').forDocument(this.session.currentId).getCurrentPage() - 1, 0, this.editor().pages.length - 1);
@@ -184,13 +194,24 @@ export class TextSurface {
       record.layer = document.createElement('div'); record.layer.className = 'text-boxes-layer';
       record.plane.append(record.canvas, record.layer); this.draw(record, context.image);
       this.drawBoxes(index); this.layout(); this.updateList(); this.trim();
-      if (this.afterCommit?.index === index) {
-        const id = this.afterCommit.id; this.afterCommit = null;
-        const note = context.notes.find(note => note.id === id);
-        if (note) this.select(index, note);
-      }
     } catch (error) { if (generation === this.generation) this.status(error.message); }
-    finally { record.loading = false; this.loading = false; if (this.queue.length) this.pump(); }
+    finally {
+      for (const resolve of record.waiters ?? []) resolve(generation === this.generation ? record.context : null);
+      record.waiters = []; record.loading = false; this.loading = false; if (this.queue.length) this.pump();
+    }
+  }
+  async leaveAndSelect(index, id) {
+    if (!await this.commit(false)) return;
+    if (!id || !this.active) return;
+    const record = this.records.get(index);
+    if (!record) return;
+    if (!record.context) {
+      const ready = new Promise(resolve => (record.waiters ??= []).push(resolve));
+      this.wantPage(index, true);
+      if (!await ready) return;
+    }
+    const note = record.context.notes.find(note => note.id === id);
+    if (note) await this.select(index, note, true);
   }
   trim() {
     if ([...this.records.values()].filter(record => record.context).length <= 8) return;
@@ -267,7 +288,7 @@ export class TextSurface {
   }
   place(element, p) { Object.assign(element.style, { left: `${p.x}px`, top: `${p.y}px`, width: `${p.width}px`, height: `${p.height}px` }); }
   async select(index, note, editing = false) {
-    if (this.unavailable() || this.pending || !this.deselect()) { this.status('Applica o annulla la modifica corrente prima di selezionare un’altra casella.'); return; }
+    if (this.unavailable() || this.pending || !this.deselect()) { this.status('Attendi l’applicazione della modifica corrente o correggi la casella.'); return; }
     const input = { id: note.id, contents: note.contents, font: note.font, size: note.size, color: note.color, position: clone(note.position) };
     this.selected = { index, input, initial: JSON.stringify(input), existing: true, editing: false, ready: false };
     this.currentPage = index; this.onPage(index); this.setStyles(input); this.drawBoxes(index); this.updateControls(); this.notify();
@@ -276,13 +297,14 @@ export class TextSurface {
       const context = await this.read(index, note.id);
       if (this.selected !== selection || generation !== this.generation) return;
       this.draw(this.records.get(index), context.image); selection.ready = true; this.drawBoxes(index);
-      if (editing || selection.wantsEdit) this.editText(); else this.selected.element?.focus({ preventScroll: true });
+      if (selection.wantsCommit) this.commit(false);
+      else if (editing || selection.wantsEdit) this.editText(); else this.selected.element?.focus({ preventScroll: true });
     } catch (error) { if (this.selected === selection) { this.deselect(true); this.status(error.message); } }
   }
   drawSelected() {
     const selection = this.selected, record = this.records.get(selection.index);
     const box = document.createElement('div'); box.className = 'text-box-selected'; box.tabIndex = 0;
-    box.setAttribute('aria-label', 'Casella selezionata. Doppio clic per modificare il testo.');
+    box.setAttribute('aria-label', 'Casella selezionata. Clicca sul testo per modificarlo.');
     this.place(box, selection.input.position); record.layer.append(box); selection.element = box;
     box.ondblclick = () => this.editText();
     const textarea = document.createElement('textarea'); textarea.className = 'text-inline-input'; textarea.spellcheck = false;
@@ -319,7 +341,7 @@ export class TextSurface {
   }
   deselect(force = false) {
     if (this.drag) return false;
-    if (this.changed() && !force) { this.status('Applica o annulla le modifiche alla casella.'); return false; }
+    if (this.changed() && !force) { this.status('Esci dalla casella per applicarla, oppure annulla la modifica.'); return false; }
     if (this.selected) {
       const index = this.selected.index, record = this.records.get(index);
       this.selected = null;
@@ -328,8 +350,9 @@ export class TextSurface {
     this.updateControls(); this.notify(); return true;
   }
   cancel() {
+    if (this.unavailable() || this.committing) return;
     this.cancelDrag();
-    if (this.changed() && !confirm('Scartare le modifiche non applicate alla casella?')) return;
+    if (this.changed() && !confirm('Scartare le modifiche non applicate alla casella?')) { this.editText(); return; }
     this.creating = false; this.pasting = null; this.deselect(true); this.status('Modifica annullata.');
   }
   pointerDown(index, event) {
@@ -342,6 +365,11 @@ export class TextSurface {
     const handle = event.target.closest('[data-handle]')?.dataset.handle;
     let selectedBox = event.target.closest('.text-box-selected');
     const id = event.target.closest('[data-note]')?.dataset.note;
+    if (this.changed() && !selectedBox) {
+      event.preventDefault();
+      this.leaveAndSelect(index, id);
+      return;
+    }
     if (id && !selectedBox) {
       const note = record.context.notes.find(note => note.id === id);
       event.preventDefault(); this.select(index, note);
@@ -392,7 +420,11 @@ export class TextSurface {
       else this.status('Trascina per disegnare una casella di almeno 12 × 12 pt.');
     } else {
       this.updateControls(); this.notify();
-      this.status('Posizione aggiornata. Applica per confermare, oppure continua a modificare la casella.');
+      if (this.changed()) {
+        if (this.selected?.ready) this.commit(false);
+        else if (this.selected) this.selected.wantsCommit = true;
+      }
+      else if (drag.kind === 'move') this.editText();
     }
     this.notify();
   }
@@ -455,23 +487,46 @@ export class TextSurface {
     if (!box) return;
     event.preventDefault(); this.pasteBox(box);
   }
-  pasteBox(box = this.clipboard) {
+  async pasteBox(box = this.clipboard) {
     if (!box || this.unavailable()) return;
     if (!this.pointer || !this.records.get(this.pointer.index)?.context) { this.pasting = box; this.status('Clicca sulla pagina nel punto in cui incollare la casella.'); return; }
-    if (this.changed()) { this.status('Applica o annulla la modifica corrente prima di incollare una nuova casella.'); return; }
     if (typeof box.contents !== 'string' || box.contents.length > 10000 || !Number.isInteger(box.font) || box.font < 0 || box.font > 11 ||
         !Number.isFinite(box.size) || box.size < 6 || box.size > 144 || !/^#[0-9a-f]{6}$/i.test(box.color) ||
         !Number.isFinite(box.width) || !Number.isFinite(box.height)) { this.status('Casella negli appunti non valida.'); return; }
-    const { index, x, y } = this.pointer, record = this.records.get(index);
+    const { index, x, y } = this.pointer;
+    if (this.changed() && !await this.commit(false)) return;
+    const record = this.records.get(index);
+    if (!record) return;
+    if (!record.context) {
+      const ready = new Promise(resolve => (record.waiters ??= []).push(resolve));
+      this.wantPage(index, true);
+      if (!await ready) return;
+    }
     const width = clamp(box.width, 12, record.width), height = clamp(box.height, 12, record.height);
     this.newBox(index, { x: clamp(x, 0, record.width - width), y: clamp(y, 0, record.height - height), width, height },
       { contents: box.contents, font: box.font, size: box.size, color: box.color }, true);
   }
-  async commit(remove) {
-    if (!this.selected || !this.selected.ready || this.unavailable()) return;
-    if (!remove && !this.size.reportValidity()) return;
-    if (remove && !this.selected.existing) { this.cancel(); return; }
-    if (remove && !confirm('Eliminare la casella selezionata? L’operazione può essere annullata.')) return;
+  commit(remove) {
+    if (this.committing) return this.committing;
+    if (this.unavailable() || this.drag) return Promise.resolve(false);
+    // Queue the entire flush, rather than queueing apply from inside a flush:
+    // editor.lock uses flush directly on this same queue before native saving.
+    this.committing = this.run(() => this.flush(remove)).finally(() => {
+      this.committing = null; this.notify();
+    });
+    this.notify();
+    return this.committing;
+  }
+  async flush(remove = false) {
+    if (this.drag) return false;
+    if (!this.selected) return true;
+    if (!remove && !this.changed()) { this.deselect(true); return true; }
+    if (!this.selected.ready) return false;
+    // Empty new outlines are placeholders, never blank PDF annotations.
+    if (!remove && !this.selected.existing && !this.selected.input.contents.trim()) { this.deselect(true); return true; }
+    if (!remove && !this.size.reportValidity()) return false;
+    if (remove && !this.selected.existing) { this.deselect(true); return true; }
+    if (remove && !confirm('Eliminare la casella selezionata? L’operazione può essere annullata.')) return false;
     const selection = this.selected, generation = this.generation;
     const payload = { pageIndex: selection.index, token: this.token, revision: this.revision, input: clone(selection.input), remove };
     // Keep a failed draft recoverable. The host is locked by withWorking while
@@ -480,34 +535,41 @@ export class TextSurface {
     try {
       await this.apply(payload);
       if (this.generation === generation) this.deselect(true); // no-op edit
-      if (!remove) {
-        const record = this.records.get(selection.index), note = record?.context?.notes.find(note => note.id === selection.input.id);
-        if (note) this.select(selection.index, note);
-        else this.afterCommit = { index: selection.index, id: selection.input.id };
-      }
       this.creating = false; this.notify(); this.pump();
-      this.status(remove ? 'Casella eliminata.' : 'Casella applicata. Puoi selezionarla, copiarla o modificarla sulla pagina.');
+      this.status(remove ? 'Casella eliminata.' : 'Testo applicato. Clicca sulla casella per modificarlo ancora; Salva aggiorna il PDF.');
+      return true;
     } catch (error) {
-      this.afterCommit = null;
       if (this.generation === generation) this.selected = selection;
       this.updateControls(); this.notify(); this.status(error.message);
+      this.editText();
+      return false;
     }
   }
   async showContextMenu(index, event, keyboard = false) {
     event.preventDefault(); event.stopPropagation();
     this.hideMenu();
-    const record = this.records.get(index);
+    let record = this.records.get(index);
     if (!this.active || this.unavailable() || !record?.context || this.drag) return;
-    const request = ++this.menuRequest, generation = this.generation;
     const selectedBox = event.target.closest?.('.text-box-selected');
     const id = selectedBox && this.selected?.index === index ? this.selected.input.id : event.target.closest?.('[data-note]')?.dataset.note;
     const boxRect = (selectedBox ?? event.target.closest?.('[data-note]') ?? record.element).getBoundingClientRect();
     const clientX = keyboard ? boxRect.left + Math.min(20, boxRect.width / 2) : event.clientX;
     const clientY = keyboard ? boxRect.top + Math.min(20, boxRect.height / 2) : event.clientY;
     const point = { index, ...this.point(index, { clientX, clientY }) };
+    if (this.changed() && id !== this.selected?.input.id) {
+      if (!await this.commit(false)) return;
+      record = this.records.get(index);
+      if (!record) return;
+      if (!record.context) {
+        const ready = new Promise(resolve => (record.waiters ??= []).push(resolve));
+        this.wantPage(index, true);
+        if (!await ready) return;
+      }
+    }
+    const request = ++this.menuRequest, generation = this.generation;
     if (id && (this.selected?.input.id !== id || this.selected.index !== index)) {
       const note = record.context.notes.find(note => note.id === id);
-      if (!note || this.pending) { this.status('Applica o annulla la modifica corrente prima di selezionare un’altra casella.'); return; }
+      if (!note || this.pending) { this.status('Correggi o annulla la modifica corrente prima di selezionare un’altra casella.'); return; }
       await this.select(index, note);
     }
     if (request !== this.menuRequest || generation !== this.generation || !this.active || this.unavailable()) return;
@@ -559,10 +621,9 @@ export class TextSurface {
     const enabled = !!this.editor()?.canText && !this.unavailable();
     for (const control of this.toolbar.querySelectorAll('button,input,select')) control.disabled = !enabled;
     document.querySelector('#text-new').setAttribute('aria-pressed', String(!!this.creating));
-    for (const id of ['text-apply', 'text-cancel', 'text-delete']) document.querySelector(`#${id}`).disabled = !enabled || !this.selected;
+    for (const id of ['text-cancel', 'text-delete']) document.querySelector(`#${id}`).disabled = !enabled || !this.selected;
     // A failed Worker must still let the user copy or discard a recoverable draft.
     document.querySelector('#text-cancel').disabled = this.unavailable() || !this.selected;
-    document.querySelector('#text-apply').disabled ||= !this.selected?.ready;
     this.list.disabled = !enabled || !this.active;
     this.zoom.disabled = !enabled || !this.active;
     this.surface.classList.toggle('drawing-text', !!this.creating);

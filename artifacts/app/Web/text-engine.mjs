@@ -107,49 +107,44 @@ export function createTextTools(api) {
     validate(value);
     return value;
   }
-  function appearance(annot, value) {
-    // Build the appearance in an isolated document. Existing AcroForm font
-    // resources in the edited PDF must not determine how our text is painted.
-    const document = api.FPDF_CreateNewDocument();
-    checked(document, 'Impossibile preparare l’aspetto del testo.');
-    let page = 0, temporary = 0, exported = 0, ptr = 0;
+  function appearanceText(annot) {
+    const length = api.FPDFAnnot_GetAP(annot, 0, 0, 0);
+    if (length <= 2) return '';
+    checked(length <= 4 * 1024 * 1024, 'Aspetto del testo troppo grande.');
+    const ptr = alloc(length);
     try {
-      const width = value.rect[2] - value.rect[0], height = value.rect[1] - value.rect[3];
-      page = api.FPDFPage_New(document, 0, width, height);
-      checked(page);
-      temporary = api.EPDFPage_CreateAnnot(page, 3);
-      checked(temporary);
-      ptr = alloc(16);
-      api.pdfium.HEAPF32.set([0, height, width, 0], ptr / 4);
-      checked(api.FPDFAnnot_SetRect(temporary, ptr));
-      setString(temporary, 'Contents', value.contents);
-      checked(api.FPDFAnnot_SetFlags(temporary, 4));
-      checked(api.EPDFAnnot_SetBorderStyle(temporary, 1, 0));
-      checked(api.EPDFAnnot_ClearColor(temporary, 0));
-      checked(api.EPDFAnnot_SetOpacity(temporary, 1));
-      checked(api.EPDFAnnot_SetTextAlignment(temporary, 0));
-      checked(api.EPDFAnnot_SetVerticalAlignment(temporary, 0));
-      const rgb = [1, 3, 5].map(offset => parseInt(value.color.slice(offset, offset + 2), 16));
-      checked(api.EPDFAnnot_SetDefaultAppearance(temporary, value.font, value.size, ...rgb));
-      checked(api.EPDFAnnot_GenerateAppearance(temporary), 'Impossibile generare l’aspetto del testo.');
-      const length = api.FPDFAnnot_GetAP(temporary, 0, 0, 0);
-      checked(length > 2 && length <= 4 * 1024 * 1024, 'L’aspetto generato per il testo è vuoto o non valido.');
-      const stream = alloc(length);
-      try {
-        checked(api.FPDFAnnot_GetAP(temporary, 0, stream, length));
-        const contents = new TextDecoder('utf-16le').decode(api.pdfium.HEAPU8.slice(stream, stream + length - 2));
-        checked(/\b(?:Tj|TJ)\b/.test(contents), 'Il motore non ha generato il testo della casella. Provare un altro font o una casella più grande.');
-      } finally { free(stream); }
-      exported = api.EPDFAnnot_ExportAppearanceAsDocument(temporary);
-      checked(exported, 'L’aspetto della casella di testo non è disponibile.');
-      checked(api.EPDFAnnot_SetAppearanceFromPage(annot, exported, 0), 'Impossibile applicare l’aspetto del testo alla casella.');
-    } finally {
-      if (exported) api.FPDF_CloseDocument(exported);
-      if (ptr) free(ptr);
-      if (temporary) api.FPDFPage_CloseAnnot(temporary);
-      if (page) api.FPDF_ClosePage(page);
-      api.FPDF_CloseDocument(document);
-    }
+      checked(api.FPDFAnnot_GetAP(annot, 0, ptr, length));
+      return new TextDecoder('utf-16le').decode(api.pdfium.HEAPU8.slice(ptr, ptr + length - 2));
+    } finally { free(ptr); }
+  }
+  function appearance(annot, value) {
+    // The native setter takes an 8-bit alpha, unlike the SDK's 0..1 wrapper.
+    // Generate directly on the destination annotation: exporting/importing its
+    // AP through a page can leave operators referring to the wrong Resources.
+    checked(api.EPDFAnnot_SetOpacity(annot, 255));
+    const rgb = [1, 3, 5].map(offset => parseInt(value.color.slice(offset, offset + 2), 16));
+    checked(api.EPDFAnnot_SetDefaultAppearance(annot, value.font, value.size, ...rgb));
+    checked(api.FPDFAnnot_SetAP(annot, 0, 0)); // remove broken legacy wrappers
+    checked(api.EPDFAnnot_GenerateAppearance(annot), 'Impossibile generare l’aspetto del testo.');
+    checked(/\b(?:Tj|TJ)\b/.test(appearanceText(annot)),
+      'Il motore non ha generato il testo della casella. Provare un altro font o una casella più grande.');
+  }
+  function needsRepair(page) {
+    const count = api.FPDFPage_GetAnnotCount(page), ptr = alloc(4);
+    try {
+      checked(count >= 0, 'Impossibile leggere le annotazioni.');
+      for (let i = 0; i < count; i++) {
+        const annot = api.FPDFPage_GetAnnot(page, i);
+        checked(annot, 'Annotazione non leggibile.');
+        try {
+          const value = readNote(annot);
+          if (!value || !value.contents.trim()) continue;
+          checked(api.EPDFAnnot_GetOpacity(annot, ptr));
+          if (api.pdfium.HEAP32[ptr / 4] !== 255 || !/\b(?:Tj|TJ)\b/.test(appearanceText(annot))) return true;
+        } finally { api.FPDFPage_CloseAnnot(annot); }
+      }
+      return false;
+    } finally { free(ptr); }
   }
   function repairAppearances(page, skip = new Set()) {
     const count = api.FPDFPage_GetAnnotCount(page);
@@ -194,11 +189,8 @@ export function createTextTools(api) {
         checked(api.FPDFAnnot_SetFlags(annot, 4)); // printable, rotates with the page
         checked(api.EPDFAnnot_SetBorderStyle(annot, 1, 0));
         checked(api.EPDFAnnot_ClearColor(annot, 0)); // transparent background
-        checked(api.EPDFAnnot_SetOpacity(annot, 1));
         checked(api.EPDFAnnot_SetTextAlignment(annot, 0));
         checked(api.EPDFAnnot_SetVerticalAlignment(annot, 0));
-        const rgb = [1, 3, 5].map(offset => parseInt(value.color.slice(offset, offset + 2), 16));
-        checked(api.EPDFAnnot_SetDefaultAppearance(annot, value.font, value.size, ...rgb));
         appearance(annot, value);
       } finally { if (ptr) free(ptr); api.FPDFPage_CloseAnnot(annot); }
     }
@@ -219,5 +211,5 @@ export function createTextTools(api) {
       return { pixels: pixels.buffer, width: w, height: h };
     } finally { if (bitmap) api.FPDFBitmap_Destroy(bitmap); free(ptr); }
   }
-  return { notes, geometry, prepare, apply, repairAppearances, render };
+  return { notes, geometry, prepare, apply, repairAppearances, needsRepair, render };
 }

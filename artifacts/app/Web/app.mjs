@@ -182,10 +182,10 @@ try {
       welcome.hidden = false;
       return notify();
     }),
-    'document.export': () => {
+    'document.export': () => withWorking(async () => {
       if (!locked || !editor) throw new Error('Documento non disponibile per il salvataggio.');
       return editor.export();
-    },
+    }),
     'document.markSaved': payload => {
       if (!locked || !editor) throw new Error('Documento non disponibile per il salvataggio.');
       editor.markSaved(payload);

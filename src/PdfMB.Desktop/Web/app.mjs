@@ -23,7 +23,8 @@ const enqueue = action => {
 function editorState() {
   return { ...(editor?.state() ?? { token: null, revision: 0, dirty: false, readOnly: true,
     canEdit: false, canText: false, canUndo: false, canRedo: false, blockedReason: '' }),
-    busy: locked || working || !!textSurface?.pending, textEditing: !!textSurface?.textEditing,
+    dirty: !!editor?.state().dirty || !!textSurface?.changed(),
+    busy: locked || working || !!textSurface?.busy, textEditing: !!textSurface?.textEditing,
     textMode: !!textSurface?.active,
     editorOpen: panelOpen && !!editor };
 }
@@ -120,8 +121,8 @@ function togglePanel() {
 try {
   if (!transport) throw new Error('Aprire PDF MB tramite l’applicazione Windows.');
   const handlers = {
-    'editor.lock': () => {
-      if (textSurface?.pending) throw new Error('Applicare o annullare la modifica alla casella di testo prima di continuare.');
+    'editor.lock': async () => {
+      if (textSurface && !await textSurface.flush()) throw new Error('Correggere o annullare la modifica alla casella prima di continuare.');
       panel.cancelDialogs(); locked = true; return notify();
     },
     'editor.unlock': () => { locked = false; return notify(); },
@@ -181,10 +182,10 @@ try {
       welcome.hidden = false;
       return notify();
     }),
-    'document.export': () => {
+    'document.export': () => withWorking(async () => {
       if (!locked || !editor) throw new Error('Documento non disponibile per il salvataggio.');
       return editor.export();
-    },
+    }),
     'document.markSaved': payload => {
       if (!locked || !editor) throw new Error('Documento non disponibile per il salvataggio.');
       editor.markSaved(payload);
@@ -226,7 +227,8 @@ try {
   textSurface = new TextSurface({ editor: () => editor, plugin, session, notify,
     unavailable: () => locked || working,
     read: (pageIndex, omitId) => enqueue(() => editor.textContext(pageIndex, omitId)),
-    apply: payload => enqueue(() => withWorking(() => editor.changeText(payload))),
+    run: action => enqueue(action),
+    apply: payload => withWorking(() => editor.changeText(payload)),
     onPage: index => {
       if (!session.currentId) return;
       plugin('scroll').forDocument(session.currentId).scrollToPage({ pageNumber: index + 1, behavior: 'instant' });
@@ -255,11 +257,11 @@ try {
     if (['z', 'y'].includes(key) && (document.querySelector('dialog[open]') || target?.matches?.('input,textarea'))) return;
     event.preventDefault(); event.stopImmediatePropagation();
     if (locked || working) return;
-    if (textSurface?.pending) { textSurface.status('Applica o annulla la modifica alla casella prima di continuare.'); return; }
     if (key === 'o') bridge.emit('host.open');
     if (key === 's') bridge.emit(event.shiftKey ? 'host.saveAs' : 'host.save');
-    if (key === 'z') uiAction(() => editor?.undo());
-    if (key === 'y') uiAction(() => editor?.redo());
+    if (key === 'z' || key === 'y') enqueue(async () => {
+      if (await textSurface.flush()) await withWorking(() => key === 'z' ? editor?.undo() : editor?.redo());
+    }).catch(showError);
   }, true);
   bridge.emit('viewer.ready');
   notify();

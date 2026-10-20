@@ -269,7 +269,17 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
         sourceCount = api.FPDF_GetPageCount(handle);
         nextPageId = sourceCount;
         if (sourceCount < 1) throw new Error('Il PDF non contiene pagine.');
-        return { ...protection(handle), pageCount: sourceCount };
+        const policy = protection(handle);
+        let textRepairNeeded = false;
+        if (policy.canAnnotate) {
+          for (let i = 0; i < sourceCount && !textRepairNeeded; i++) {
+            const page = api.FPDF_LoadPage(handle, i);
+            if (!page) throw new Error('Pagina non leggibile.');
+            try { textRepairNeeded = textTools.needsRepair(page); }
+            finally { api.FPDF_ClosePage(page); }
+          }
+        }
+        return { ...policy, pageCount: sourceCount, textRepairNeeded };
       });
     } else if (type === 'rebuild' && source) result = rebuild(payload);
     else if (['text-context', 'text-change'].includes(type) && source) result = textRequest(type, payload);
