@@ -1,3 +1,4 @@
+import { HighlightSurface } from './highlight-surface.mjs';
 import { createBridge } from './bridge.mjs';
 import { createDocumentSession } from './document-session.mjs';
 import { PageEditor, decodePdf } from './page-editor.mjs';
@@ -8,7 +9,7 @@ import { italian } from './italian.mjs';
 const welcome = document.querySelector('#welcome');
 const openButton = document.querySelector('#open');
 const transport = window.chrome?.webview;
-let bridge, registry, session, editor, panel, textSurface;
+let bridge, registry, session, editor, panel, textSurface, highlightSurface;
 let locked = false, working = false, panelOpen = false, nextView = null, strategy = 'vertical';
 let tail = Promise.resolve();
 const layouts = new Set();
@@ -123,6 +124,7 @@ try {
   const handlers = {
     'editor.lock': async () => {
       if (textSurface && !await textSurface.flush()) throw new Error('Correggere o annullare la modifica alla casella prima di continuare.');
+      highlightSurface?.close();
       panel.cancelDialogs(); locked = true; return notify();
     },
     'editor.unlock': () => { locked = false; return notify(); },
@@ -130,6 +132,13 @@ try {
     'editor.text': () => withWorking(async () => {
       if (!locked || !editor?.canText) throw new Error('Il documento non consente l’inserimento di testo.');
       textSurface.toggle(undefined, true);
+      return notify();
+    }),
+    'editor.highlight': () => withWorking(async () => {
+      if (!locked || !editor?.canText) throw new Error('Annotazioni non consentite.');
+      const pageIndex = Math.max(0, viewerState().page - 1);
+      if (textSurface.active) textSurface.toggle(false, true);
+      await highlightSurface.open(pageIndex);
       return notify();
     }),
     'editor.change': payload => withWorking(async () => { if (editor) await editor.change(payload); return editorState(); }),
@@ -235,6 +244,7 @@ try {
     },
     onView: () => bridge.emit('viewer.state', viewerState())
   });
+  highlightSurface = new HighlightSurface({ editor: () => editor, run: action => enqueue(() => withWorking(action)), notify });
   plugin('scroll').onLayoutReady(event => layouts.add(event.documentId));
   plugin('document-manager').onDocumentClosed(id => layouts.delete(id));
   plugin('scroll').onStateChange(state => { strategy = state.strategy; });
@@ -270,3 +280,4 @@ try {
   document.querySelector('#hint').textContent = 'Avvio non riuscito';
   bridge?.emit('viewer.error', { message: error?.message ?? String(error) });
 }
+

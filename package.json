@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "assets": "node scripts/copy-assets.mjs"
+    "assets": "node scripts/copy-assets.mjs",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@embedpdf/pdfium": "2.15.1",

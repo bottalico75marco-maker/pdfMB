@@ -14,6 +14,7 @@ internal sealed class MainForm : Form
     private readonly ToolStripButton _save = new("Salva") { ToolTipText = "Salva (Ctrl+S)" };
     private readonly ToolStripButton _saveAs = new("Salva con nome…") { ToolTipText = "Salva con nome (Ctrl+Maiusc+S)" };
     private readonly ToolStripButton _manage = new("Gestisci pagine");
+    private readonly ToolStripButton _highlight = new("Evidenziatore") { ToolTipText = "Evidenzia il testo della pagina corrente" };
     private readonly ToolStripButton _text = new("Testo") { ToolTipText = "Modifica le caselle di testo direttamente sulla pagina" };
     private readonly ToolStripButton _undo = new("Annulla") { ToolTipText = "Annulla (Ctrl+Z)" };
     private readonly ToolStripButton _redo = new("Ripeti") { ToolTipText = "Ripeti (Ctrl+Y)" };
@@ -69,7 +70,7 @@ internal sealed class MainForm : Form
         };
         toolbar.Items.AddRange([new ToolStripLabel(AppTitle) { Font = new Font("Segoe UI", 12, FontStyle.Bold) },
             new ToolStripSeparator(), _open, _recent, _save, _saveAs, new ToolStripSeparator(),
-            _manage, _text, _undo, _redo, new ToolStripSeparator(), _close, _mode]);
+            _manage, _text, _highlight, _undo, _redo, new ToolStripSeparator(), _close, _mode]);
         var statusBar = new StatusStrip { BackColor = Color.White, SizingGrip = false };
         statusBar.Items.AddRange([_status, _pages]);
         _fileHeader.Controls.AddRange([_fileName, _unsavedFile]);
@@ -82,6 +83,7 @@ internal sealed class MainForm : Form
         _save.Click += async (_, _) => await RunHostAsync(async () => { await SaveCoreAsync(false); });
         _saveAs.Click += async (_, _) => await RunHostAsync(async () => { await SaveCoreAsync(true); });
         _manage.Click += async (_, _) => await EditorCommandAsync("editor.toggle");
+        _highlight.Click += async (_, _) => await EditorCommandAsync("editor.highlight");
         _text.Click += async (_, _) => await EditorCommandAsync("editor.text");
         _undo.Click += async (_, _) => await EditorCommandAsync("editor.undo");
         _redo.Click += async (_, _) => await EditorCommandAsync("editor.redo");
@@ -194,6 +196,7 @@ internal sealed class MainForm : Form
         _saveAs.Text = _readOnly ? "Salva copia…" : "Salva con nome…";
         _undo.Enabled = hasDocument && _canUndo;
         _text.Enabled = hasDocument && _canText;
+        _highlight.Enabled = hasDocument && _canText;
         _text.ToolTipText = _canText ? "Modifica le caselle di testo direttamente sulla pagina" : "Testo non disponibile: controllare i permessi del documento";
         _redo.Enabled = hasDocument && _canRedo;
         Text = _document is null ? AppTitle : $"{(_dirty ? "* " : "")}{_document.Name} — {AppTitle}";
@@ -510,3 +513,4 @@ internal sealed class MainForm : Form
         MessageBox.Show(this, ex.Message, "PDF MB", MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 }
+

@@ -93,3 +93,10 @@ dialog input { width: 100%; padding: 9px; border: 1px solid #879bb5; border-radi
 #text-context-menu button { display: block; width: 100%; margin: 0; padding: 9px 10px; text-align: left; font-size: 13px; border-radius: 4px; background: transparent; color: #203047; }
 #text-context-menu button:hover, #text-context-menu button:focus-visible { background: #e4edfa; }
 #text-context-menu button:disabled { opacity: .45; cursor: default; background: transparent; }
+
+
+#highlight-dialog { width: min(1100px, 94vw); max-width: 94vw; }
+.highlight-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.highlight-page { overflow: auto; max-height: 65vh; background: #e8ebef; text-align: center; }
+#highlight-canvas { display: block; width: 100%; height: auto; background: white; cursor: text; touch-action: none; }
+#highlight-status { max-height: 4em; overflow: auto; white-space: pre-wrap; }

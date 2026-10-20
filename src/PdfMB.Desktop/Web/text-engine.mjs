@@ -211,5 +211,6 @@ export function createTextTools(api) {
       return { pixels: pixels.buffer, width: w, height: h };
     } finally { if (bitmap) api.FPDFBitmap_Destroy(bitmap); free(ptr); }
   }
-  return { notes, geometry, prepare, apply, repairAppearances, needsRepair, render };
+  return { notes, geometry, point, screenRect, prepare, apply, repairAppearances, needsRepair, render };
 }
+

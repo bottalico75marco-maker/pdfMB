@@ -215,3 +215,16 @@ Attivare **Testo** nella barra principale. Tutti i controlli contestuali sono so
 | Documento con altre annotazioni e moduli, rete disattivata, scala Windows 125/150/200% | Altre annotazioni conservate; funzionamento locale e barra utilizzabile anche su più righe |
 
 Sottolineato, barrato, apice/pedice, evidenziazione dei caratteri, maiuscole/minuscole, rimozione della formattazione e stili misti sono ancora previsti per incrementi successivi.
+
+
+## Evidenziatore 0.7.0
+
+- Aprire un PDF testuale, selezionare una parola e un intervallo su più righe; applicare giallo e un secondo colore. Il testo deve restare leggibile e selezionabile in consultazione.
+- Provare selezione da destra verso sinistra, frecce e Maiusc+frecce, pagine con CropBox diverso dall’origine, rotazioni permanenti 90/180/270°, colonne e testo ruotato. Verificare allineamento tra selezione e risultato.
+- Aprire una scansione: segnalazione di assenza di testo, nessuna modifica al documento.
+- Annullare/ripetere aggiunta ed eliminazione. Eliminare l’unica evidenziazione appena creata: lo stato torna pulito se non ci sono altre modifiche.
+- Salvare, chiudere, riaprire e verificare aspetto in PDF MB e in un lettore esterno. Eliminare dall’elenco una evidenziazione riaperta, salvare e controllare che resti eliminata. Conservare le annotazioni estranee.
+- Alternare evidenziazioni, caselle, rotazione, spostamento, inserimento ed estrazione delle pagine; verificare anche Annulla/Ripeti dopo Salva.
+- Provare PDF firmati, cifrati e senza permessi di annotazione: comando disabilitato. Un errore di caricamento/salvataggio deve mantenere il lavoro e lo stato non salvato.
+- Aprire Evidenziatore durante la modifica di una casella: la bozza deve applicarsi prima dell’apertura. Apri/Salva/Chiudi dalla finestra principale devono chiudere la finestra di selezione senza applicare selezioni pendenti.
+- Compilare e pubblicare su Windows con SDK .NET 10 e asset EmbedPDF 2.15.1; la barra deve mostrare 0.7.0. Non distribuire la cartella 0.6.5 come 0.7.0.

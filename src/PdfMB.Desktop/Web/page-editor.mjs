@@ -48,9 +48,9 @@ class EditingWorker {
   }
 }
 
-const key = pages => JSON.stringify(pages.map(page => [page.id, page.rotation, page.textChanges ?? []]));
+const key = pages => JSON.stringify(pages.map(page => [page.id, page.rotation, page.textChanges ?? [], page.highlightChanges ?? []]));
 // Text records are immutable; snapshots share them and only copy page/array containers.
-const copyPages = pages => pages.map(page => ({ ...page, ...(page.textChanges ? { textChanges: [...page.textChanges] } : {}) }));
+const copyPages = pages => pages.map(page => ({ ...page, ...(page.textChanges ? { textChanges: [...page.textChanges] } : {}), ...(page.highlightChanges ? { highlightChanges: [...page.highlightChanges] } : {}) }));
 
 export class PageEditor {
   constructor(name, replaceView, currentPage) {
@@ -244,6 +244,29 @@ export class PageEditor {
     this.future = [];
     await this.releaseUnusedSources();
   }
+  async highlightContext(pageIndex) {
+    if (!this.canText) throw new Error('Annotazioni non consentite.');
+    const buffer = this.bytes.slice(0);
+    return this.worker.request('highlight-context', { buffer, pageIndex }, [buffer]);
+  }
+  async changeHighlight({ pageIndex, token, revision, input, remove = false }) {
+    if (!this.canText || token !== this.token || revision !== this.revision || !this.pages[pageIndex])
+      throw new Error('Documento cambiato o annotazioni non consentite.');
+    const before = this.snapshot(), target = this.snapshot(), page = target.pages[pageIndex];
+    const buffer = this.bytes.slice(0);
+    const { value, exists } = await this.worker.request('highlight-change', { buffer, pageIndex, pageId: page.id, input, remove }, [buffer]);
+    page.highlightChanges = (page.highlightChanges ?? []).filter(change => change.id !== input.id);
+    if (value || exists) page.highlightChanges.push({ id: input.id, value });
+    page.highlightChanges.sort((a, b) => a.id.localeCompare(b.id));
+    if (!page.highlightChanges.length) delete page.highlightChanges;
+    if (key(before.pages) === key(target.pages)) return;
+    target.focus = page.id;
+    await this.apply(target);
+    this.past.push(before);
+    if (this.past.length > 100) this.past.shift();
+    this.future = [];
+    await this.releaseUnusedSources();
+  }
   async export() {
     // Old files contain the text but may have a transparent or invalid AP.
     // Repair even when the user simply reopens and saves, preserving source
@@ -264,3 +287,4 @@ export class PageEditor {
   }
   dispose() { this.worker?.dispose(); }
 }
+

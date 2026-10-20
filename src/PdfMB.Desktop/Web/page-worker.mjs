@@ -1,9 +1,10 @@
+import { createHighlightTools } from './highlight-engine.mjs';
 import { init } from './vendor/pdfium-api.js';
 import { createTextTools } from './text-engine.mjs';
 
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_SOURCE_BYTES = 128 * 1024 * 1024;
-let api, textTools, source, sourceCount, nextPageId, pendingImport;
+let api, textTools, highlightTools, source, sourceCount, nextPageId, pendingImport;
 const imports = new Map();
 const catalog = new Map();
 async function initialize() {
@@ -13,6 +14,7 @@ async function initialize() {
   api = await init({ wasmBinary: await response.arrayBuffer() });
   api.PDFiumExt_Init();
   textTools = createTextTools(api);
+  highlightTools = createHighlightTools(api, textTools);
 }
 function allocate(length) {
   const pointer = api.pdfium.wasmExports.malloc(length);
@@ -143,6 +145,8 @@ function rebuild(pages) {
       withDocument(importHandle => {
         const importPolicy = protection(importHandle);
         if (importPolicy.readOnly) throw new Error(importPolicy.blockedReason);
+        if (!importPolicy.canAnnotate && group.some(item => pages.find(page => page.id === item.id)?.highlightChanges?.length))
+          throw new Error('La pagina importata non consente annotazioni.');
         const pointer = allocate(group.length * 4);
         try {
           api.pdfium.HEAP32.set(group.map(page => page.index), pointer / 4);
@@ -166,6 +170,10 @@ function rebuild(pages) {
       const page = api.FPDF_LoadPage(handle, index);
       if (!page) throw new Error('Pagina non disponibile per la rotazione.');
       try {
+        if (pages[index].highlightChanges?.length) {
+          if (!policy.canAnnotate) throw new Error('Annotazioni non consentite.');
+          highlightTools.apply(page, pages[index].highlightChanges);
+        }
         if (pages[index].textChanges?.length) {
           if (!policy.canAnnotate) throw new Error('Il documento non consente l’aggiunta o la modifica di annotazioni.');
           textTools.apply(page, pages[index].textChanges);
@@ -283,6 +291,28 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
       });
     } else if (type === 'rebuild' && source) result = rebuild(payload);
     else if (['text-context', 'text-change'].includes(type) && source) result = textRequest(type, payload);
+    else if (type === 'highlight-context' && source) result = withPage(payload.buffer, payload.pageIndex, page => ({
+      ...textTools.geometry(page), image: textTools.render(page), chars: highlightTools.characters(page), highlights: highlightTools.list(page)
+    }));
+    else if (type === 'highlight-change' && source) {
+      const policy = withDocument(handle => protection(handle));
+      if (!policy.canAnnotate) throw new Error('Annotazioni non consentite.');
+      const origin = pageOrigin(payload.pageId);
+      if (!origin) throw new Error('Pagina non disponibile.');
+      const original = origin.source === 'base' ? source : imports.get(origin.source)?.buffer;
+      if (!original) throw new Error('Sorgente non disponibile.');
+      if (!withDocument(handle => protection(handle), original).canAnnotate)
+        throw new Error('La pagina di origine non consente annotazioni.');
+      const exists = withPage(original, origin.index, page => highlightTools.list(page).some(h => h.id === payload.input.id));
+      const current = withPage(payload.buffer, payload.pageIndex, page => {
+        if (payload.remove) {
+          if (!highlightTools.list(page).some(h => h.id === payload.input.id)) throw new Error('Evidenziazione non disponibile.');
+          return null;
+        }
+        return highlightTools.prepare(page, payload.input);
+      });
+      result = { value: current, exists };
+    }
     else if (type === 'extract' && source) result = extract(payload);
     else if (type === 'prepare-import' && source) result = prepareImport(payload);
     else if (type === 'register-import' && source) result = registerImport(payload);
@@ -294,3 +324,4 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
     self.postMessage({ id, ok: false, error: error?.message ?? String(error) });
   }
 };
+

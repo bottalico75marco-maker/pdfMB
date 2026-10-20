@@ -2,7 +2,7 @@
 
 Applicazione desktop WinForms **.NET 10 + WebView2 + EmbedPDF 2.15.1**, con consultazione PDF, gestione pagine, testo libero e ponte C#↔JavaScript.
 
-La Release con correzione della visibilità delle caselle nel PDF salvato mostra **PDF MB 0.6.5**. Pubblicazione pronta in `artifacts/app-0.6.5/PdfMB.Desktop.exe`.
+La versione dei sorgenti è **PDF MB 0.7.0**, con evidenziatore del testo. L’ultima pubblicazione già inclusa nel repository resta la 0.6.5; la 0.7.0 deve essere compilata e pubblicata su Windows.
 
 ## Avvio
 
@@ -67,6 +67,16 @@ La selezione della casella e quella dei caratteri sono distinte: clic sul bordo 
 
 Dalla 0.6.5 l'aspetto viene generato direttamente nell'annotazione del documento di destinazione, senza esportazioni/importazioni intermedie: stream e risorse font restano nello stesso contesto. L'opacità nativa è impostata a 255 (100%). I PDF MB delle versioni precedenti con caselle trasparenti o aspetti non validi vengono rilevati all'apertura e segnalati come da salvare: **Salva** o **Salva con nome** rigenera le caselle, conserva contenuti e geometria e aggiorna il viewer. Non è necessario riscrivere il testo. Solo la scrittura riuscita rimuove l'indicazione di modifiche non salvate. Sorgente iniziale e cronologia restano conservate; documenti protetti e annotazioni estranee sono esclusi dalla riparazione.
 
+## Evidenziatore · 0.7.0
+
+Il comando **Evidenziatore** della barra Windows apre la pagina corrente in una finestra dedicata. Trascinare dal primo all’ultimo carattere da evidenziare, scegliere il colore e premere **Evidenzia selezione**. Da tastiera, con il foglio attivo, usare le frecce sinistra/destra e Maiusc per estendere la selezione. La selezione segue l’ordine del testo estratto da PDFium: verificare il risultato sui documenti con colonne o testo ruotato. Chiudi scarta soltanto la selezione non applicata; ogni applicazione è già una modifica al documento in memoria.
+
+L’elenco **Evidenziazioni PDF MB** permette di selezionare ed eliminare quelle create dall’applicazione, anche dopo salvataggio e riapertura. Ogni aggiunta/eliminazione è un’azione nella cronologia comune Annulla/Ripeti. Salva e Salva con nome includono le evidenziazioni, come le operazioni sulle pagine e l’estrazione. Le annotazioni Highlight native conservano il testo originale. Le evidenziazioni di altri programmi sono conservate e non modificabili da questo strumento.
+
+Lo strumento richiede gli stessi permessi delle caselle di testo. Le scansioni senza livello testuale richiedono OCR, non incluso. La finestra lavora su una pagina alla volta, con la rotazione permanente del PDF e senza la rotazione della sola vista. Per cambiare pagina chiudere la finestra, navigare e riaprire Evidenziatore. Limiti: 10.000 caratteri e 1.000 rettangoli per selezione, 1.000 modifiche alle evidenziazioni per pagina; pagine con oltre 100.000 caratteri non gestite.
+
+Verifiche automatiche del controller: `npm test` (Node.js, senza dipendenze aggiuntive). Queste verifiche non sostituiscono le prove del rendering PDFium e dell’app Windows.
+
 ## Struttura
 
 | Percorso | Responsabilità |
@@ -111,3 +121,4 @@ Le prove funzionali sono affidate all'utente: [CHECKLIST-MANUALE.md](docs/CHECKL
 - [EmbedPDF: distribuzione offline](https://www.embedpdf.com/docs/snippet/airgapped)
 - [EmbedPDF: caricamento dei documenti](https://www.embedpdf.com/docs/snippet/plugins/plugin-document-manager)
 - [WebView2: mapping dei contenuti locali](https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2.setvirtualhostnametofoldermapping)
+

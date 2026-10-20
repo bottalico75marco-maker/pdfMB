@@ -5,7 +5,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.6.5</Version>
+    <Version>0.7.0</Version>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <NuGetAudit>false</NuGetAudit>
     <WebView2Version>1.0.4022.49</WebView2Version>
@@ -26,3 +26,4 @@
     </ItemGroup>
   </Target>
 </Project>
+
