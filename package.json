@@ -1,0 +1,13 @@
+{
+  "name": "pdfmb-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "assets": "node scripts/copy-assets.mjs"
+  },
+  "dependencies": {
+    "@embedpdf/pdfium": "2.15.1",
+    "@embedpdf/snippet": "2.15.1"
+  }
+}

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>0.6.3</Version>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <NuGetAudit>false</NuGetAudit>
+    <WebView2Version>1.0.4022.49</WebView2Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="$(WebView2Version)" />
+    <Content Include="Web\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(NuGetPackageRoot)\microsoft.web.webview2\$(WebView2Version)\LICENSE.txt" Link="ThirdParty\WebView2\LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(NuGetPackageRoot)\microsoft.web.webview2\$(WebView2Version)\NOTICE.txt" Link="ThirdParty\WebView2\NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="CheckViewerAssets" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('Web\vendor\embedpdf.js') Or !Exists('Web\vendor\pdfium.wasm') Or !Exists('Web\vendor\pdfium-api.js')" Text="Asset EmbedPDF mancanti. Eseguire npm ci e npm run assets dalla radice del repository." />
+  </Target>
+  <Target Name="RemoveUnusedWpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <!-- WebView2 adds WPF as well; this host uses WinForms exclusively. -->
+      <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+  </Target>
+</Project>
