@@ -90,7 +90,7 @@ export class PageEditor {
   state() {
     return { token: this.token, revision: this.revision, dirty: this.dirty, readOnly: this.policy.readOnly,
       canEdit: this.canEdit, canText: this.canText, canContent: this.canEdit && !!this.policy.canContent,
-      canPrint: !!this.policy.canPrint, canCapture: !!this.policy.canCapture, blockedReason: this.blockedReason,
+      canPrint: !!this.policy.canPrint, blockedReason: this.blockedReason,
       canUndo: this.canEdit && this.past.length > 0, canRedo: this.canEdit && this.future.length > 0 };
   }
   snapshot() {
@@ -299,8 +299,14 @@ export class PageEditor {
     const buffer = this.bytes.slice(0);
     return this.worker.request('workbench-context', { buffer, pageIndex, pageId: this.pages[pageIndex].id }, [buffer]);
   }
+  async previewWorkbench({ pageIndex, token, revision, input, scale = 2 }) {
+    if (token !== this.token || revision !== this.revision || !this.pages[pageIndex] || !this.canEdit || !this.policy.canContent)
+      throw new Error('Anteprima non disponibile per questo documento.');
+    const buffer = this.bytes.slice(0);
+    return this.worker.request('workbench-preview', { buffer, pageIndex, pageId: this.pages[pageIndex].id, input, scale }, [buffer]);
+  }
   async outputPage(pageIndex, kind) {
-    if (!this.pages[pageIndex] || (kind === 'print' ? !this.policy.canPrint : !this.policy.canCapture))
+    if (!this.pages[pageIndex] || (kind !== 'print' || !this.policy.canPrint))
       throw new Error('Esportazione non consentita.');
     const buffer = this.bytes.slice(0);
     return this.worker.request('output-page', { buffer, pageIndex, pageId: this.pages[pageIndex].id, kind }, [buffer]);

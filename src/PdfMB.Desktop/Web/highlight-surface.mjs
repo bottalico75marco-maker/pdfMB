@@ -1,4 +1,5 @@
-// Uses the viewer's text selection: no overlay, canvas or duplicate document.
+import { pagePoint } from './viewer-page.mjs';
+// Uses the viewer's text selection and page pointer handlers.
 export function captureSelection(selection) {
   return selection.map(({ pageIndex, segmentRects }) => ({ pageIndex,
     rects: segmentRects.map(segment => ({ origin: { ...segment.origin }, size: { ...segment.size } }))
@@ -16,10 +17,17 @@ export class HighlightSurface {
     this.active = false;
     this.color = '#ffff00';
     this.disposers = [];
+    this.menuRequest = 0;
+    this.hosts = new WeakSet();
     this.deleteMenu = document.querySelector('#highlight-delete-menu');
-    this.deleteList = document.querySelector('#highlight-delete-list');
     this.deleteMenu.querySelector('[data-highlight-dismiss]').onclick = () => this.deleteMenu.hidePopover();
     this.deleteMenu.querySelector('[data-highlight-remove]').onclick = () => this.removeSelected();
+    document.addEventListener('pointerdown', event => {
+      if (!this.deleteMenu.contains(event.target)) this.hideMenu();
+    }, true);
+    window.addEventListener('blur', () => this.suspend());
+    window.addEventListener('resize', () => this.hideMenu());
+    document.addEventListener('scroll', () => this.hideMenu(), true);
   }
   setColor(color) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error('Colore evidenziatore non valido.');
@@ -33,17 +41,35 @@ export class HighlightSurface {
     this.sync();
     if (this.active) this.selection?.clear();
   }
-  suspend() { this.gesture = null; this.selection?.clear(); this.deleteMenu.hidePopover(); }
-  async showDelete(pageIndex) {
+  hideMenu() { this.menuRequest++; this.deleteTarget = null; this.deleteMenu.hidePopover(); }
+  suspend() { this.gesture = null; this.hideMenu(); this.selection?.clear(); }
+  async showContext(pageIndex, event) {
+    if (event.button !== 2 || this.pending || this.unavailable() || !this.editor()?.canText) return;
+    event.preventDefault(); event.stopPropagation();
+    const request = ++this.menuRequest;
     const editor = this.editor();
-    const items = await editor.highlightList(pageIndex);
-    this.deleteTarget = { token: editor.token, revision: editor.revision, pageIndex };
-    this.deleteList.replaceChildren(new Option(items.length ? 'Seleziona un’evidenziazione' : 'Nessuna evidenziazione PDF MB nella pagina', ''));
-    items.forEach((item, index) => this.deleteList.add(new Option('Evidenziazione ' + (index + 1), item.id)));
-    this.deleteMenu.showPopover();
+    const target = { token: editor.token, revision: editor.revision, pageIndex, documentId: this.documentId };
+    const host = event.currentTarget, click = { clientX: event.clientX, clientY: event.clientY };
+    const rotation = this.plugin('rotate').forDocument(this.documentId).getRotation();
+    try {
+      const items = await editor.highlightList(pageIndex);
+      if (request !== this.menuRequest || this.unavailable() || target.documentId !== this.documentId ||
+          target.token !== this.editor()?.token || target.revision !== this.editor()?.revision || !host.isConnected) return;
+      const hit = [...items].reverse().find(item => {
+        const [x, y] = pagePoint(click, host, item, rotation);
+        return (item.rects.length ? item.rects : [item.position]).some(p => x >= p.x && y >= p.y && x <= p.x + p.width && y <= p.y + p.height);
+      });
+      if (!hit) return;
+      this.deleteTarget = { ...target, id: hit.id };
+      this.selection?.clear();
+      this.deleteMenu.style.left = `${Math.max(8, Math.min(click.clientX, window.innerWidth - 220))}px`;
+      this.deleteMenu.style.top = `${Math.max(8, Math.min(click.clientY, window.innerHeight - 110))}px`;
+      this.deleteMenu.showPopover();
+      this.deleteMenu.querySelector('[data-highlight-remove]').focus();
+    } catch (error) { if (request === this.menuRequest) this.showError(error); }
   }
   removeSelected() {
-    const id = this.deleteList.value;
+    const id = this.deleteTarget?.id;
     if (!id || this.pending || this.unavailable()) return;
     const target = { ...this.deleteTarget };
     this.pending = true;
@@ -53,6 +79,7 @@ export class HighlightSurface {
   }
   unbind() {
     this.disposers.forEach(dispose => dispose()); this.disposers = [];
+    this.hosts = new WeakSet();
     try { this.interaction?.removeCursor('pdfmb-highlight'); } catch { /* Document already closed. */ }
     this.selection = this.interaction = null;
   }
@@ -62,8 +89,7 @@ export class HighlightSurface {
     if (!editor?.canText) this.active = false;
     const id = this.session.currentId;
     if (id !== this.documentId) {
-      this.deleteMenu.hidePopover();
-      this.unbind(); this.gesture = null; this.documentId = id;
+      this.unbind(); this.suspend(); this.gesture = null; this.documentId = id;
       if (id && editor) {
         this.selection = this.plugin('selection').forDocument(id);
         this.interaction = this.plugin('interaction-manager').forDocument(id);
@@ -72,9 +98,24 @@ export class HighlightSurface {
           this.gesture = { token: editor.token, revision: editor.revision, documentId: id, color: this.color };
         }));
         this.disposers.push(this.selection.onEndSelection(() => this.finish()));
+        const manager = this.plugin('interaction-manager');
+        editor.pages.forEach((_, pageIndex) => this.disposers.push(manager.registerAlways({
+          scope: { type: 'page', documentId: id, pageIndex },
+          handlers: {
+            onPointerEnter: (_, event) => this.bindHost(pageIndex, event.currentTarget),
+            onPointerDown: (_, event) => this.bindHost(pageIndex, event.currentTarget)
+          }
+        })));
       }
     }
     this.updateCursor();
+  }
+  bindHost(pageIndex, host) {
+    if (this.hosts.has(host)) return;
+    this.hosts.add(host);
+    const handler = event => this.showContext(pageIndex, event);
+    host.addEventListener('contextmenu', handler);
+    this.disposers.push(() => host.removeEventListener('contextmenu', handler));
   }
   updateCursor() {
     if (!this.interaction) return;

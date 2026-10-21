@@ -27,10 +27,19 @@ export function createHighlightTools(api, textTools) {
         if (api.FPDFAnnot_GetSubtype(a) !== 9 || string(a, 'PDFMBHighlight') !== '1') continue;
         const id = string(a, 'NM');
         if (!/^pdfmb-h-[0-9a-f-]{36}$/.test(id)) continue;
-        const p = alloc(16);
+        const p = alloc(32);
         try {
           check(api.FPDFAnnot_GetRect(a, p));
-          result.push({ id, position: textTools.screenRect(page, Array.from(api.pdfium.HEAPF32.slice(p / 4, p / 4 + 4))) });
+          const position = textTools.screenRect(page, Array.from(api.pdfium.HEAPF32.slice(p / 4, p / 4 + 4)));
+          const rects = [], count = api.FPDFAnnot_CountAttachmentPoints(a);
+          check(count >= 0 && count <= 1000);
+          for (let q = 0; q < count; q++) {
+            check(api.FPDFAnnot_GetAttachmentPoints(a, q, p));
+            const quad = Array.from(api.pdfium.HEAPF32.slice(p / 4, p / 4 + 8));
+            const xs = quad.filter((_, i) => i % 2 === 0), ys = quad.filter((_, i) => i % 2);
+            rects.push(textTools.screenRect(page, [Math.min(...xs), Math.max(...ys), Math.max(...xs), Math.min(...ys)]));
+          }
+          result.push({ id, position, rects, ...textTools.geometry(page) });
         } finally { free(p); }
       } finally { api.FPDFPage_CloseAnnot(a); }
     }

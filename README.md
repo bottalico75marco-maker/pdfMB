@@ -6,16 +6,19 @@
 
 | Riferimento | Stato |
 | --- | --- |
+| **0.8.4** | Build locale in `artifacts/app-0.8.4`: rettangoli ed ellissi senza campo note; Salva include anche le forme ancora da applicare; colore, spessore e aspetto conservati dopo riapertura. |
+| **0.8.3** | Build locale in `artifacts/app-0.8.3`: preview live di testo/font/dimensione, tavolozza con 14 timbri statici e data, PNG personali trasparenti in raccolta locale. |
+| **0.8.2** | Build locale in `artifacts/app-0.8.2`: selezione degli oggetti dal menu o dal PDF, apertura con trascinamento, registrazione come lettore PDF per Windows. |
 | **0.8.0** | Versione di sviluppo più recente, con tutte le funzioni descritte qui e guida Windows. Disponibile nel [ramo di sviluppo](https://github.com/bottalico75marco-maker/pdfMB/tree/codex/evidenziatore-0.7.0) e nella [PR #1](https://github.com/bottalico75marco-maker/pdfMB/pull/1), ancora in bozza per le prove Windows. |
 | **0.6.5** | Versione dei sorgenti su `main` al momento della pubblicazione di questo README e ultima cartella binaria storica inclusa nel repository. |
 
-Questo README presenta lo stato raggiunto dall’applicazione fino alla **0.8.0**. Aggiornare la documentazione nella pagina principale non unisce automaticamente la PR: per usare le nuove funzioni scegliere il ramo o la build corrispondente.
+Questo README presenta le funzioni aggiornate alla **0.8.4** locale. Aggiornare la documentazione nella pagina principale non unisce automaticamente la PR: per usare le nuove funzioni scegliere la build corrispondente.
 
 **Collegamenti:** [Guida Windows](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/GUIDA-WINDOWS.html) · [Checklist unica delle prove](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/CHECKLIST-MANUALE.md) · [Build Windows su GitHub Actions](https://github.com/bottalico75marco-maker/pdfMB/actions) · [Architettura](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/ARCHITETTURA.md)
 
 ## Installazione su Windows
 
-1. Aprire il risultato della workflow **Verifica e build Windows** relativo al commit desiderato e scaricare l’artefatto **PDF-MB-0.8.0-win-x64**, quando la compilazione è terminata con successo.
+1. Aprire il risultato della workflow **Verifica e build Windows** relativo al commit desiderato e scaricare l’artefatto **PDF-MB-0.8.4-win-x64**, quando la compilazione è terminata con successo.
 2. Estrarre **l’intera cartella** dello ZIP.
 3. Verificare la presenza di **.NET Desktop Runtime 10** e **Microsoft Edge WebView2 Runtime** su Windows a 64 bit.
 4. Avviare **PdfMB.Desktop.exe**.
@@ -24,11 +27,12 @@ Tenere insieme EXE, DLL, cartelle `Web` e `ThirdParty` e `GUIDA-WINDOWS.html`. P
 
 La guida si apre offline con **Aiuto → Guida Windows** o **F1**, nel browser predefinito. Include istruzioni per tutti gli strumenti e per la risoluzione dei problemi più comuni. La scritta fissa “Gestione pagine” in alto a destra è stata rimossa; il pulsante **Gestisci pagine** resta disponibile.
 
-## Tutte le funzionalità disponibili nella 0.8.0
+## Tutte le funzionalità disponibili nella 0.8.4
 
 ### Apertura e consultazione
 
-- Apertura mediante dialogo Windows, elenco degli ultimi dieci file o percorso passato all’avvio.
+- Apertura mediante dialogo Windows, elenco degli ultimi dieci file, trascinamento di un PDF sulla finestra o percorso passato all’avvio.
+- Registrazione in **Apri con** e comando **Aiuto → Imposta come lettore PDF predefinito…**: Windows permette di scegliere PDF MB per i file `.pdf`; il doppio clic apre il documento nel programma.
 - Un documento alla volta, fino a **64 MB**.
 - Miniature delle pagine, navigazione, ricerca e selezione/copia del testo quando consentite.
 - Zoom, adattamento alla pagina, vista singola/affiancata e modalità di scorrimento.
@@ -82,19 +86,19 @@ Ogni casella usa uno stile uniforme e ammette fino a 10.000 caratteri occidental
 3. Trascinare sul testo del PDF: il colore viene applicato al rilascio.
 4. Continuare con altri tratti oppure premere di nuovo il pulsante o `Esc` per tornare alla selezione normale.
 
-L’evidenziatore usa la selezione nativa del viewer e mantiene zoom, scorrimento e rotazioni. Non apre una finestra alternativa e non disegna rettangoli liberi sullo sfondo. **Elimina evidenziazione…** elenca quelle create da PDF MB nella pagina corrente, comprese quelle riaperte da un file salvato. Sono incluse nel salvataggio, nell’estrazione e nella cronologia comune.
+L’evidenziatore usa la selezione nativa del viewer e mantiene zoom, scorrimento e rotazioni. Non apre una finestra alternativa e non disegna rettangoli liberi sullo sfondo. Per eliminare un tratto, fare **clic destro sull’evidenziazione → Elimina evidenziazione**, anche dopo salvataggio e riapertura. Il comando agisce sul tratto cliccato. Le evidenziazioni sono incluse nel salvataggio, nell’estrazione e nella cronologia comune.
 
 ### Note adesive, forme e penna
 
-Dal menu **Strumenti** sono disponibili **Nota adesiva, Rettangolo, Ellisse, Linea e Penna**.
+Dal menu **Strumenti** sono disponibili **Nota adesiva, Rettangolo, Ellisse, Linea e Penna**. I controlli compaiono sopra il documento e si opera direttamente sulle pagine del viewer, mantenendo disponibili zoom, scorrimento e rotazione della vista. **Chiudi** o `Esc` termina la modalità strumenti.
 
 - Le note hanno un contenuto testuale modificabile.
-- Forme e disegni hanno colore e spessore selezionabili.
+- Forme e disegni hanno colore e spessore selezionabili, senza campo note/commento.
 - Posizione e dimensioni si impostano cliccando o trascinando sulla pagina di lavoro.
-- **Applica** conferma la modifica in memoria; **Salva** la conserva nel file.
-- L’elenco degli elementi permette di aggiornare le note ed eliminare note e disegni di PDF MB, anche dopo riapertura.
+- **Applica** conferma la modifica in memoria; **Salva** la conserva nel file e conferma anche la forma ancora in anteprima.
+- L’elenco degli elementi mostra quelli dello strumento corrente e permette di aggiornare le note, cambiare colore/spessore dei disegni ed eliminare gli elementi di PDF MB, anche dopo riapertura.
 - Le annotazioni sono PDF native; quelle di altri programmi vengono conservate e non sono modificabili dall’elenco dell’app.
-- I pulsanti Pagina precedente/successiva permettono di spostarsi tra le pagine di lavoro.
+- I pulsanti Pagina precedente/successiva navigano il PDF aperto; si può anche scorrere o iniziare una selezione su un’altra pagina.
 
 ### Modifica del testo e degli oggetti originali
 
@@ -102,18 +106,28 @@ Dal menu **Strumenti** sono disponibili **Nota adesiva, Rettangolo, Ellisse, Lin
 
 - **Sostituire il testo** di un singolo oggetto con un nuovo oggetto testuale nella stessa posizione e ordine: il vecchio contenuto non viene semplicemente coperto.
 - Scegliere **Helvetica, Times o Courier**, con dimensione **6–144 pt**.
+- Vedere **l’anteprima live sulla pagina** mentre si modificano testo, font e dimensione. L’anteprima usa il motore PDF e non aggiunge cronologia; **Applica** conferma e **Annulla anteprima** ripristina l’originale.
 - **Spostare, scalare, ruotare o eliminare** testo, immagini, tracciati e gruppi.
 - Applicare le modifiche alla cronologia comune e conservarle dopo salvataggio/riapertura.
 
 L’editor lavora sui singoli oggetti: non ricompone paragrafi e non modifica gli elementi interni dei gruppi/Form XObject. Il testo sostitutivo è occidentale, su una riga e fino a 10.000 caratteri; il font standard scelto può cambiare la larghezza rispetto all’originale. Verificare il risultato su pagine complesse, con ritagli, link, segnalibri o moduli.
 
-### Stampa e cattura PNG
+### Timbri statici e personali
+
+**Strumenti → Timbri** apre una tavolozza con Approvato, Come è, Confidenziale, Dipartimentale, Brutta copia, Esperimento, Scaduto, Finale, Per commento, Per il pubblico rilasciato, Non approvato, Non per rilascio pubblico, Venduta e Segretissimo.
+
+- **Data** permette di scegliere giorno e formato italiano; il valore inserito nel PDF resta statico.
+- **Carica PNG personale** importa un’immagine trasparente nella raccolta locale, disponibile anche dopo riavvio. PNG fino a 8 MB, 4096 pixel per lato e 8 milioni di pixel; l’importazione ottimizza il lato maggiore a 1200 pixel senza aggiungere sfondi.
+- Clic sulla pagina per la dimensione iniziale oppure trascinamento e campo **Larghezza mm** per dimensionarla. Le proporzioni sono bloccate; la dimensione iniziale arriva a circa **64 × 35 mm**, riducendosi per pagine piccole e immagini strette o alte.
+- **Applica** aggiunge un’annotazione Stamp al PDF; **Salva** la conserva. Timbri applicati selezionabili dall’elenco e rimovibili; Annulla/Ripeti opera nella cronologia comune.
+- Fino a 25 PNG personali, conservati in `%LOCALAPPDATA%\PdfMB\Stamps`. La libreria non contiene i documenti PDF.
+
+### Stampa
 
 **Stampa… / Ctrl+P** prepara il documento corrente, comprese le modifiche applicate ma non ancora salvate. L’anteprima separata offre il dialogo di stampa del browser per scegliere stampante, intervallo, copie, orientamento e scala.
 
 La stampa è raster, fino a **144 dpi** oppure **72 dpi** se il documento permette solo bassa qualità. Il limite per lavoro è **500 pagine e 36 MB di immagini**; per documenti più grandi si possono estrarre intervalli e stamparli separatamente.
 
-**Strumenti → Cattura PNG** salva l’intera pagina oppure un’area selezionata, comprese le annotazioni applicate. Il lato massimo della cattura è **1.400 pixel**. La destinazione viene scelta dal dialogo Windows e la scrittura è atomica. Stampa e cattura non cambiano il percorso, i Recenti o lo stato di salvataggio del PDF.
 
 ### Oscuramento effettivo
 
@@ -131,7 +145,7 @@ Annulla può ripristinare la sorgente nella sessione: condividere soltanto il PD
 - PDF elaborati localmente, con viewer, Worker e PDFium WASM distribuiti insieme all’app.
 - Nessun server HTTP locale avviato dall’applicazione; contenuti del viewer esposti tramite mapping locale WebView2.
 - Percorsi di apertura/salvataggio gestiti dai dialoghi Windows, non scelti dal codice web.
-- Permessi separati per annotazioni, modifica del contenuto, copia/cattura e stampa, ricontrollati anche sulle sorgenti importate.
+- Permessi separati per annotazioni, modifica del contenuto, copia e stampa, ricontrollati anche sulle sorgenti importate.
 - Documenti firmati, cifrati, senza permessi di assemblaggio o con controlli falliti mantenuti in sola consultazione secondo la policy dell’app.
 - Profili WebView2 ed elenco dei Recenti conservati in `%LOCALAPPDATA%\PdfMB`; i Recenti contengono percorsi locali.
 
@@ -166,7 +180,7 @@ La cronologia seguente è ricostruita dai sorgenti, dalla documentazione e dalle
 
 | Versione | Funzionalità e modifiche |
 | --- | --- |
-| **0.8.0** | Note adesive modificabili; rettangoli, ellissi, linee e penna; stampa con anteprima e cattura PNG; modifica del testo originale per oggetto, trasformazione/eliminazione di oggetti; oscuramento effettivo mediante ricostruzione raster; sorgenti immutabili nella cronologia; controlli separati dei permessi; correzione dei canali colore e rendering degli aspetti dei moduli; test con PDFium reale, prova browser e workflow di build Windows. Aggiornamento successivo della stessa versione: guida Windows offline, menu Aiuto/F1 e rimozione dell’etichetta fissa “Gestione pagine” in alto a destra. |
+| **0.8.0** | Note adesive modificabili; rettangoli, ellissi, linee e penna; stampa con anteprima; modifica del testo originale per oggetto, trasformazione/eliminazione di oggetti; oscuramento effettivo mediante ricostruzione raster; sorgenti immutabili nella cronologia; controlli separati dei permessi; correzione dei canali colore e rendering degli aspetti dei moduli; test con PDFium reale, prova browser e workflow di build Windows. Aggiornamento successivo della stessa versione: guida Windows offline, menu Aiuto/F1 e rimozione dell’etichetta fissa “Gestione pagine” in alto a destra. |
 | **0.7.0** | Evidenziatore direttamente sul testo selezionabile del viewer, pulsante di attivazione, cursore a pennarello e select del colore adiacente; applicazione al rilascio, eliminazione delle evidenziazioni PDF MB, salvataggio e cronologia comune; un’unica azione per selezioni su più pagine. |
 | **0.6.5** | Correzione delle caselle non visibili nel PDF salvato: opacità nativa e aspetto generato sulla FreeText di destinazione. Rilevamento/riparazione al salvataggio dei file creati dalle versioni precedenti. |
 | **0.6.4** | Applicazione automatica delle bozze di testo, eliminazione del pulsante Applica nelle caselle e sincronizzazione con Salva/chiusura; conferma di spostamento e ridimensionamento al rilascio. |

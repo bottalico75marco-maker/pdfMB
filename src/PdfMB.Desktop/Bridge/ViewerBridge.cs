@@ -8,6 +8,7 @@ internal sealed class ViewerBridge(CoreWebView2 core) : IDisposable
     public const string Origin = "https://pdfmb.example";
     private readonly Dictionary<string, TaskCompletionSource<JsonElement>> _pending = [];
     public event Action<string, JsonElement>? EventReceived;
+    public event Action<string>? FileDropped;
 
     public void Attach() => core.WebMessageReceived += OnMessage;
 
@@ -40,7 +41,17 @@ internal sealed class ViewerBridge(CoreWebView2 core) : IDisposable
                 else completion.TrySetException(new InvalidOperationException(message.GetProperty("error").GetString()));
             }
             else if (kind == "event")
-                EventReceived?.Invoke(message.GetProperty("type").GetString()!, message.GetProperty("payload").Clone());
+            {
+                string type = message.GetProperty("type").GetString()!;
+                if (type == "host.drop")
+                {
+                    // Accept the file object supplied by WebView2 for the drop,
+                    // never a filesystem path supplied in a JSON message.
+                    if (e.AdditionalObjects.Count == 1 && e.AdditionalObjects[0] is CoreWebView2File file)
+                        FileDropped?.Invoke(file.Path);
+                }
+                else EventReceived?.Invoke(type, message.GetProperty("payload").Clone());
+            }
         }
         catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
         { /* Ignore malformed messages; never interpret them as filesystem commands. */ }

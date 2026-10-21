@@ -1,11 +1,11 @@
-# Prova unica PDF MB 0.8.0
+# Prova unica PDF MB 0.8.4
 
 Questo è il riferimento per provare insieme evidenziatore e nuovi punti 2–5. Le prove delle caselle della 0.6.5 sono già state completate dall’utente; sotto si controllano soltanto le interazioni con i nuovi strumenti. Usare copie dei propri PDF, conservando gli originali per il confronto.
 
 ## Preparazione
 
-- [ ] Scaricare l’artefatto **PDF-MB-0.8.0-win-x64** dalla workflow **Verifica e build Windows** del commit della PR. Estrarre tutta la cartella e avviare PdfMB.Desktop.exe. Devono essere installati .NET Desktop Runtime 10 e WebView2 Runtime.
-- [ ] Verificare la versione 0.8.0 nella barra. Non usare l’EXE storico della 0.6.5.
+- [ ] Scaricare l’artefatto **PDF-MB-0.8.4-win-x64** dalla workflow **Verifica e build Windows** del commit della PR. Estrarre tutta la cartella e avviare PdfMB.Desktop.exe. Devono essere installati .NET Desktop Runtime 10 e WebView2 Runtime.
+- [ ] Verificare la versione 0.8.4 nella barra. Non usare l’EXE storico della 0.6.5.
 - [ ] Preparare: PDF testuale di almeno 3 pagine; PDF con immagini e tracciati; scansione senza testo; pagina con CropBox/rotazioni; PDF con note/moduli/link/segnalibri; PDF firmato/cifrato/con permessi ridotti. Per l’oscuramento usare una parola di prova univoca e una zona di immagine riconoscibile.
 - [ ] Registrare per ogni problema file, pagina, comando, risultato atteso/osservato e screenshot. Non inviare referti o altri dati personali se non necessari: si possono riprodurre i casi su dati di prova.
 
@@ -14,6 +14,9 @@ Questo è il riferimento per provare insieme evidenziatore e nuovi punti 2–5. 
 - [ ] In alto a destra non compare la scritta Gestione pagine; il pulsante Gestisci pagine continua a funzionare.
 - [ ] Aiuto → Guida Windows apre la guida locale nel browser predefinito anche senza un PDF aperto. F1 apre la stessa guida, anche con il focus sul viewer.
 - [ ] La cartella estratta contiene GUIDA-WINDOWS.html accanto all’EXE; la guida è consultabile offline, indice e collegamenti interni funzionano e la stampa dal browser è leggibile.
+- [ ] Trascinare un PDF sulla pagina, sulla barra e sulla zona del nome file: apertura nel programma. Provare file con spazi, estensione PDF maiuscola, documenti grandi/non validi e più file: niente navigazione esterna o perdita del PDF già aperto.
+- [ ] Con modifiche pendenti, trascinare un altro PDF e provare Salva / Non salvare / Annulla: il flusso deve essere quello di Apri PDF.
+- [ ] Aiuto → Imposta come lettore PDF predefinito apre le impostazioni Windows; PDF MB compare per `.pdf` e in Apri con. Dopo averlo scelto, doppio clic su un PDF con spazi nel percorso apre il documento. Nessuna modifica automatica alla scelta del lettore predefinito.
 
 ## 1. Evidenziatore nel PDF
 
@@ -28,16 +31,15 @@ Questo è il riferimento per provare insieme evidenziatore e nuovi punti 2–5. 
 - [ ] Strumenti → Nota adesiva: scrivere testo con accenti, cliccare sulla pagina, applicare. Deve comparire una nota nel PDF e nell’elenco.
 - [ ] Selezionare la nota dall’elenco, cambiare contenuto, applicare; salvare/riaprire e rileggere il contenuto. Eliminare e usare Annulla/Ripeti.
 - [ ] Disegnare rettangolo, ellisse, linea (anche orizzontale, verticale e con pendenza inversa) e penna; provare colore/spessore. Dopo Applica e riapertura devono restare nello stesso punto e poter essere eliminati dall’elenco.
+- [ ] Rettangolo ed ellisse non mostrano campi note/commento. Su un PDF appena aperto disegnarli e premere direttamente Salva senza Applica: riaprendo il file devono essere visibili. Riprovare cambiando colore/spessore di una forma salvata e verificare il risultato dopo riapertura.
 - [ ] Spostarsi tra pagine con i pulsanti degli strumenti; le modifiche applicate restano. Con una bozza, Chiudi/cambio strumento chiede se scartarla; annullando la domanda, la bozza deve restare.
 - [ ] Aprire un PDF con annotazioni di altri programmi: devono restare inalterate, senza possibilità di cancellarle dall’elenco delle annotazioni PDF MB.
 
-## 3. Stampa e cattura
+## 3. Stampa
 
 - [ ] Con modifiche applicate ma non salvate, Stampa… o Ctrl+P deve mostrare il risultato corrente su tutte le pagine. Confrontare anteprima e PDF.
 - [ ] Scegliere stampante/stampa PDF, intervallo, copie, orientamento e scala. Provare fogli verticali/orizzontali, dimensioni diverse e una pagina con campi modulo compilati. Controllare che nulla sia tagliato o perso.
 - [ ] Annullare il dialogo di stampa: documento, cronologia, percorso e dirty invariati. Provare il messaggio oltre 500 pagine/36 MB e ristampare intervalli estratti.
-- [ ] Strumenti → Cattura PNG: senza area salva la pagina intera; con trascinamento salva solo l’area. Verificare PNG, colore, orientamento e annotazioni.
-- [ ] Annullare Salva cattura; cambiare destinazione; tentare una destinazione PDF: il PDF aperto non deve essere sovrascritto. La cattura non cambia Recenti né dirty.
 
 ## 4. Testo e oggetti originali
 
@@ -58,8 +60,8 @@ Questo è il riferimento per provare insieme evidenziatore e nuovi punti 2–5. 
 
 ## 6. Prova incrociata e protezioni
 
-- [ ] Sullo stesso documento: evidenzia → nota → forma → modifica testo → sposta/ruota pagina → casella → cattura → stampa → oscuramento → salva/riapri. Annulla/Ripeti deve attraversare tutte le modifiche, con un’azione per comando e dirty coerente.
-- [ ] Su PDF firmato/cifrato: nessuna modifica e copia originale conservata. Stampa/cattura devono rispettare i rispettivi permessi. Senza permesso annotazioni: note/forme/evidenziatore disabilitati; senza permesso modifica: oggetti/oscuramento disabilitati.
+- [ ] Sullo stesso documento: evidenzia → nota → forma → modifica testo → sposta/ruota pagina → casella → stampa → oscuramento → salva/riapri. Annulla/Ripeti deve attraversare tutte le modifiche, con un’azione per comando e dirty coerente.
+- [ ] Su PDF firmato/cifrato: nessuna modifica e copia originale conservata. La stampa deve rispettare i relativi permessi. Senza permesso annotazioni: note/forme/evidenziatore disabilitati; senza permesso modifica: oggetti/oscuramento disabilitati.
 - [ ] Provare pagine importate con permessi diversi: nessuna operazione deve aggirare i permessi della sorgente. Provare anche inserimento, eliminazione ed estrazione dopo una modifica di contenuto.
 - [ ] File destinazione modificato da un altro programma, errore di scrittura, risultato oltre 64 MB o sorgenti/cronologia oltre 128 MB: lavoro precedente recuperabile, dirty non cancellato e nessuna scrittura parziale.
 - [ ] Scala Windows 100/125/150/200%, finestra ridotta e monitor diversi: comandi raggiungibili, selezioni allineate e dialoghi utilizzabili.
@@ -299,9 +301,28 @@ Sottolineato, barrato, apice/pedice, evidenziazione dei caratteri, maiuscole/min
 - Selezionare parole, più righe, più pagine e in direzione inversa. Ogni trascinamento deve contare come una sola azione Annulla/Ripeti, anche su più pagine.
 - Provare zoom diversi, rotazione della vista e rotazioni permanenti 90/180/270°, CropBox diverso dall’origine, colonne e testo ruotato: selezione e annotazioni salvate devono coincidere.
 - Trascinare su una scansione senza testo o sullo sfondo: nessuna evidenziazione a rettangolo libero e nessuna modifica al documento.
-- Eliminare una evidenziazione della pagina corrente con Elimina evidenziazione…; verificare Annulla/Ripeti. Eliminare l’unica evidenziazione appena creata: ritorno allo stato pulito se non ci sono altre modifiche.
-- Salvare, chiudere, riaprire e verificare aspetto in PDF MB e in un lettore esterno. Eliminare dall’elenco una evidenziazione riaperta, salvare e controllare che resti eliminata. Conservare le annotazioni estranee.
+- Fare clic destro su una evidenziazione e scegliere Elimina evidenziazione; verificare Annulla/Ripeti. Eliminare l’unica evidenziazione appena creata: ritorno allo stato pulito se non ci sono altre modifiche.
+- Salvare, chiudere, riaprire e verificare aspetto in PDF MB e in un lettore esterno. Eliminare con il tasto destro una evidenziazione riaperta, salvare e controllare che resti eliminata. Conservare le annotazioni estranee.
 - Alternare evidenziazioni, caselle, rotazione, spostamento, inserimento ed estrazione delle pagine; verificare anche Annulla/Ripeti dopo Salva.
 - Provare PDF firmati, cifrati e senza permessi di annotazione: comandi disabilitati. Un errore di caricamento/salvataggio deve mantenere lavoro, cronologia e stato non salvato.
 - Attivare Evidenziatore mentre si modifica una casella: la bozza deve applicarsi prima. Attivare Testo deve spegnere il pennarello. Apri/Salva/Chiudi devono interrompere i gesti pendenti; cambiando documento il pulsante torna inattivo.
 - Compilare e pubblicare su Windows con SDK .NET 10 e asset EmbedPDF 2.15.1; la barra deve mostrare 0.7.0. Non distribuire la cartella 0.6.5 come 0.7.0.
+
+## Strumenti sul viewer
+
+- Aprire ogni voce di Strumenti: barra sopra il documento, nessuna finestra con una copia della pagina. Il viewer deve rimanere visibile e navigabile.
+- Creare note, rettangoli, ellissi, linee e tratti di penna direttamente sulle pagine. Verificare anteprima, Applica, Salva e Annulla/Ripeti.
+- Cambiare pagina con i pulsanti, scorrendo e cliccando un’altra pagina; verificare che creazione, selezione di oggetti, oscuramento riguardino la pagina indicata nella barra.
+- Ripetere con zoom diversi, vista ruotata e pagine con rotazione permanente. Il tratto e la selezione devono seguire la pagina durante scorrimento e zoom.
+- Clic destro su evidenziazioni di più righe: selezionare solo il tratto cliccato; clic nello spazio tra le righe o fuori dai tratti non deve proporre eliminazioni di altri elementi.
+- Alternare Strumenti, Testo ed Evidenziatore; Chiudi/Esc deve ripristinare la consultazione. Le bozze non applicate devono restare protette dalla conferma esistente.
+
+## Preview live e timbri 0.8.3
+
+- Selezionare un testo dal menu senza passare il mouse sulla pagina; cambiare font e dimensione. Verificare preview immediata nella posizione corretta, senza doppio testo, a vari zoom e rotazioni. Ripetere con selezione mediante clic.
+- Durante la preview, il PDF e la cronologia non cambiano. Annulla anteprima ripristina contenuto, font e dimensione; Applica crea una sola modifica annullabile. Cambiare rapidamente stile, pagina e strumento non deve mostrare risposte obsolete.
+- Aprire Strumenti → Timbri e la tavolozza: 14 diciture e Data. Scegliere data e formato, applicare, salvare e riaprire: la data resta quella scelta.
+- Posizionare un timbro con clic; crearne un altro mediante trascinamento. Modificare Larghezza mm prima di Applica: proporzioni e misura visualizzata devono corrispondere. Provare i bordi e pagine piccole o ruotate.
+- Importare un PNG con trasparenza e semitrasparenza, sopra testo o sfondo colorato. Lo sfondo del PDF deve restare visibile attraverso il timbro, anche dopo salvataggio/riapertura ed estrazione.
+- Riavviare PDF MB e selezionare il PNG dalla raccolta Personali; importare non deve sporcare il documento. Provare un file non PNG, un’immagine troppo grande e un campo larghezza temporaneamente vuoto: errore gestito e programma utilizzabile.
+- Selezionare un timbro applicato dall’elenco, eliminarlo e usare Annulla/Ripeti; salvare e riaprire. Le annotazioni esterne devono rimanere intatte.

@@ -57,7 +57,7 @@ test('failed rasterization closes temporary page, bitmap, detached object and do
 function editorFixture(failView = false) {
   const requests = [], editor = new PageEditor('test.pdf', async () => { if (failView) throw Error('viewer failure'); }, () => 1);
   editor.source = editor.bytes = new ArrayBuffer(16);
-  editor.policy = { readOnly: false, canContent: true, canAnnotate: true, canPrint: true, canCapture: true };
+  editor.policy = { readOnly: false, canContent: true, canAnnotate: true, canPrint: true };
   editor.worker = { alive: true, request: async (type, payload) => {
     requests.push({ type, payload });
     if (type === 'workbench-change') return { override: 'revision-' + requests.length };
@@ -112,7 +112,7 @@ test('new text edits use the current override as their baseline after content ch
   await editor.changeText({ pageIndex: 0, token: editor.token, revision: editor.revision, input: { id: 'text' } });
   assert.equal(requests.find(r => r.type === 'text-change').payload.pageOverride, override);
 });
-test('content, annotations, print and capture enforce separate permissions', async () => {
+test('content, annotations and print enforce separate permissions', async () => {
   const { editor, change, requests } = editorFixture();
   editor.policy.canContent = false;
   await assert.rejects(change({ operation: 'object-delete' }));
@@ -120,7 +120,6 @@ test('content, annotations, print and capture enforce separate permissions', asy
   assert.equal(requests.length, 0);
   await change({ operation: 'note' });
   editor.policy.canPrint = false; await assert.rejects(editor.outputPage(0, 'print'));
-  editor.policy.canCapture = false; await assert.rejects(editor.outputPage(0, 'capture'));
   editor.policy.canAnnotate = false; await assert.rejects(change({ operation: 'square' }));
 });
 test('stale workbench rejects modifications before creating worker sources', async () => {

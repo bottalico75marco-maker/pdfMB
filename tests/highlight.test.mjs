@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PageEditor } from '../src/PdfMB.Desktop/Web/page-editor.mjs';
 import { captureSelection, markerCursor, HighlightSurface } from '../src/PdfMB.Desktop/Web/highlight-surface.mjs';
+import { pagePoint } from '../src/PdfMB.Desktop/Web/viewer-page.mjs';
 
 const input = { id: 'pdfmb-h-12345678-1234-1234-1234-123456789abc', start: 0, end: 4, color: '#ffff00' };
 function setup({ exists = false, failView = false } = {}) {
@@ -103,20 +104,21 @@ test('failure preparing a later page preserves the entire document', async () =>
 });
 
 function toolFixture() {
-  const menu = { hidePopover() {}, querySelector: () => ({}) };
-  globalThis.document = { querySelector: name => name === '#highlight-delete-menu' ? menu : {} };
+  const menu = { style: {}, opened: false, hidePopover() { this.opened = false; }, showPopover() { this.opened = true; }, querySelector: () => ({ focus() {} }) };
+  globalThis.document = { addEventListener() {}, querySelector: name => name === '#highlight-delete-menu' ? menu : { addEventListener() {} } };
+  globalThis.window = { innerWidth: 1000, innerHeight: 800, addEventListener() {} };
   let begin, end, selection = [], queued;
   const cursors = [], calls = [];
   const scope = { onBeginSelection: fn => { begin = fn; return () => {}; },
     onEndSelection: fn => { end = fn; return () => {}; }, clear: () => {},
     getFormattedSelection: () => selection, setMarqueeEnabled: () => {} };
-  const interaction = { activate: id => calls.push(id), setCursor: (...args) => cursors.push(args), removeCursor: id => calls.push(id) };
-  const editor = { token: 'document-a', revision: 4, canText: true, changeHighlights: async payload => calls.push(payload) };
+  const interaction = { getRotation: () => 0, activate: id => calls.push(id), setCursor: (...args) => cursors.push(args), removeCursor: id => calls.push(id) };
+  const editor = { token: 'document-a', revision: 4, pages: [], canText: true, changeHighlights: async payload => calls.push(payload) };
   const session = { currentId: 'view-a' };
   const tool = new HighlightSurface({ editor: () => editor, session, plugin: name => ({ forDocument: () => name === 'selection' ? scope : interaction }),
     run: action => { queued = action; return Promise.resolve(); }, notify() {}, unavailable: () => false, showError: assert.fail });
   tool.sync();
-  return { tool, editor, session, calls, cursors, begin: () => begin(), end: () => end(),
+  return { tool, menu, editor, session, calls, cursors, begin: () => begin(), end: () => end(),
     select: () => { selection = [{ pageIndex: 0, segmentRects: [{ origin: { x: 1, y: 2 }, size: { width: 3, height: 4 } }] }]; },
     commit: async () => queued?.() };
 }
@@ -152,4 +154,33 @@ test('deactivation or a host lock cancels an in-progress selection', async () =>
   assert.equal(f.calls.some(call => call.selections), false);
   f.begin(); f.tool.toggle(false); f.end();
   assert.equal(f.calls.some(call => call.selections), false);
+});
+
+test('page coordinates preserve the clicked PDF point across view rotation and zoom', () => {
+  const geometry = { width: 240, height: 200 };
+  for (let r = 0; r < 4; r++) for (const scale of [.5, 1, 2.5]) {
+    const host = { getBoundingClientRect: () => ({ left: 30, top: -50,
+      width: (r % 2 ? 200 : 240) * scale, height: (r % 2 ? 240 : 200) * scale }) };
+    const [x, y] = [[60, 80], [120, 60], [180, 120], [80, 180]][r];
+    assert.deepEqual(pagePoint({ clientX: 30 + x * scale, clientY: -50 + y * scale }, host, geometry, r).map(Math.round), [60, 80]);
+  }
+});
+
+test('right-click targets the actual highlight segment, excludes gaps, and rejects stale reads', async () => {
+  const f = toolFixture();
+  const item = { id: input.id, width: 240, height: 200,
+    position: { x: 10, y: 10, width: 100, height: 70 },
+    rects: [{ x: 10, y: 10, width: 100, height: 10 }, { x: 10, y: 70, width: 100, height: 10 }] };
+  f.editor.highlightList = async () => [item];
+  const host = { isConnected: true, getBoundingClientRect: () => ({ left: 0, top: 0, width: 480, height: 400 }) };
+  const event = y => ({ button: 2, currentTarget: host, clientX: 40, clientY: y, preventDefault() {}, stopPropagation() {} });
+  await f.tool.showContext(0, event(30));
+  assert.equal(f.menu.opened, true); assert.equal(f.tool.deleteTarget.id, item.id);
+  f.tool.suspend(); await f.tool.showContext(0, event(80));
+  assert.equal(f.menu.opened, false);
+  let resolve;
+  f.editor.highlightList = () => new Promise(done => { resolve = done; });
+  const pending = f.tool.showContext(0, event(30));
+  f.editor.revision++; resolve([item]); await pending;
+  assert.equal(f.menu.opened, false);
 });

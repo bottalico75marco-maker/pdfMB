@@ -1,11 +1,12 @@
 import { createHighlightTools } from './highlight-engine.mjs';
+import { createStampTools } from './stamp-engine.mjs';
 import { createWorkbenchTools } from './workbench-engine.mjs';
 import { init } from './vendor/pdfium-api.js';
 import { createTextTools } from './text-engine.mjs';
 
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_SOURCE_BYTES = 128 * 1024 * 1024;
-let api, textTools, highlightTools, workbenchTools, source, sourceCount, nextPageId, pendingImport;
+let api, textTools, highlightTools, workbenchTools, stampTools, source, sourceCount, nextPageId, pendingImport;
 const imports = new Map();
 const catalog = new Map();
 const overrides = new Map();
@@ -18,6 +19,7 @@ async function initialize() {
   textTools = createTextTools(api);
   highlightTools = createHighlightTools(api, textTools);
   workbenchTools = createWorkbenchTools(api, textTools);
+  stampTools = createStampTools(api, textTools);
 }
 function allocate(length) {
   const pointer = api.pdfium.wasmExports.malloc(length);
@@ -99,7 +101,7 @@ function pagePolicy(pageId) {
   const base = withDocument(handle => protection(handle));
   const imported = withDocument(handle => protection(handle), origin.buffer);
   return { canAnnotate: base.canAnnotate && imported.canAnnotate, canContent: base.canContent && imported.canContent,
-    canCapture: base.canCapture && imported.canCapture, canPrint: base.canPrint && imported.canPrint,
+    canPrint: base.canPrint && imported.canPrint,
     canPrintHigh: base.canPrintHigh && imported.canPrintHigh };
 }
 function retainPages(payload) {
@@ -125,7 +127,7 @@ function protection(handle) {
     !(permissions & 1024) ? 'Il documento non consente l’assemblaggio delle pagine.' : '';
   return { readOnly: !!reason, blockedReason: reason, signatures, permissions,
     canAnnotate: !reason && !!(permissions & 32), canContent: !reason && !!(permissions & 8),
-    canCapture: !!(permissions & 16), canPrint: !!(permissions & 4), canPrintHigh: !!(permissions & 2048) };
+    canPrint: !!(permissions & 4), canPrintHigh: !!(permissions & 2048) };
 }
 function serialize(handle) {
   const writer = api.PDFiumExt_OpenFileWriter();
@@ -352,6 +354,7 @@ function workbenchChange({ buffer, pageIndex, pageId, pageOverride, input }) {
     if (!page) throw new Error('Pagina non leggibile.');
     try {
       if (input.operation === 'redact') { /* Sanitized from the complete current document, including form appearances. */ }
+      else if (input.operation === 'stamp') stampTools.apply(single, page, input);
       else if (input.operation.startsWith('object-')) workbenchTools.mutateObject(single, page, input);
       else workbenchTools.mutateAnnotation(page, input);
     } finally { api.FPDF_ClosePage(page); }
@@ -393,10 +396,20 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
     else if (['text-context', 'text-change'].includes(type) && source) result = textRequest(type, payload);
     else if (type === 'workbench-context' && source) result = workbenchContext(payload);
     else if (type === 'workbench-change' && source) result = workbenchChange(payload);
+    else if (type === 'workbench-preview' && source) {
+      if (!pagePolicy(payload.pageId).canContent || !['object-text', 'object-transform'].includes(payload.input.operation))
+        throw new Error('Anteprima non consentita.');
+      result = withPage(payload.buffer, payload.pageIndex, (page, document) => {
+        workbenchTools.mutateObject(document, page, payload.input);
+        const scale = Number.isFinite(payload.scale) ? Math.max(1, Math.min(4, payload.scale)) : 2;
+        return { image: textTools.render(page, 2800, scale, document),
+          position: workbenchTools.objects(page, false).find(item => item.index === payload.input.index)?.position };
+      });
+    }
     else if (type === 'output-page' && source) {
       const policy = pagePolicy(payload.pageId);
-      if (payload.kind === 'print' ? !policy.canPrint : !policy.canCapture) throw new Error('Esportazione non consentita.');
-      result = withPage(payload.buffer, payload.pageIndex, (page, document) => ({ ...textTools.geometry(page), image: textTools.render(page, payload.kind === 'print' && !policy.canPrintHigh ? 1400 : 2800, payload.kind === 'print' && !policy.canPrintHigh ? 1 : 2, document) }));
+      if (payload.kind !== 'print' || !policy.canPrint) throw new Error('Esportazione non consentita.');
+      result = withPage(payload.buffer, payload.pageIndex, (page, document) => ({ ...textTools.geometry(page), image: textTools.render(page, !policy.canPrintHigh ? 1400 : 2800, !policy.canPrintHigh ? 1 : 2, document) }));
     }
     else if (type === 'highlight-list'  && source) result = withPage(payload.buffer, payload.pageIndex, page => highlightTools.list(page));
     else if (type === 'highlight-change' && source) {

@@ -1,4 +1,6 @@
-import { WorkbenchSurface, pngFromImage } from './workbench-surface.mjs';
+import { WorkbenchSurface } from './workbench-surface.mjs';
+import { printImageBase64 } from './print-image.mjs';
+import { installPdfDrop } from './pdf-drop.mjs';
 import { HighlightSurface } from './highlight-surface.mjs';
 import { createBridge } from './bridge.mjs';
 import { createDocumentSession } from './document-session.mjs';
@@ -25,8 +27,8 @@ const enqueue = action => {
 function editorState() {
   return { ...(editor?.state() ?? { token: null, revision: 0, dirty: false, readOnly: true,
     canEdit: false, canText: false, canUndo: false, canRedo: false, blockedReason: '' }),
-    dirty: !!editor?.state().dirty || !!textSurface?.changed(),
-    busy: locked || working || !!textSurface?.busy, textEditing: !!textSurface?.textEditing,
+    dirty: !!editor?.state().dirty || !!textSurface?.changed() || !!workbench?.pendingShape,
+    busy: locked || working || !!textSurface?.busy || !!workbench?.busy || workbench?.drag != null, textEditing: !!textSurface?.textEditing,
     textMode: !!textSurface?.active, highlightMode: !!highlightSurface?.active,
     editorOpen: panelOpen && !!editor };
 }
@@ -52,6 +54,8 @@ function notify() {
   const state = editorState();
   document.querySelector('#workspace').inert = locked || working;
   document.querySelector('#text-toolbar').inert = locked || working;
+  document.querySelector('#tools-toolbar').inert = locked || working;
+  workbench?.sync();
   panel?.refresh(panelOpen && !!editor);
   textSurface?.sync();
   bridge.emit('editor.state', state);
@@ -124,8 +128,11 @@ function togglePanel() {
 try {
   if (!transport) throw new Error('Aprire PDF MB tramite l’applicazione Windows.');
   const handlers = {
+    'stamps.set': payload => workbench.setCustomStamps(payload),
+    'stamps.error': payload => workbench.stampError(payload.message),
     'editor.lock': async () => {
       if (textSurface && !await textSurface.flush()) throw new Error('Correggere o annullare la modifica alla casella prima di continuare.');
+      if (workbench && !await workbench.flushShapes()) throw new Error('Correggere la forma prima di salvare o cambiare documento.');
       if (workbench && !workbench.close()) throw new Error('Chiudere o completare gli strumenti pagina.');
       highlightSurface?.suspend();
       panel.cancelDialogs(); locked = true; return notify();
@@ -144,11 +151,6 @@ try {
       highlightSurface.toggle();
       return notify();
     }),
-    'editor.highlightDelete': () => withWorking(async () => {
-      if (!locked || !editor?.canText) throw new Error('Annotazioni non consentite.');
-      await highlightSurface.showDelete(Math.max(0, viewerState().page - 1));
-      return notify();
-    }),
     'editor.tools': payload => withWorking(async () => {
       if (!locked || !editor) throw new Error('Documento non disponibile.');
       highlightSurface.toggle(false);
@@ -163,7 +165,7 @@ try {
       const pages = []; let total = 0;
       for (let index = 0; index < editor.pages.length; index++) {
         const data = await editor.outputPage(index, 'print');
-        const base64 = pngFromImage(data.image);
+        const base64 = printImageBase64(data.image);
         total += base64.length;
         if (total > 48 * 1024 * 1024) throw new Error('Anteprima oltre 36 MB. Estrarre un intervallo e stampare separatamente.');
         pages.push({ base64, widthMm: data.width * 25.4 / 72, heightMm: data.height * 25.4 / 72 });
@@ -236,6 +238,9 @@ try {
   };
   bridge = createBridge(transport, Object.fromEntries(Object.entries(handlers)
     .map(([name, handler]) => [name, payload => enqueue(() => handler(payload))])));
+  installPdfDrop({ target: document, unavailable: () => locked || working || !session,
+    open: file => transport.postMessageWithAdditionalObjects({ version: 1, kind: 'event', type: 'host.drop', payload: {} }, [file]),
+    showError });
   const { default: EmbedPDF } = await import('./vendor/embedpdf.js');
   const viewer = EmbedPDF.init({
     type: 'container', target: document.querySelector('#viewer'), worker: true,
@@ -277,11 +282,12 @@ try {
     },
     onView: () => bridge.emit('viewer.state', viewerState())
   });
-  workbench = new WorkbenchSurface({ editor: () => editor, run: action => enqueue(() => withWorking(action)),
+  workbench = new WorkbenchSurface({ editor: () => editor, plugin, session, read: action => enqueue(action), run: action => enqueue(() => withWorking(action)),
+    commit: payload => withWorking(() => editor.changeWorkbench(payload)),
     notify, emit: (type, payload) => bridge.emit(type, payload), unavailable: () => locked || working });
   highlightSurface = new HighlightSurface({ editor: () => editor, plugin, session,
     run: action => enqueue(() => withWorking(action)), notify,
-    unavailable: () => locked || working || !!textSurface?.active, showError });
+    unavailable: () => locked || working || !!textSurface?.active || !!workbench?.active, showError });
   plugin('scroll').onLayoutReady(event => layouts.add(event.documentId));
   plugin('document-manager').onDocumentClosed(id => layouts.delete(id));
   plugin('scroll').onStateChange(state => { strategy = state.strategy; });
@@ -298,6 +304,10 @@ try {
   document.addEventListener('keydown', event => {
     if (event.key === 'F1') {
       event.preventDefault(); event.stopImmediatePropagation(); bridge.emit('host.guide'); return;
+    }
+    if (event.key === 'Escape' && workbench.active && !locked && !working) {
+      if (document.querySelector(':popover-open')) return;
+      event.preventDefault(); workbench.close(); notify(); return;
     }
     if (event.key === 'Escape' && highlightSurface.active && !locked && !working) {
       highlightSurface.toggle(false); notify(); return;

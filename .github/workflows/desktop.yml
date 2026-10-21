@@ -22,11 +22,12 @@ jobs:
       - run: npm run assets
       - run: npm test
       - run: dotnet build PdfMB.sln -c Release --nologo
-      - run: dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.8.0 --nologo
+      - run: dotnet run --project tests/DesktopChecks -c Release
+      - run: dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.8.4 --nologo
       - uses: actions/upload-artifact@v4
         with:
-          name: PDF-MB-0.8.0-win-x64
-          path: artifacts/app-0.8.0/
+          name: PDF-MB-0.8.4-win-x64
+          path: artifacts/app-0.8.4/
           if-no-files-found: error
   browser:
     runs-on: ubuntu-latest

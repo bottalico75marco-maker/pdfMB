@@ -5,6 +5,8 @@ import { registerHooks } from 'node:module';
 import { init } from '@embedpdf/pdfium';
 import { createTextTools } from '../src/PdfMB.Desktop/Web/text-engine.mjs';
 import { createWorkbenchTools } from '../src/PdfMB.Desktop/Web/workbench-engine.mjs';
+import { createHighlightTools } from '../src/PdfMB.Desktop/Web/highlight-engine.mjs';
+import { createStampTools } from '../src/PdfMB.Desktop/Web/stamp-engine.mjs';
 
 const wasm = await readFile(new URL('../node_modules/@embedpdf/pdfium/dist/pdfium.wasm', import.meta.url));
 const api = await init({ wasmBinary: wasm }); api.PDFiumExt_Init();
@@ -39,6 +41,61 @@ function reopen(buffer, fn) {
   try { return fn(doc, page); } finally { api.FPDF_ClosePage(page); api.FPDF_CloseDocument(doc); free(p); }
 }
 const region = { x: 10, y: 30, width: 120, height: 50 };
+
+test('transparent native stamps survive save/reopen with all permanent rotations', () => {
+  const stamps = createStampTools(api, textTools);
+  for (let rotation = 0; rotation < 4; rotation++) {
+    const f = fixture();
+    try {
+      const background = api.FPDFPageObj_CreateNewRect(0, 0, 240, 200);
+      assert.ok(api.FPDFPageObj_SetFillColor(background, 0, 0, 255, 255));
+      assert.ok(api.FPDFPath_SetDrawMode(background, 2, false));
+      assert.ok(api.FPDFPage_InsertObjectAtIndex(f.page, background, 0));
+      assert.ok(api.FPDFPage_GenerateContent(f.page));
+      api.FPDFPage_SetRotation(f.page, rotation);
+      const pixels = new Uint8Array(16 * 8 * 4);
+      for (let y = 0; y < 8; y++) for (let x = 8; x < 16; x++) { const i = (y * 16 + x) * 4; pixels[i] = 255; pixels[i + 3] = x < 12 ? 255 : 128; }
+      stamps.apply(f.doc, f.page, { operation: 'stamp', label: 'Personale trasparente',
+        region: { x: 100, y: 90, width: 80, height: 40 }, image: { width: 16, height: 8, pixels: pixels.buffer } });
+      reopen(save(f.doc), (_, page) => {
+        const [stamp] = tools.annotations(page); assert.equal(stamp.type, 13); assert.equal(stamp.contents, 'Personale trasparente');
+        const image = textTools.render(page), data = new Uint8Array(image.pixels), geometry = textTools.geometry(page);
+        const at = (x, y) => [...data.slice((Math.round(y * image.height / geometry.height) * image.width + Math.round(x * image.width / geometry.width)) * 4,
+          (Math.round(y * image.height / geometry.height) * image.width + Math.round(x * image.width / geometry.width)) * 4 + 4)];
+        assert.deepEqual(at(120, 110), [0, 0, 255, 255]);
+        assert.deepEqual(at(150, 110), [255, 0, 0, 255]);
+        const blend = at(170, 110); assert.ok(Math.abs(blend[0] - 128) <= 1 && Math.abs(blend[2] - 127) <= 1);
+        tools.mutateAnnotation(page, { operation: 'annotation-delete', id: stamp.id });
+        assert.equal(api.FPDFPage_GetAnnotCount(page), 0);
+      });
+    } finally { f.close(); }
+  }
+});
+
+test('reopened highlights expose individual hit regions with permanent page rotation', () => {
+  const highlights = createHighlightTools(api, textTools);
+  for (let rotation = 0; rotation < 4; rotation++) {
+    const f = fixture();
+    try {
+      api.FPDFPage_SetRotation(f.page, rotation);
+      const id = 'pdfmb-h-12345678-1234-1234-1234-123456789abc';
+      const rects = [{ origin: { x: 10, y: 20 }, size: { width: 90, height: 12 } },
+        { origin: { x: 10, y: 60 }, size: { width: 70, height: 12 } }];
+      highlights.apply(f.page, [{ id, value: highlights.prepare(f.page, { id, color: '#ffff00', rects }) }]);
+      reopen(save(f.doc), (_, page) => {
+        const [item] = highlights.list(page);
+        assert.equal(item.id, id); assert.equal(item.rotation, rotation);
+        assert.equal(item.rects.length, 2);
+        item.rects.forEach((p, i) => {
+          assert.ok(Math.abs(p.x - rects[i].origin.x) < .1);
+          assert.ok(Math.abs(p.y - rects[i].origin.y) < .1);
+          assert.ok(Math.abs(p.width - rects[i].size.width) < .1);
+          assert.ok(Math.abs(p.height - rects[i].size.height) < .1);
+        });
+      });
+    } finally { f.close(); }
+  }
+});
 
 test('PDFium native note, rectangle, ellipse, line and ink survive save/reopen, update and deletion', () => {
   const f = fixture();
@@ -112,6 +169,55 @@ async function request(type, payload) {
   response = null; await self.onmessage({ data: { id: ++requestId, type, payload } });
   assert.equal(response.ok, true, response.error); return response.result;
 }
+
+test('shape appearances and styles persist through Worker rebuild, file reopen and later edits without note contents', async () => {
+  const f = fixture(), source = save(f.doc); f.close();
+  await request('load', source);
+  let bytes = source, page = { id: 0, rotation: 0 };
+  for (const operation of ['square', 'circle']) {
+    const result = await request('workbench-change', { buffer: bytes, pageIndex: 0, pageId: 0, pageOverride: page.override,
+      input: { operation, region: { x: 120, y: 90, width: 60, height: 40 }, color: '#ff0000', stroke: 3 } });
+    page = { ...page, override: result.override }; bytes = await request('rebuild', [page]);
+  }
+  const verify = (buffer, color) => reopen(buffer, (_, handle) => {
+    const shapes = tools.annotations(handle); assert.equal(shapes.length, 2);
+    shapes.forEach(shape => { assert.equal(shape.contents, ''); assert.equal(shape.color, color); });
+    for (let i = 0; i < 2; i++) {
+      const annot = api.FPDFPage_GetAnnot(handle, i);
+      try { assert.ok(api.FPDFAnnot_GetAP(annot, 0, 0, 0) > 2, 'Saved shape has a native appearance'); }
+      finally { api.FPDFPage_CloseAnnot(annot); }
+    }
+    const image = textTools.render(handle), pixels = new Uint8Array(image.pixels);
+    let colored = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (color === '#ff0000' ? pixels[i] > 180 && pixels[i + 1] < 80 && pixels[i + 2] < 80 : pixels[i + 2] > 180 && pixels[i] < 80) colored++;
+    }
+    assert.ok(colored > 100, 'Shapes are visible in the saved PDF, outside the UI preview');
+    return shapes;
+  });
+  const original = verify(bytes, '#ff0000');
+  for (const shape of original) {
+    const change = await request('workbench-change', { buffer: bytes, pageIndex: 0, pageId: 0, pageOverride: page.override,
+      input: { operation: 'annotation-update', id: shape.id, color: '#0000ff', stroke: 5 } });
+    page = { ...page, override: change.override }; bytes = await request('rebuild', [page]);
+  }
+  verify(bytes, '#0000ff').forEach(shape => assert.equal(shape.stroke, 5));
+});
+
+test('live text preview matches the committed PDF rendering and leaves original bytes untouched', async () => {
+  const f = fixture(), source = save(f.doc); f.close();
+  await request('load', source);
+  const input = { operation: 'object-text', index: 0, contents: 'PREVIEW', font: 'Courier', size: 24 };
+  const preview = await request('workbench-preview', { buffer: source, pageIndex: 0, pageId: 0, input });
+  const original = await request('workbench-context', { buffer: source, pageIndex: 0, pageId: 0 });
+  assert.equal(original.objects[0].text, 'SECRET'); assert.equal(original.objects[0].size, 16);
+  assert.notDeepEqual(preview.image.pixels, original.image.pixels);
+  const change = await request('workbench-change', { buffer: source, pageIndex: 0, pageId: 0, input });
+  const bytes = await request('rebuild', [{ id: 0, rotation: 0, override: change.override }]);
+  const committed = await request('workbench-context', { buffer: bytes, pageIndex: 0, pageId: 0 });
+  assert.equal(committed.objects[0].text, 'PREVIEW'); assert.equal(committed.objects[0].font, 'Courier');
+  assert.deepEqual(committed.image.pixels, preview.image.pixels);
+});
 test('production Worker composes notes, text edits, permanent rotation, redaction and subsequent edits', async () => {
   const f = fixture(); const source = save(f.doc); f.close();
   const policy = await request('load', source); assert.ok(policy.canContent && policy.canAnnotate);
@@ -154,7 +260,7 @@ test('production Worker composes notes, text edits, permanent rotation, redactio
   reopen(extracted, (_, page) => assert.equal(api.FPDFPage_CountObjects(page), 1));
 });
 
-test('form field appearances are present in captures and preserved outside a redacted area', () => {
+test('form field appearances are rendered for printing and preserved outside a redacted area', () => {
   const appearance = 'q 0 0 1 rg 0 0 140 40 re f Q';
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [4 0 R] /DR << /Font << /F1 6 0 R >> >> /DA (/F1 14 Tf 0 g) >> >>',

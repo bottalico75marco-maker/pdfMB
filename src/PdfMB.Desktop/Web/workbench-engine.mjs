@@ -43,9 +43,16 @@ export function createWorkbenchTools(api, textTools) {
       try {
         if (get(a, 'PDFMBTool') !== '1') continue;
         const id = get(a, 'NM'), type = api.FPDFAnnot_GetSubtype(a), contents = get(a, 'Contents');
-        const p = alloc(16);
-        try { check(api.FPDFAnnot_GetRect(a, p)); result.push({ id, type, contents,
-          position: textTools.screenRect(page, Array.from(api.pdfium.HEAPF32.slice(p / 4, p / 4 + 4))) }); }
+        const p = alloc(32);
+        try {
+          check(api.FPDFAnnot_GetRect(a, p));
+          const position = textTools.screenRect(page, Array.from(api.pdfium.HEAPF32.slice(p / 4, p / 4 + 4)));
+          let color = get(a, 'PDFMBColor'), stroke = Number(get(a, 'PDFMBStroke'));
+          if (!/^#[0-9a-f]{6}$/i.test(color) && api.FPDFAnnot_GetColor(a, 0, p, p + 4, p + 8, p + 12))
+            color = '#' + [...api.pdfium.HEAPU32.slice(p / 4, p / 4 + 3)].map(value => value.toString(16).padStart(2, '0')).join('');
+          if (!(stroke >= .5 && stroke <= 20)) { api.EPDFAnnot_GetBorderStyle(a, p); stroke = api.pdfium.HEAPF32[p / 4]; }
+          result.push({ id, type, contents, position, color: /^#[0-9a-f]{6}$/i.test(color) ? color : '#ffcc00', stroke: stroke >= .5 && stroke <= 20 ? stroke : 2 });
+        }
         finally { free(p); }
       } finally { api.FPDFPage_CloseAnnot(a); }
     }
@@ -61,7 +68,7 @@ export function createWorkbenchTools(api, textTools) {
         const type = api.FPDFPageObj_GetType(object);
         if (!api.FPDFPageObj_GetBounds(object, p, p + 4, p + 8, p + 12)) continue;
         const [left, bottom, right, top] = api.pdfium.HEAPF32.slice(p / 4, p / 4 + 4);
-        let text = '', size = 12;
+        let text = '', size = 12, font = 'Helvetica';
         if (type === 1 && textPage) {
           const length = api.FPDFTextObj_GetText(object, textPage, 0, 0);
           if (length > 2 && length <= 20002) {
@@ -70,8 +77,17 @@ export function createWorkbenchTools(api, textTools) {
             finally { free(s); }
           }
           if (api.FPDFTextObj_GetFontSize(object, p + 16)) size = api.pdfium.HEAPF32[(p + 16) / 4];
+          const handle = api.FPDFTextObj_GetFont(object), n = handle && api.FPDFFont_GetBaseFontName(handle, 0, 0);
+          if (n > 0 && n < 512) {
+            const name = alloc(n);
+            try {
+              api.FPDFFont_GetBaseFontName(handle, name, n);
+              const family = new TextDecoder().decode(api.pdfium.HEAPU8.slice(name, name + n));
+              font = /courier/i.test(family) ? 'Courier' : /times/i.test(family) ? 'Times-Roman' : 'Helvetica';
+            } finally { free(name); }
+          }
         }
-        result.push({ index, type, text, size, position: textTools.screenRect(page, [left, top, right, bottom]) });
+        result.push({ index, type, text, size, font, position: textTools.screenRect(page, [left, top, right, bottom]) });
       }
       return result;
     } finally { if (textPage) api.FPDFText_ClosePage(textPage); free(p); }
@@ -92,9 +108,17 @@ export function createWorkbenchTools(api, textTools) {
         try {
           match = get(a, 'PDFMBTool') === '1' && get(a, 'NM') === input.id;
           if (match && input.operation === 'annotation-update') {
-            check(api.FPDFAnnot_GetSubtype(a) === 1, 'Solo le note adesive hanno un contenuto modificabile.');
-            check(typeof input.contents === 'string' && input.contents.trim() && input.contents.length <= 10000, 'Scrivere da 1 a 10.000 caratteri.');
-            set(a, 'Contents', input.contents);
+            const type = api.FPDFAnnot_GetSubtype(a);
+            if ([4, 5, 6, 15].includes(type)) {
+              // Remove the previous appearance before changing native colors;
+              // then regenerate and persist the replacement appearance.
+              check(api.FPDFAnnot_SetAP(a, 0, 0));
+              applyShapeStyle(a, input); set(a, 'Contents', '');
+            } else {
+              check(type === 1, 'Questo elemento non ha un testo modificabile.');
+              check(typeof input.contents === 'string' && input.contents.trim() && input.contents.length <= 10000, 'Scrivere da 1 a 10.000 caratteri.');
+              set(a, 'Contents', input.contents);
+            }
             check(api.EPDFAnnot_GenerateAppearance(a));
           }
         } finally { api.FPDFPage_CloseAnnot(a); }
@@ -139,10 +163,19 @@ export function createWorkbenchTools(api, textTools) {
           finally { free(s); }
         }
         if (input.operation !== 'note') check(api.EPDFAnnot_ClearColor(a, 1));
+        if (input.operation !== 'note') { set(a, 'PDFMBColor', input.color); set(a, 'PDFMBStroke', String(input.stroke)); }
         check(api.EPDFAnnot_GenerateAppearance(a), 'Aspetto annotazione non generato.');
       } finally { free(p); api.FPDFPage_CloseAnnot(a); }
     }
     check(api.FPDFPage_GenerateContent(page));
+  }
+  function applyShapeStyle(annot, input) {
+    check(/^#[0-9a-f]{6}$/i.test(input.color) && Number.isFinite(input.stroke) && input.stroke >= .5 && input.stroke <= 20, 'Colore o spessore della forma non validi.');
+    const rgb = [1, 3, 5].map(i => parseInt(input.color.slice(i, i + 2), 16));
+    check(api.FPDFAnnot_SetColor(annot, 0, ...rgb, 255));
+    check(api.EPDFAnnot_SetOpacity(annot, 255)); check(api.EPDFAnnot_SetBorderStyle(annot, 1, input.stroke));
+    check(api.EPDFAnnot_ClearColor(annot, 1));
+    set(annot, 'PDFMBColor', input.color); set(annot, 'PDFMBStroke', String(input.stroke));
   }
   function mutateObject(document, page, input) {
     check(Number.isInteger(input.index) && input.index >= 0 && input.index < api.FPDFPage_CountObjects(page), 'Oggetto non disponibile.');

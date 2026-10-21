@@ -15,7 +15,6 @@ internal sealed class MainForm : Form
     private readonly ToolStripButton _saveAs = new("Salva con nome…") { ToolTipText = "Salva con nome (Ctrl+Maiusc+S)" };
     private readonly ToolStripButton _manage = new("Gestisci pagine");
     private readonly ToolStripButton _highlight = new("Evidenziatore") { ToolTipText = "Attiva il pennarello sul testo del PDF (Esc per uscire)", Overflow = ToolStripItemOverflow.Never };
-    private readonly ToolStripButton _highlightDelete = new("Elimina evidenziazione…");
     private readonly ToolStripComboBox _highlightColor = new()
     {
         DropDownStyle = ComboBoxStyle.DropDownList, AutoSize = false, Width = 94,
@@ -25,8 +24,7 @@ internal sealed class MainForm : Form
     private readonly ToolStripButton _text = new("Testo") { ToolTipText = "Modifica le caselle di testo direttamente sulla pagina" };
     private readonly ToolStripDropDownButton _tools = new("Strumenti");
     private readonly ToolStripButton _print = new("Stampa…");
-    private bool _canContent, _canPrint, _canCapture;
-    private long _revision;
+    private bool _canContent, _canPrint;
     private readonly ToolStripButton _undo = new("Annulla") { ToolTipText = "Annulla (Ctrl+Z)" };
     private readonly ToolStripButton _redo = new("Ripeti") { ToolTipText = "Ripeti (Ctrl+Y)" };
     private readonly ToolStripButton _close = new("Chiudi documento");
@@ -55,6 +53,7 @@ internal sealed class MainForm : Form
     private readonly string[] _args;
     private readonly string _dataDirectory;
     private readonly RecentFiles _recentFiles;
+    private readonly StampLibrary _stampLibrary;
     private ViewerBridge? _bridge;
     private PdfFile? _document;
     private string? _openedPath, _token;
@@ -67,6 +66,7 @@ internal sealed class MainForm : Form
         _args = args;
         _dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PdfMB");
         _recentFiles = new RecentFiles(_dataDirectory);
+        _stampLibrary = new StampLibrary(Path.Combine(_dataDirectory, "Stamps"));
         _recentFiles.Load();
         Text = AppTitle;
         StartPosition = FormStartPosition.CenterScreen;
@@ -81,7 +81,7 @@ internal sealed class MainForm : Form
         };
         toolbar.Items.AddRange([new ToolStripLabel(AppTitle) { Font = new Font("Segoe UI", 12, FontStyle.Bold) },
             new ToolStripSeparator(), _open, _recent, _save, _saveAs, new ToolStripSeparator(),
-            _manage, _text, _highlight, _highlightColor, _highlightDelete, _tools, _print, _undo, _redo, new ToolStripSeparator(), _close, _help]);
+            _manage, _text, _highlight, _highlightColor, _tools, _print, _undo, _redo, new ToolStripSeparator(), _close, _help]);
         var statusBar = new StatusStrip { BackColor = Color.White, SizingGrip = false };
         statusBar.Items.AddRange([_status, _pages]);
         _fileHeader.Controls.AddRange([_fileName, _unsavedFile]);
@@ -90,6 +90,7 @@ internal sealed class MainForm : Form
         Controls.Add(_fileHeader);
         Controls.Add(toolbar);
         Controls.Add(statusBar);
+        RegisterFileDrop(this);
         _open.Click += async (_, _) => await OpenDialogAsync();
         _save.Click += async (_, _) => await RunHostAsync(async () => { await SaveCoreAsync(false); });
         _saveAs.Click += async (_, _) => await RunHostAsync(async () => { await SaveCoreAsync(true); });
@@ -102,10 +103,9 @@ internal sealed class MainForm : Form
             if (_document is not null && index >= 0)
                 ReadEditorState(await _bridge!.RequestAsync("editor.highlightColor", new { color = HighlightColors[index] }));
         });
-        _highlightDelete.Click += async (_, _) => await EditorCommandAsync("editor.highlightDelete");
         _highlight.Click += async (_, _) => await EditorCommandAsync("editor.highlight");
         _text.Click += async (_, _) => await EditorCommandAsync("editor.text");
-        foreach (var tool in new (string Name, string Mode)[] { ("Nota adesiva", "note"), ("Rettangolo", "square"), ("Ellisse", "circle"), ("Linea", "line"), ("Penna", "ink"), ("Modifica testo e oggetti", "objects"), ("Cattura PNG", "capture"), ("Oscuramento effettivo", "redact") })
+        foreach (var tool in new (string Name, string Mode)[] { ("Nota adesiva", "note"), ("Rettangolo", "square"), ("Ellisse", "circle"), ("Linea", "line"), ("Penna", "ink"), ("Timbri", "stamp"), ("Modifica testo e oggetti", "objects"), ("Oscuramento effettivo", "redact") })
         {
             var item = new ToolStripMenuItem(tool.Name) { Tag = tool.Mode };
             item.Click += async (_, _) => await RunHostAsync(async () =>
@@ -122,6 +122,13 @@ internal sealed class MainForm : Form
         var guide = new ToolStripMenuItem("Guida Windows") { ShortcutKeyDisplayString = "F1" };
         guide.Click += (_, _) => OpenWindowsGuide();
         _help.DropDownItems.Add(guide);
+        var defaultPdf = new ToolStripMenuItem("Imposta come lettore PDF predefinito…");
+        defaultPdf.Click += (_, _) =>
+        {
+            try { PdfAssociation.OpenDefaultSettings(); }
+            catch (Exception ex) { ShowError(ex); }
+        };
+        _help.DropDownItems.Add(defaultPdf);
         Shown += async (_, _) => await StartAsync();
         FormClosing += OnFormClosing;
         FormClosed += (_, _) => _bridge?.Dispose();
@@ -132,6 +139,9 @@ internal sealed class MainForm : Form
     {
         try
         {
+            try { PdfAssociation.Register(); }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+            { /* Restricted Windows profiles can still open PDFs from the app. */ }
             string webDirectory = Path.Combine(AppContext.BaseDirectory, "Web");
             if (!File.Exists(Path.Combine(webDirectory, "vendor", "pdfium-api.js")))
                 throw new FileNotFoundException("Asset EmbedPDF mancanti. Eseguire npm ci e npm run assets, poi ricompilare.");
@@ -153,8 +163,10 @@ internal sealed class MainForm : Form
             _bridge = new ViewerBridge(core);
             _bridge.Attach();
             _bridge.EventReceived += OnViewerEvent;
+            _bridge.FileDropped += async path => await OpenDroppedPdfAsync(path);
             core.Navigate(ViewerBridge.Origin + "/index.html");
             await _ready.Task.WaitAsync(TimeSpan.FromSeconds(45));
+            await _bridge.RequestAsync("stamps.set", new { items = _stampLibrary.List() });
             _initialized = true;
             _hostBusy = false;
             _status.Text = "Pronto · Apri un documento PDF";
@@ -186,7 +198,17 @@ internal sealed class MainForm : Form
                 case "host.insert": await RunHostAsync(InsertPagesCoreAsync); break;
                 case "host.guide": OpenWindowsGuide(); break;
                 case "host.print": await RunHostAsync(PrintCoreAsync); break;
-                case "host.capture": await RunHostAsync(() => CaptureCoreAsync(payload)); break;
+                case "host.stampImport":
+                    try
+                    {
+                        string id = _stampLibrary.Import(payload.GetProperty("name").GetString()!, payload.GetProperty("base64").GetString()!);
+                        await _bridge!.RequestAsync("stamps.set", new { items = _stampLibrary.List(), selectedId = id });
+                    }
+                    catch (Exception ex)
+                    {
+                        await _bridge!.RequestAsync("stamps.error", new { message = ex.Message });
+                    }
+                    break;
                 case "host.extract": await RunHostAsync(ExtractPagesCoreAsync); break;
                 case "viewer.state":
                     int count = payload.GetProperty("pageCount").GetInt32();
@@ -210,8 +232,6 @@ internal sealed class MainForm : Form
         _canText = state.GetProperty("canText").GetBoolean();
         _canContent = state.TryGetProperty("canContent", out var content) && content.GetBoolean();
         _canPrint = state.TryGetProperty("canPrint", out var print) && print.GetBoolean();
-        _canCapture = state.TryGetProperty("canCapture", out var capture) && capture.GetBoolean();
-        _revision = state.GetProperty("revision").GetInt64();
         _textEditing = state.GetProperty("textEditing").GetBoolean();
         _text.Checked = state.GetProperty("textMode").GetBoolean();
         _highlight.Checked = state.GetProperty("highlightMode").GetBoolean();
@@ -236,10 +256,10 @@ internal sealed class MainForm : Form
         _undo.Enabled = hasDocument && _canUndo;
         _text.Enabled = hasDocument && _canText;
         _print.Enabled = hasDocument && _canPrint;
-        _tools.Enabled = hasDocument && (_canText || _canContent || _canCapture);
+        _tools.Enabled = hasDocument && (_canText || _canContent);
         foreach (ToolStripMenuItem item in _tools.DropDownItems)
-            item.Enabled = (string)item.Tag! switch { "objects" or "redact" => _canContent, "capture" => _canCapture, _ => _canText };
-        _highlight.Enabled = _highlightColor.Enabled = _highlightDelete.Enabled = hasDocument && _canText;
+            item.Enabled = (string)item.Tag! switch { "objects" or "redact" => _canContent, _ => _canText };
+        _highlight.Enabled = _highlightColor.Enabled = hasDocument && _canText;
         _text.ToolTipText = _canText ? "Modifica le caselle di testo direttamente sulla pagina" : "Testo non disponibile: controllare i permessi del documento";
         _redo.Enabled = hasDocument && _canRedo;
         Text = _document is null ? AppTitle : $"{(_dirty ? "* " : "")}{_document.Name} — {AppTitle}";
@@ -327,24 +347,6 @@ internal sealed class MainForm : Form
         preview.ShowDialog(this);
     }
 
-    private async Task CaptureCoreAsync(JsonElement payload)
-    {
-        if (_document is null || !_canCapture || payload.GetProperty("token").GetString() != _token || payload.GetProperty("revision").GetInt64() != _revision)
-            throw new InvalidOperationException("La cattura non corrisponde al documento corrente.");
-        byte[] bytes = PngFile.Decode(payload.GetProperty("base64").GetString()!);
-        using var dialog = new SaveFileDialog { Filter = "Immagine PNG|*.png", DefaultExt = "png", AddExtension = true,
-            FileName = Path.GetFileNameWithoutExtension(_document.Name) + $" - pagina {payload.GetProperty("page").GetInt32()}.png" };
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        string destination = Path.GetFullPath(dialog.FileName);
-        if (!destination.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(destination, _document.Path, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(destination, _openedPath, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Scegliere un percorso PNG diverso dal PDF aperto.");
-        var expected = await PdfFile.GetStampAsync(destination);
-        await PngFile.WriteAtomicAsync(destination, bytes, expected);
-        _status.Text = "Cattura PNG salvata";
-    }
-
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
         if (keyData == Keys.F1) { OpenWindowsGuide(); return true; }
@@ -367,6 +369,34 @@ internal sealed class MainForm : Form
         using var dialog = new OpenFileDialog { Filter = "Documento PDF (*.pdf)|*.pdf", Title = "Apri PDF", CheckFileExists = true };
         if (dialog.ShowDialog(this) == DialogResult.OK) await OpenPathCoreAsync(dialog.FileName);
     });
+
+    private void RegisterFileDrop(Control control)
+    {
+        // The embedded browser receives File objects through its DOM drop
+        // events. The remaining WinForms controls use Windows file drops.
+        if (control == _webView) return;
+        control.AllowDrop = true;
+        control.DragEnter += OnFileDrag;
+        control.DragOver += OnFileDrag;
+        control.DragDrop += async (_, e) =>
+        {
+            if (PdfDropFiles.GetPath(e.Data) is string path) await OpenDroppedPdfAsync(path);
+        };
+        foreach (Control child in control.Controls) RegisterFileDrop(child);
+    }
+
+    private void OnFileDrag(object? sender, DragEventArgs e)
+    {
+        e.Effect = !IsBusy && _initialized && (e.AllowedEffect & DragDropEffects.Copy) != 0 && PdfDropFiles.GetPath(e.Data) is not null
+            ? DragDropEffects.Copy : DragDropEffects.None;
+    }
+
+    private Task OpenDroppedPdfAsync(string path)
+    {
+        if (!string.Equals(Path.GetExtension(path), ".pdf", StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
+            return Task.CompletedTask;
+        return RunHostAsync(() => OpenPathCoreAsync(path));
+    }
 
     private async Task OpenPathCoreAsync(string path)
     {
@@ -541,7 +571,7 @@ internal sealed class MainForm : Form
         _document = null;
         _openedPath = _token = null;
         _dirty = _readOnly = _canEdit = _canText = _textEditing = _canUndo = _canRedo = false;
-        _canContent = _canPrint = _canCapture = false;
+        _canContent = _canPrint = false;
         _manage.Checked = false;
         _text.Checked = _highlight.Checked = false;
         _status.Text = "Pronto · Apri un documento PDF";
