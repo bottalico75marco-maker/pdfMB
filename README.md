@@ -1,8 +1,6 @@
 # PDF MB
 
-**Applicazione desktop per Windows per consultare, organizzare e modificare documenti PDF, con elaborazione locale dei file.**
-
-PDF MB riunisce visualizzazione, gestione delle pagine, caselle di testo, evidenziatore, note e disegni, modifica dei contenuti originali, stampa, cattura PNG e oscuramento effettivo.
+**Il tuo editor PDF per Windows:** organizza pagine, modifica testi, aggiungi annotazioni, stampa e oscura contenuti. Tutto in locale.
 
 ## Stato del progetto e versione attuale
 
