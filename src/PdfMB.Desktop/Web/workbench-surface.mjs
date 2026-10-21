@@ -264,7 +264,8 @@ export class WorkbenchSurface {
     this.field('content-label').textContent = objects ? 'Nuovo testo dell’oggetto' : 'Contenuto nota';
     this.items.disabled = redact;
     this.contents.value = ''; this.originalContents = '';
-    this.field('apply').textContent = redact ? 'Applica oscuramento' : 'Applica';
+    this.field('apply').setAttribute('aria-label', redact ? 'Applica oscuramento' : 'Applica');
+    this.field('apply').title = redact ? 'Applica oscuramento' : 'Applica';
     this.field('apply').disabled = false;
     this.field('delete').hidden = redact;
     this.field('warning').hidden = !redact;

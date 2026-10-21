@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { registerHooks } from 'node:module';
 import { init } from '@embedpdf/pdfium';
+import { PDFDocument } from 'pdf-lib';
 import { createTextTools } from '../src/PdfMB.Desktop/Web/text-engine.mjs';
 import { createWorkbenchTools } from '../src/PdfMB.Desktop/Web/workbench-engine.mjs';
 import { createHighlightTools } from '../src/PdfMB.Desktop/Web/highlight-engine.mjs';
@@ -169,6 +170,76 @@ async function request(type, payload) {
   response = null; await self.onmessage({ data: { id: ++requestId, type, payload } });
   assert.equal(response.ok, true, response.error); return response.result;
 }
+
+test('blank PDF formats have correct physical sizes and insertion leaves source content intact', async () => {
+  const expected = { A4: [210, 297], A5: [148, 210], A3: [297, 420] };
+  for (const [format, mm] of Object.entries(expected)) for (const landscape of [false, true]) {
+    const bytes = await request('create-blank', { format, landscape });
+    const pdf = await PDFDocument.load(bytes);
+    assert.equal(pdf.getPageCount(), 1);
+    const size = landscape ? [...mm].reverse() : mm;
+    assert.ok(Math.abs(pdf.getPage(0).getWidth() * 25.4 / 72 - size[0]) < .01);
+    assert.ok(Math.abs(pdf.getPage(0).getHeight() * 25.4 / 72 - size[1]) < .01);
+    reopen(bytes, (_, page) => { assert.equal(api.FPDFPage_CountObjects(page), 0); assert.equal(api.FPDFPage_GetAnnotCount(page), 0); });
+  }
+  await assert.rejects(request('create-blank', { format: 'A2', landscape: false }), /A4/);
+  const f = fixture(), source = save(f.doc); f.close();
+  await request('load', source);
+  const blank = await request('create-blank', { format: 'A5', landscape: true });
+  const prepared = await request('prepare-import', blank);
+  const [inserted] = await request('register-import', { token: prepared.token, pageIndexes: [0] });
+  const bytes = await request('rebuild', [inserted, { id: 0, rotation: 0, formFields: [] }]);
+  const pdf = await PDFDocument.load(bytes);
+  assert.equal(pdf.getPageCount(), 2);
+  assert.ok(Math.abs(pdf.getPage(0).getWidth() * 25.4 / 72 - 210) < .01);
+  assert.equal(pdf.getPage(1).getWidth(), 240);
+  const restored = await request('rebuild', [{ id: 0, rotation: 0 }]);
+  reopen(restored, (_, page) => assert.equal(tools.objects(page, true)[0].text, 'SECRET'));
+});
+
+test('managed forms survive Worker rotation, page overrides, extraction, reopening and redaction without orphan fields', async () => {
+  const f = fixture();
+  const second = api.FPDFPage_New(f.doc, 1, 240, 200); api.FPDF_ClosePage(second);
+  const source = save(f.doc); f.close();
+  const policy = await request('load', source); assert.ok(policy.canFormDesign);
+  const prepare = (index, kind, name, value) => request('form-prepare', { buffer: source, pageIndex: index, pageId: index, input: {
+    id: 'pdfmb-f-' + crypto.randomUUID(), kind, name, label: name, value, defaultValue: kind === 'text' ? '' : false,
+    font: 'Helvetica', size: 14, color: '#112233', maxLength: 1000, required: false, readOnly: false, multiline: false,
+    position: { x: 20, y: 20, width: kind === 'text' ? 150 : 20, height: 24 } } });
+  const text = await prepare(0, 'text', 'nome', 'Città €'), checkbox = await prepare(1, 'checkbox', 'consenso', true);
+  const pages = [{ id: 0, rotation: 1, formFields: [text] }, { id: 1, rotation: 0, formFields: [checkbox] }];
+  let bytes = await request('rebuild', pages);
+  let pdf = await PDFDocument.load(bytes);
+  assert.equal(pdf.getForm().getTextField('nome').getText(), 'Città €');
+  assert.ok(pdf.getForm().getCheckBox('consenso').isChecked());
+  const context = await request('form-context', { buffer: bytes, pageIndex: 0 });
+  assert.equal(context.width, 200); assert.equal(context.fields[0].name, 'nome');
+  const note = await request('workbench-change', { buffer: bytes, pageIndex: 0, pageId: 0,
+    input: { operation: 'note', region: { x: 160, y: 140, width: 24, height: 24 }, color: '#ffff00', stroke: 2, contents: 'Nota' } });
+  pages[0] = { ...pages[0], override: note.override, rotation: 0 };
+  bytes = await request('rebuild', pages);
+  pdf = await PDFDocument.load(bytes);
+  assert.equal(pdf.getForm().getFields().length, 2);
+  assert.equal(pdf.getForm().getTextField('nome').getText(), 'Città €');
+  const extracted = await request('extract', { buffer: bytes, pageIndexes: [1] });
+  const single = await PDFDocument.load(extracted);
+  assert.deepEqual(single.getForm().getFields().map(f => f.getName()), ['consenso']);
+  assert.ok(single.getForm().getCheckBox('consenso').isChecked());
+  // Remove a page and verify its global field tree entries disappear too.
+  const removed = await request('rebuild', [pages[1]]);
+  assert.deepEqual((await PDFDocument.load(removed)).getForm().getFields().map(f => f.getName()), ['consenso']);
+  const redaction = await request('workbench-change', { buffer: bytes, pageIndex: 0, pageId: 0, pageOverride: note.override,
+    input: { operation: 'redact', region: { x: 10, y: 10, width: 80, height: 80 } } });
+  pages[0] = { ...pages[0], override: redaction.override, formFields: [] };
+  bytes = await request('rebuild', pages);
+  pdf = await PDFDocument.load(bytes);
+  assert.deepEqual(pdf.getForm().getFields().map(f => f.getName()), ['consenso']);
+  assert.ok(pdf.getForm().getCheckBox('consenso').isChecked());
+  const reopened = await request('load', bytes);
+  assert.equal(reopened.formPages[0].length, 0); assert.equal(reopened.formPages[1][0].value, true);
+  const again = await request('rebuild', [{ id: 1, rotation: 0, formFields: reopened.formPages[1] }, { id: 0, rotation: 0, formFields: [] }]);
+  assert.ok((await PDFDocument.load(again)).getForm().getCheckBox('consenso').isChecked());
+});
 
 test('shape appearances and styles persist through Worker rebuild, file reopen and later edits without note contents', async () => {
   const f = fixture(), source = save(f.doc); f.close();

@@ -1,3 +1,52 @@
+# Logo schermata iniziale 0.9.5
+
+- [ ] Avviare `artifacts/app-0.9.5/PdfMB.Desktop.exe` senza documenti: al posto del vecchio riquadro PDF compare il biscione nero/azzurro, centrato sopra PDF MB · DOCUMENTI.
+- [ ] Verificare Nuovo/Apri e il ritorno alla schermata iniziale dopo la chiusura del documento.
+
+# Icona pdfMB 0.9.4
+
+- [ ] Estrarre `PDF-MB-0.9.4-win-x64.zip`: l’eseguibile mostra il biscione nerazzurro in Esplora file. Provare icone piccole, medie e grandi.
+- [ ] Avviare la build: icona del biscione nel titolo, nella barra applicazioni e nelle finestre dell’app, compresa l’anteprima di stampa.
+- [ ] Verificare trasparenza e leggibilità con ridimensionamento Windows al 100%, 150% e 200%.
+
+# Tooltip PDF MB 0.9.3
+
+- [ ] Aprire `artifacts/app-0.9.3/PdfMB.Desktop.exe`, caricare un PDF e fermare il puntatore su Gestisci pagine: compare «Mostra o nascondi Gestisci pagine».
+- [ ] Verificare i suggerimenti anche per Strumenti, Stampa, Chiudi documento, Recenti e Aiuto, oltre ai comandi con scorciatoie.
+
+# Interfaccia PDF MB 0.9.2
+
+- [ ] Aprire `artifacts/app-0.9.2/PdfMB.Desktop.exe`: assenti la riga del nome documento e la riga menu File/Pagine/Moduli, anche dopo apertura e modifica di un PDF.
+- [ ] Progetta modulo si trova tra Testo ed Evidenziatore, con icona e tooltip; resta visibile alla larghezza minima. Verificare ingresso/uscita dalla modalità.
+- [ ] Nome e asterisco delle modifiche restano nella barra del titolo. Nuovo documento si apre dalla barra o con Ctrl+N; inserimento pagina vuota e da PDF restano nel menu delle miniature.
+- [ ] Verificare che il PDF inizi subito sotto la barra principale, senza spazi lasciati dalle righe rimosse.
+
+# Novità PDF MB 0.9.1
+
+- [ ] Aprire `artifacts/app-0.9.1/PdfMB.Desktop.exe`, anche alla larghezza minima: Progetta modulo resta la prima icona dopo il titolo, con tooltip e percorso Moduli → Progetta modulo.
+- [ ] Verificare icone, tooltip e nomi accessibili nelle barre, nei dialoghi e nei menu. Il vecchio menu Documento vuoto del viewer non compare.
+- [ ] File → Nuovo documento…: provare A4, A5 e A3, verticale e orizzontale; il primo Salva chiede il percorso. Annullare il dialogo non sostituisce il documento corrente.
+- [ ] Nuovo documento con lavoro pendente: provare Salva, Non salvare e Annulla. Non deve essere creato un file automaticamente nella cartella dell'app.
+- [ ] Pagine → Inserisci pagina vuota… e menu delle miniature: provare prima pagina, posizione intermedia e fondo; controllare formati, orientamento, Undo/Redo e conservazione di testi e moduli esistenti.
+
+- [ ] Progetta modulo: applicare campi e cambiare pagina senza attese ripetute; uscire dalla modalità e verificare pagina, zoom e strumenti ordinari.
+- [ ] Checkbox: inserire con un clic (16 × 16 pt), poi ridimensionare la bozza dalla maniglia prima di applicarla; salvare e riaprire.
+- [ ] Dropdown: inserire più opzioni, una per riga; scegliere un valore predefinito, compilare con una scelta diversa e salvare. Verificare opzioni e scelta dopo riapertura, Undo/Redo, importazione e con un altro lettore PDF.
+- [ ] Rifiutare opzioni duplicate, vuote o oltre i limiti; consentire Nessuna scelta senza perdere le opzioni.
+
+# Moduli PDF MB 0.9.0
+
+- [ ] Aprire `artifacts/app-0.9.0/PdfMB.Desktop.exe` e verificare la versione nel titolo.
+- [ ] Premere l'icona Progetta modulo: spariscono gli altri strumenti e compare la barra dedicata con icone e tooltip.
+- [ ] Creare testo e checkbox; provare proprietà, spostamento, maniglia di ridimensionamento, cancellazione e scarto della bozza.
+- [ ] Provare multilinea, caratteri accentati/euro, obbligatorio, sola lettura e nomi duplicati.
+- [ ] Salvare un campo senza premere Applica e un valore ancora a fuoco; chiudere e riaprire il file.
+- [ ] Alternare Progetta/Compila con l'occhio, compilare da tastiera, usare Annulla/Ripeti e uscire con la porta.
+- [ ] Verificare il ripristino della barra principale dopo l'uscita e la conservazione delle modifiche.
+- [ ] Compilare e salvare il PDF con Acrobat Reader e Microsoft Edge, poi riaprirlo in PDF MB.
+- [ ] Verificare stampa, pagine ruotate, CropBox, inserimento con nomi in conflitto ed estrazione delle sole pagine selezionate.
+- [ ] Oscurare una pagina: i suoi campi diventano statici e scompaiono dall'albero dei dati; le altre pagine conservano i loro campi.
+
 # Prova unica PDF MB 0.8.4
 
 Questo è il riferimento per provare insieme evidenziatore e nuovi punti 2–5. Le prove delle caselle della 0.6.5 sono già state completate dall’utente; sotto si controllano soltanto le interazioni con i nuovi strumenti. Usare copie dei propri PDF, conservando gli originali per il confronto.

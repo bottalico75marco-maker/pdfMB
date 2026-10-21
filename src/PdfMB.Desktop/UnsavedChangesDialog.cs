@@ -10,6 +10,7 @@ internal static class UnsavedChangesDialog
             FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false,
             ShowInTaskbar = false, ClientSize = new Size(500, 155), Font = new Font("Segoe UI", 10)
         };
+        AppIcon.Apply(dialog);
         var message = new Label
         {
             Text = $"Salvare le modifiche a «{fileName}» prima di continuare?",
@@ -26,6 +27,7 @@ internal static class UnsavedChangesDialog
         dialog.Controls.AddRange([message, buttons]);
         dialog.AcceptButton = save;
         dialog.CancelButton = cancel;
+        CommandIcons.ConfigureDialog(dialog);
         return dialog.ShowDialog(owner);
     }
 }

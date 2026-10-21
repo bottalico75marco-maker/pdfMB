@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
+<section id="form-toolbar" aria-label="Strumenti modulo" hidden><strong id="form-mode">Progetta modulo</strong><div role="toolbar" aria-label="Comandi modulo"><button type="button" id="form-select" data-icon="select" title="Seleziona e sposta" aria-label="Seleziona e sposta" data-tool="select" aria-pressed="false"></button><button type="button" id="form-text" data-icon="text" title="Campo testo" aria-label="Campo testo" data-tool="text" aria-pressed="false"></button><button type="button" id="form-checkbox" data-icon="checkbox" title="Casella di spunta" aria-label="Casella di spunta" data-tool="checkbox" aria-pressed="false"></button><button type="button" id="form-dropdown" data-icon="dropdown" title="Elenco a tendina" aria-label="Elenco a tendina" data-tool="dropdown" aria-pressed="false"></button><button type="button" id="form-preview" data-icon="preview" title="Progetta / Compila modulo" aria-label="Progetta / Compila modulo"></button><button type="button" id="form-save" data-icon="save" title="Salva (Ctrl+S)" aria-label="Salva (Ctrl+S)"></button><button type="button" id="form-saveAs" data-icon="saveAs" title="Salva con nome (Ctrl+Maiusc+S)" aria-label="Salva con nome (Ctrl+Maiusc+S)"></button><button type="button" id="form-undo" data-icon="undo" title="Annulla (Ctrl+Z)" aria-label="Annulla (Ctrl+Z)"></button><button type="button" id="form-redo" data-icon="redo" title="Ripeti (Ctrl+Y)" aria-label="Ripeti (Ctrl+Y)"></button><button type="button" id="form-previous" data-icon="previous" title="Pagina precedente" aria-label="Pagina precedente"></button><output id="form-page" aria-label="Pagina corrente"></output><button type="button" id="form-next" data-icon="next" title="Pagina successiva" aria-label="Pagina successiva"></button><button type="button" id="form-zoomOut" data-icon="zoomOut" title="Riduci zoom" aria-label="Riduci zoom"></button><button type="button" id="form-zoomIn" data-icon="zoomIn" title="Aumenta zoom" aria-label="Aumenta zoom"></button><button type="button" id="form-fit" data-icon="fit" title="Adatta larghezza" aria-label="Adatta larghezza"></button><button type="button" id="form-delete" data-icon="delete" title="Elimina campo selezionato" aria-label="Elimina campo selezionato"></button><button type="button" id="form-exit" data-icon="exit" title="Esci dalla modalità modulo" aria-label="Esci dalla modalità modulo"></button></div><p id="form-status" role="status" aria-live="polite"></p></section>
   <section id="text-toolbar" aria-label="Strumenti testo e carattere" hidden>
     <div class="text-tools-row">
       <button id="text-new" type="button" aria-pressed="false">Nuova casella</button>
@@ -55,6 +56,28 @@
     <h2>Personali · PNG trasparenti</h2><div id="stamp-personal" class="stamp-grid"></div>
     <p>Carica un PNG dai controlli Timbri. Le proporzioni e la trasparenza vengono conservate.</p>
   </div>
+<section id="form-workspace" aria-label="Editor modulo" hidden>
+  <main id="form-pages" aria-label="Pagina del modulo"><div id="form-sheet"><canvas id="form-canvas" aria-hidden="true"></canvas><div id="form-fields"></div></div></main>
+  <aside id="form-properties" aria-label="Proprietà campo">
+    <header><h2>Proprietà campo</h2><button id="form-apply" data-icon="apply" title="Applica (Ctrl+Invio)" aria-label="Applica campo"></button><button id="form-cancel" data-icon="cancel" title="Scarta modifica" aria-label="Scarta modifica"></button></header>
+    <p id="form-empty">Scegli uno strumento e trascina sulla pagina per creare un campo.</p>
+    <div id="form-property-fields" hidden>
+      <label>Nome<input id="form-name" maxlength="80" autocomplete="off" spellcheck="false"></label>
+      <label>Descrizione accessibile<input id="form-label" maxlength="160"></label>
+      <div id="form-text-properties">
+        <label>Valore predefinito<textarea id="form-defaultValue" rows="3" maxlength="10000"></textarea></label>
+        <label class="form-check"><input id="form-multiline" type="checkbox">Multilinea</label>
+        <label>Lunghezza massima<input id="form-maxLength" type="number" min="1" max="10000" value="1000"></label>
+      </div>
+      <div id="form-dropdown-properties" hidden><label>Opzioni · una per riga<textarea id="form-options" rows="6" maxlength="32200" spellcheck="false"></textarea></label><label>Valore predefinito<select id="form-defaultOption"></select></label></div>
+        <div id="form-font-properties" class="form-property-row"><label>Font<select id="form-font"><option>Helvetica</option><option>Times</option><option>Courier</option></select></label><label>pt<input id="form-size" type="number" min="6" max="72" value="12"></label><label>Colore<input id="form-color" type="color" value="#202020"></label></div>
+      <div id="form-check-properties" hidden><label class="form-check"><input id="form-defaultChecked" type="checkbox">Selezionata per impostazione iniziale</label></div>
+      <label class="form-check"><input id="form-required" type="checkbox">Obbligatorio</label>
+      <label class="form-check"><input id="form-readOnly" type="checkbox">Sola lettura</label>
+      <fieldset><legend>Posizione e dimensioni · pt</legend><div class="form-geometry"><label>X<input id="form-x" type="number" min="0" step="0.1"></label><label>Y<input id="form-y" type="number" min="0" step="0.1"></label><label>Larghezza<input id="form-width" type="number" min="0" step="0.1"></label><label>Altezza<input id="form-height" type="number" min="0" step="0.1"></label></div></fieldset><p class="form-help">Il nome identifica il dato nel PDF. Ogni campo ha un nome univoco. La modalità Compila modulo permette di provare e salvare i valori correnti.</p>
+    </div>
+  </aside>
+</section>
   <div id="workspace">
     <aside id="pages-panel" aria-label="Gestione pagine" hidden>
       <div class="panel-heading"><h2>Gestisci pagine</h2><button id="panel-close" class="secondary" aria-label="Chiudi pannello pagine">×</button></div>
@@ -76,6 +99,7 @@
     <button type="button" role="menuitem" data-operation="delete" class="delete-page">Elimina</button>
     <button type="button" role="menuitem" data-operation="move">Sposta…</button>
     <hr role="separator">
+    <button type="button" role="menuitem" data-operation="insert-blank">Inserisci pagina vuota…</button>
     <button type="button" role="menuitem" data-operation="insert">Inserisci…</button>
     <button type="button" role="menuitem" data-operation="extract">Estrai pagine…</button>
   </div>
@@ -85,11 +109,11 @@
     <button type="button" role="menuitem" id="text-context-paste">Incolla</button>
   </div>
   <section id="welcome" aria-labelledby="welcome-title">
-    <div class="file-icon" aria-hidden="true">PDF</div>
+    <img class="welcome-logo" src="assets/pdfmb-logo.png" alt="Logo pdfMB" width="88" height="88">
     <p class="eyebrow">PDF MB · DOCUMENTI</p>
     <h1 id="welcome-title">Il tuo documento, qui.</h1>
-    <p>Apri un PDF per consultare pagine, miniature e testo.</p>
-    <button id="open" disabled>Apri documento</button>
+    <p>Crea un nuovo documento oppure apri un PDF per consultarlo e modificarlo.</p>
+    <div class="welcome-actions"><button id="new-document" class="secondary" disabled>Nuovo documento</button><button id="open" disabled>Apri documento</button></div>
     <small id="hint" role="status">Avvio del motore PDF…</small>
   </section>
   <div id="fatal" role="alert" hidden><span id="error-text"></span><button id="dismiss-error" class="secondary" aria-label="Chiudi messaggio">×</button></div>

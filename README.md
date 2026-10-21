@@ -6,19 +6,25 @@
 
 | Riferimento | Stato |
 | --- | --- |
+| **0.9.5** | Logo del biscione nerazzurro nella schermata iniziale al posto del riquadro PDF. Build locale in `artifacts/app-0.9.5`. |
+| **0.9.4** | Icona del biscione nerazzurro applicata all’eseguibile e alle finestre. ICO trasparente in sette dimensioni, da 16 a 256 px. Build locale in `artifacts/app-0.9.4`. |
+| **0.9.3** | Ripristinati i tooltip dei comandi a icona, incluso Gestisci pagine. Proposta grafica nero/azzurro con biscione in `docs/branding`, separata dall’icona dell’app. Build locale in `artifacts/app-0.9.3`. |
+| **0.9.2** | Rimosse le due righe superiori con nome documento e menu; Progetta modulo spostato tra Testo ed Evidenziatore. Build locale in `artifacts/app-0.9.2`. |
+| **0.9.1** | Barre e pulsanti a icone con tooltip; Progetta modulo fissato all’inizio della barra e disponibile nel menu Moduli; Nuovo documento e inserimento di pagine vuote A4/A5/A3, orientamento e cronologia; progettazione più reattiva, checkbox standard e dropdown a scelta singola. Build locale in `artifacts/app-0.9.1`. |
+| **0.9.0** | Moduli PDF compilabili: progettazione dedicata con barra a icone, campi testo e checkbox, anteprima di compilazione, salvataggio e cronologia comune. Build locale in `artifacts/app-0.9.0`. |
 | **0.8.4** | Build locale in `artifacts/app-0.8.4`: rettangoli ed ellissi senza campo note; Salva include anche le forme ancora da applicare; colore, spessore e aspetto conservati dopo riapertura. |
 | **0.8.3** | Build locale in `artifacts/app-0.8.3`: preview live di testo/font/dimensione, tavolozza con 14 timbri statici e data, PNG personali trasparenti in raccolta locale. |
 | **0.8.2** | Build locale in `artifacts/app-0.8.2`: selezione degli oggetti dal menu o dal PDF, apertura con trascinamento, registrazione come lettore PDF per Windows. |
 | **0.8.0** | Versione di sviluppo più recente, con tutte le funzioni descritte qui e guida Windows. Disponibile nel [ramo di sviluppo](https://github.com/bottalico75marco-maker/pdfMB/tree/codex/evidenziatore-0.7.0) e nella [PR #1](https://github.com/bottalico75marco-maker/pdfMB/pull/1), ancora in bozza per le prove Windows. |
 | **0.6.5** | Versione dei sorgenti su `main` al momento della pubblicazione di questo README e ultima cartella binaria storica inclusa nel repository. |
 
-Questo README presenta le funzioni aggiornate alla **0.8.4** locale. Aggiornare la documentazione nella pagina principale non unisce automaticamente la PR: per usare le nuove funzioni scegliere la build corrispondente.
+Questo README presenta le funzioni aggiornate alla **0.9.5** locale. Aggiornare la documentazione nella pagina principale non unisce automaticamente la PR: per usare le nuove funzioni scegliere la build corrispondente.
 
 **Collegamenti:** [Guida Windows](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/GUIDA-WINDOWS.html) · [Checklist unica delle prove](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/CHECKLIST-MANUALE.md) · [Build Windows su GitHub Actions](https://github.com/bottalico75marco-maker/pdfMB/actions) · [Architettura](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/ARCHITETTURA.md)
 
 ## Installazione su Windows
 
-1. Aprire il risultato della workflow **Verifica e build Windows** relativo al commit desiderato e scaricare l’artefatto **PDF-MB-0.8.4-win-x64**, quando la compilazione è terminata con successo.
+1. Aprire il risultato della workflow **Verifica e build Windows** relativo al commit desiderato e scaricare l’artefatto **PDF-MB-0.9.5-win-x64**, quando la compilazione è terminata con successo.
 2. Estrarre **l’intera cartella** dello ZIP.
 3. Verificare la presenza di **.NET Desktop Runtime 10** e **Microsoft Edge WebView2 Runtime** su Windows a 64 bit.
 4. Avviare **PdfMB.Desktop.exe**.
@@ -27,7 +33,15 @@ Tenere insieme EXE, DLL, cartelle `Web` e `ThirdParty` e `GUIDA-WINDOWS.html`. P
 
 La guida si apre offline con **Aiuto → Guida Windows** o **F1**, nel browser predefinito. Include istruzioni per tutti gli strumenti e per la risoluzione dei problemi più comuni. La scritta fissa “Gestione pagine” in alto a destra è stata rimossa; il pulsante **Gestisci pagine** resta disponibile.
 
-## Tutte le funzionalità disponibili nella 0.8.4
+## Tutte le funzionalità disponibili nella 0.9.5
+
+### Nuovo documento e pagine vuote
+
+- **Nuovo documento…** con `Ctrl+N` o icona del foglio con +: scelta **A4, A5 o A3**, verticale oppure orizzontale.
+- Il primo Salva chiede il percorso; fino ad allora il nuovo documento è segnalato come non salvato.
+- **Inserisci pagina vuota…** dal menu contestuale delle miniature: formato, orientamento e posizione da 1 a N+1. L'inserimento partecipa ad Annulla/Ripeti.
+- Tutti i comandi nelle barre e nei pulsanti dell'app usano icone con tooltip e nomi accessibili. I menu aggiungono icone ai nomi dei comandi; formati e altre proprietà restano leggibili nei campi di scelta.
+- La barra principale occupa una sola riga, senza intestazione del documento né menu superiore. **Progetta modulo** si trova tra **Testo** ed **Evidenziatore**. Il menu Documento vuoto del viewer incorporato è stato rimosso.
 
 ### Apertura e consultazione
 
@@ -43,7 +57,7 @@ La guida si apre offline con **Aiuto → Guida Windows** o **F1**, nel browser p
 ### Salvataggio e cronologia
 
 - **Salva** sul percorso corrente e **Salva con nome…** su un nuovo percorso, che diventa quello corrente.
-- Nome del documento rosso, asterisco e indicazione **file non salvato** per le modifiche pendenti.
+- Nome del documento e asterisco nella barra del titolo della finestra per le modifiche pendenti.
 - Richiesta **Salva / Non salvare / Annulla** prima di cambiare documento, chiuderlo o uscire.
 - **Annulla/Ripeti** fino a 100 operazioni nella cronologia comune, anche dopo il salvataggio.
 - Operazioni su più pagine e selezioni di evidenziatura su più pagine trattate come una sola azione.
@@ -122,6 +136,18 @@ L’editor lavora sui singoli oggetti: non ricompone paragrafi e non modifica gl
 - **Applica** aggiunge un’annotazione Stamp al PDF; **Salva** la conserva. Timbri applicati selezionabili dall’elenco e rimovibili; Annulla/Ripeti opera nella cronologia comune.
 - Fino a 25 PNG personali, conservati in `%LOCALAPPDATA%\PdfMB\Stamps`. La libreria non contiene i documenti PDF.
 
+### Moduli compilabili
+
+L'icona **Progetta modulo** apre una modalità dedicata: nasconde gli altri strumenti e mostra una barra a icone con tooltip e nomi accessibili. Si parte da un PDF esistente oppure da un nuovo documento vuoto.
+
+- Campi testo ed elenchi a tendina disegnati sulla pagina; checkbox inserite con un clic a **16 × 16 pt**, subito ridimensionabili. Tutti i campi si possono selezionare, spostare, ridimensionare ed eliminare.
+- Dropdown con **1–200 opzioni**, una per riga, scelta singola e valore predefinito facoltativo. Opzioni, scelta corrente e proprietà restano nel PDF salvato.
+- Aggiornamenti senza attesa del visualizzatore nascosto e trascinamento diretto dei campi.
+- Nome univoco, descrizione, valore predefinito, obbligatorio e sola lettura; per il testo multilinea, limite caratteri, font, dimensione e colore.
+- L'occhio alterna progettazione e compilazione; il dischetto salva anche la bozza del campo e l'ultimo valore digitato. La porta con freccia ripristina gli strumenti ordinari.
+- Campi AcroForm interattivi dopo riapertura, Annulla/Ripeti comune, conservazione durante le operazioni sulle pagine; nomi in conflitto rinominati durante l'importazione.
+- Fino a 1.000 campi; caratteri occidentali, accenti ed euro. Modifica e compilazione riguardano i campi creati da PDF MB. Radio, elenchi a selezione multipla, XFA e script non sono inclusi.
+
 ### Stampa
 
 **Stampa… / Ctrl+P** prepara il documento corrente, comprese le modifiche applicate ma non ancora salvate. L’anteprima separata offre il dialogo di stampa del browser per scegliere stampante, intervallo, copie, orientamento e scala.
@@ -166,7 +192,7 @@ Annulla può ripristinare la sorgente nella sessione: condividere soltanto il PD
 ## Limiti attuali
 
 - **64 MB** per PDF aperto, importato o risultante; **128 MB** complessivi per sorgenti e cronologia. Salvare e riaprire libera la cronologia.
-- Password di apertura, OCR e compilazione dei moduli non ancora gestiti.
+- Password di apertura e OCR non ancora gestiti; moduli limitati a testo, checkbox e dropdown a scelta singola creati da PDF MB.
 - Font remoti di fallback disabilitati: un PDF con font mancanti può richiedere una verifica sull’originale.
 - Fino a 1.000 modifiche a caselle o evidenziazioni per pagina; fino a 1.000 rettangoli per tratto di evidenziatore e pagina.
 - La superficie Strumenti ispeziona pagine con un massimo di 2.000 oggetti/annotazioni.
@@ -216,7 +242,7 @@ dotnet run --project src/PdfMB.Desktop
 Pubblicazione della cartella Windows a 64 bit:
 
 ```powershell
-dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.8.0
+dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.9.5
 ```
 
 Prova browser facoltativa:

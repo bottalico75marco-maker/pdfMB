@@ -1,3 +1,4 @@
+import { PDFDocument } from 'pdf-lib';
 // Optional end-to-end smoke test. npm ci && npm run assets && npx playwright install chromium
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -59,14 +60,16 @@ await page.addInitScript(() => {
 const request = (type, payload) => page.evaluate(({ type, payload }) => __request(type, payload), { type, payload });
 async function pageBox() {
   await page.locator('#viewer img').first().waitFor();
-  const images = await page.locator('#viewer img').all();
+  // Keep the actual nodes: nth locators can retarget or wait for an index
+  // that disappears when a PDF replacement swaps the rendered image list.
+  const images = await page.locator('#viewer img').elementHandles();
   const boxes = await Promise.all(images.map(image => image.boundingBox()));
   const viewport = page.viewportSize();
   const visibleArea = b => Math.max(0, Math.min(viewport.width, b.x + b.width) - Math.max(0, b.x)) *
     Math.max(0, Math.min(viewport.height, b.y + b.height) - Math.max(0, b.y));
   const index = boxes.map((box, index) => ({ box, index })).filter(item => item.box)
     .sort((a, b) => visibleArea(b.box) - visibleArea(a.box))[0]?.index;
-  const box = await images[index].evaluate(image => new Promise(resolve => {
+  const box = index === undefined ? null : await images[index].evaluate(image => new Promise(resolve => {
     let previous = '', stable = 0;
     const sample = () => {
       if (!image.isConnected) { resolve(null); return; }
@@ -77,6 +80,7 @@ async function pageBox() {
     };
     sample();
   }));
+  await Promise.all(images.map(image => image.dispose()));
   if (!box) return pageBox();
   assert.ok(box?.width > 100, 'Live PDF page is visible');
   return box;
@@ -84,6 +88,33 @@ async function pageBox() {
 try {
   await page.goto(origin + '/index.html');
   await page.waitForFunction(() => __messages.some(m => m.type === 'viewer.ready'), { timeout: 30000 });
+  await page.locator('#welcome .welcome-logo').evaluate(image => image.decode());
+  await mkdir(new URL('../artifacts/test/', import.meta.url), { recursive: true });
+  await page.screenshot({ path: fileURLToPath(new URL('../artifacts/test/welcome-logo.png', import.meta.url)) });
+  assert.equal(await page.locator('#text-toolbar button, #tools-toolbar button, .dialog-actions button, .welcome-actions button').evaluateAll(buttons =>
+    buttons.every(button => button.querySelector('svg') && button.getAttribute('aria-label') && button.title && !button.textContent.trim())), true, 'All application command bars and buttons use accessible icons');
+  await page.locator('#new-document').click();
+  assert.ok(await page.evaluate(() => __messages.some(m => m.type === 'host.new')));
+  await request('editor.lock');
+  const created = await request('document.create', { format: 'A5', landscape: true });
+  assert.ok(created.state.dirty); assert.equal(created.state.canUndo, false);
+  const newPdf = await PDFDocument.load(Buffer.from(created.base64, 'base64'));
+  assert.equal(newPdf.getPageCount(), 1); assert.ok(Math.abs(newPdf.getPage(0).getWidth() * 25.4 / 72 - 210) < .01);
+  await request('document.markSaved', { token: created.state.token, revision: created.state.revision, name: 'nuovo.pdf' });
+  const options = await request('editor.blankOptions'); assert.equal(options.pageCount, 1);
+  await request('editor.insertBlank', { token: created.state.token, format: 'A3', landscape: false, position: 1 });
+  const expanded = await request('document.export');
+  const expandedPdf = await PDFDocument.load(Buffer.from(expanded.base64, 'base64'));
+  assert.equal(expandedPdf.getPageCount(), 2); assert.ok(Math.abs(expandedPdf.getPage(0).getHeight() * 25.4 / 72 - 420) < .01);
+  const beforeBlank = await request('editor.undo'); assert.equal(beforeBlank.dirty, false);
+  await request('editor.redo'); await request('editor.unlock');
+  assert.equal(await page.getByRole('button', { name: 'Documento', exact: true }).count(), 0, 'The empty embedded document menu is removed');
+  await request('editor.toggle');
+  await page.locator('.page-tile').first().click({ button: 'right' });
+  await page.locator('[data-operation="insert-blank"]').click();
+  assert.ok(await page.evaluate(() => __messages.some(m => m.type === 'host.insertBlank')));
+  await page.locator('#panel-close').click();
+  console.log('Nuovo A5 orizzontale, inserimento A3, Undo/Redo, comando pagina vuota e rimozione menu vuoto: OK');
   await page.evaluate(() => {
     const transfer = new DataTransfer(); transfer.items.add(new File(['%PDF-1.7'], 'trascinato.PDF', { type: 'application/pdf' }));
     document.querySelector('#welcome').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
@@ -205,6 +236,95 @@ try {
   console.log('Generazione pagine di stampa: OK');
   await request('editor.lock'); const undo = await request('editor.undo'); const redo = await request('editor.redo'); await request('editor.unlock');
   assert.ok(undo.canRedo); assert.ok(redo.canUndo); console.log('Cronologia comune: OK');
+  // Dedicated authoring UI, pending drafts and fill values use the same save path.
+  await request('editor.lock'); await request('document.open', { name: 'modulo.pdf', base64 });
+  await request('editor.forms'); await request('editor.unlock');
+  assert.equal(await page.locator('#workspace').isVisible(), false);
+  assert.equal(await page.locator('#form-toolbar').isVisible(), true);
+  assert.equal(await page.locator('#form-toolbar button').evaluateAll(nodes => nodes.every(n => !!n.getAttribute('aria-label') && !n.textContent.trim())), true);
+  async function formDrag(x, y, w, h) {
+    const b = await page.locator('#form-sheet').boundingBox();
+    await page.mouse.move(b.x + b.width * x, b.y + b.height * y); await page.mouse.down();
+    await page.mouse.move(b.x + b.width * (x + w), b.y + b.height * (y + h), { steps: 6 }); await page.mouse.up();
+  }
+  await page.locator('#form-text').click(); await formDrag(.1, .15, .55, .15);
+  await page.locator('#form-name').fill('nome'); await page.locator('#form-defaultValue').fill('Iniziale €');
+  const applyStarted = performance.now();
+  await page.locator('#form-apply').click();
+  await page.waitForFunction(() => __messages.at(-2)?.type === 'editor.state' && !__messages.at(-2)?.payload.busy);
+  const applyElapsed = performance.now() - applyStarted;
+  assert.ok(applyElapsed < 2500, `Form Apply must not wait for hidden viewer layout (${Math.round(applyElapsed)} ms)`);
+  console.log(`Aggiornamento campo modulo: ${Math.round(applyElapsed)} ms`);
+  await page.locator('#form-checkbox').click();
+  let sheet = await page.locator('#form-sheet').boundingBox();
+  await page.mouse.click(sheet.x + sheet.width * .1, sheet.y + sheet.height * .5);
+  assert.equal(await page.locator('#form-width').inputValue(), '16');
+  assert.equal(await page.locator('#form-height').inputValue(), '16');
+  // A fresh, uncommitted checkbox can immediately be enlarged with its handle.
+  const resize = await page.locator('.form-resize').boundingBox();
+  await page.mouse.move(resize.x + resize.width / 2, resize.y + resize.height / 2); await page.mouse.down();
+  await page.mouse.move(resize.x + resize.width / 2 + 14, resize.y + resize.height / 2 + 14, { steps: 5 }); await page.mouse.up();
+  assert.ok(Number(await page.locator('#form-width').inputValue()) > 20);
+  await page.locator('#form-name').fill('consenso'); await page.locator('#form-defaultChecked').check();
+  // Save commits the checkbox still in preview, without pressing Apply.
+  await request('editor.lock'); let formSaved = await request('document.export'); await request('editor.unlock');
+  let formPdf = await PDFDocument.load(Buffer.from(formSaved.base64, 'base64'));
+  assert.equal(formPdf.getForm().getFields().length, 2); assert.ok(formPdf.getForm().getCheckBox('consenso').isChecked());
+  await page.locator('#form-dropdown').click(); await formDrag(.1, .75, .6, .14);
+  await page.locator('#form-name').fill('destinazione');
+  await page.locator('#form-options').fill('Italia\nCittà €\nEstero');
+  await page.locator('#form-defaultOption').selectOption('Italia');
+  // Selecting another field commits the draft instead of ignoring the click.
+  await page.locator('[aria-label="Campo testo: nome"]').click();
+  await page.waitForFunction(() => !document.querySelector('#form-workspace').inert);
+  assert.equal(await page.locator('#form-name').inputValue(), 'nome');
+  // Page navigation and returning to the viewer retain the current page.
+  await page.locator('#form-next').click(); await page.waitForFunction(() => document.querySelector('#form-page').textContent === '2 / 2' && !document.querySelector('#form-workspace').inert);
+  await page.locator('#form-previous').click(); await page.waitForFunction(() => document.querySelector('#form-page').textContent === '1 / 2' && !document.querySelector('#form-workspace').inert);
+  await page.screenshot({ path: fileURLToPath(new URL('../artifacts/test/form-design.png', import.meta.url)) });
+  await page.locator('#form-preview').click();
+  assert.equal(await page.locator('#form-fields select').inputValue(), 'Italia');
+  assert.deepEqual(await page.locator('#form-fields select option').evaluateAll(nodes => nodes.map(n => n.value)), ['', 'Italia', 'Città €', 'Estero']);
+  await page.locator('#form-fields select').selectOption('Città €');
+  await page.waitForFunction(() => !document.querySelector('#form-workspace').inert);
+  const nameInput = page.locator('#form-fields input:not([type="checkbox"])');
+  await nameInput.fill('Valore Tab'); await page.keyboard.press('Tab');
+  await page.waitForFunction(() => !document.querySelector('#form-workspace').inert);
+  assert.equal(await page.locator('#form-fields input[type="checkbox"]').evaluate(input => input === document.activeElement), true, 'Tab retains focus on the next field after committing');
+  await nameInput.fill('Città €');
+  // Focus is still in the input: editor.lock must acquire the last keystrokes.
+  await request('editor.lock'); formSaved = await request('document.export'); await request('editor.unlock');
+  formPdf = await PDFDocument.load(Buffer.from(formSaved.base64, 'base64'));
+  assert.equal(formPdf.getForm().getTextField('nome').getText(), 'Città €');
+  assert.deepEqual(formPdf.getForm().getDropdown('destinazione').getSelected(), ['Città €']);
+  assert.equal(formPdf.getForm().getDropdown('destinazione').isMultiselect(), false);
+  await page.locator('#form-fields input[type="checkbox"]').uncheck();
+  await page.waitForFunction(() => !document.querySelector('#form-workspace').inert);
+  await request('editor.lock'); formSaved = await request('document.export'); await request('editor.unlock');
+  assert.equal((await PDFDocument.load(Buffer.from(formSaved.base64, 'base64'))).getForm().getCheckBox('consenso').isChecked(), false);
+  await page.screenshot({ path: fileURLToPath(new URL('../artifacts/test/form-fill.png', import.meta.url)) });
+  await page.locator('#form-exit').click(); await page.locator('#form-workspace').waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('#workspace').isVisible(), true);
+  // Reopening restores the fields, values and editability.
+  await request('editor.lock'); await request('document.open', { name: 'riaperto.pdf', base64: formSaved.base64 });
+  await request('editor.forms'); await request('editor.unlock');
+  assert.equal(await page.locator('.form-widget').count(), 3);
+  await page.locator('#form-preview').click(); assert.equal(await nameInput.inputValue(), 'Città €');
+  assert.equal(await page.locator('#form-fields select').inputValue(), 'Città €');
+  await page.locator('#form-exit').click(); await page.locator('#form-workspace').waitFor({ state: 'hidden' });
+  // Insert a copy of the first form page: names and IDs must remain independent.
+  await request('editor.lock'); const currentForm = await request('document.export');
+  const incoming = await request('editor.prepareInsert', { token: currentForm.token, name: 'copia.pdf', base64: currentForm.base64 });
+  await request('editor.insert', { token: currentForm.token, importToken: incoming.importToken, pageIndexes: [0], position: 3 });
+  const insertedForm = await request('document.export');
+  const insertedPdf = await PDFDocument.load(Buffer.from(insertedForm.base64, 'base64'));
+  assert.deepEqual(insertedPdf.getForm().getFields().map(f => f.getName()).sort(), ['consenso', 'consenso_2', 'destinazione', 'destinazione_2', 'nome', 'nome_2']);
+  assert.equal(insertedPdf.getForm().getTextField('nome_2').getText(), 'Città €');
+  assert.deepEqual(insertedPdf.getForm().getDropdown('destinazione_2').getSelected(), ['Città €']);
+  await request('editor.undo'); const undoneForm = await request('document.export');
+  assert.equal((await PDFDocument.load(Buffer.from(undoneForm.base64, 'base64'))).getForm().getFields().length, 3);
+  await request('editor.redo'); await request('editor.unlock');
+  console.log('Moduli: reattività, checkbox standard ridimensionabile, dropdown, salvataggio, compilazione e riapertura: OK');
   assert.deepEqual(errors, []);
   await mkdir(new URL('../artifacts/test/', import.meta.url), { recursive: true });
   await page.screenshot({ path: fileURLToPath(new URL('../artifacts/test/browser.png', import.meta.url)) });

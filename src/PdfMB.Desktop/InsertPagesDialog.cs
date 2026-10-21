@@ -15,6 +15,7 @@ internal sealed class InsertPagesDialog : Form
     public InsertPagesDialog(string sourceName, int sourcePageCount, int destinationPageCount, int position)
     {
         if (sourcePageCount < 1 || destinationPageCount < 1) throw new ArgumentOutOfRangeException(nameof(sourcePageCount));
+        AppIcon.Apply(this);
         _sourcePageCount = sourcePageCount;
         Text = "Inserisci pagine da PDF";
         StartPosition = FormStartPosition.CenterParent;
@@ -55,6 +56,7 @@ internal sealed class InsertPagesDialog : Form
         Controls.AddRange([source, rangeLabel, _range, rangeHint, positionLabel, _position, positionHint, _error, buttons]);
         AcceptButton = insert;
         CancelButton = cancel;
+        CommandIcons.ConfigureDialog(this);
         Shown += (_, _) => { _range.Focus(); _range.SelectAll(); };
         insert.Click += (_, _) =>
         {

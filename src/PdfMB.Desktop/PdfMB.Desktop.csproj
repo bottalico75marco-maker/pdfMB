@@ -5,12 +5,14 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.8.4</Version>
+    <Version>0.9.5</Version>
+    <ApplicationIcon>Assets\pdfmb.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <NuGetAudit>false</NuGetAudit>
     <WebView2Version>1.0.4022.49</WebView2Version>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Assets\pdfmb.ico" LogicalName="PdfMB.Desktop.AppIcon.ico" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="$(WebView2Version)" />
     <Content Include="Web\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\docs\GUIDA-WINDOWS.html" Link="GUIDA-WINDOWS.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -18,7 +20,7 @@
     <Content Include="$(NuGetPackageRoot)\microsoft.web.webview2\$(WebView2Version)\NOTICE.txt" Link="ThirdParty\WebView2\NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="CheckViewerAssets" BeforeTargets="PrepareForBuild">
-    <Error Condition="!Exists('Web\vendor\embedpdf.js') Or !Exists('Web\vendor\pdfium.wasm') Or !Exists('Web\vendor\pdfium-api.js')" Text="Asset EmbedPDF mancanti. Eseguire npm ci e npm run assets dalla radice del repository." />
+    <Error Condition="!Exists('Web\vendor\embedpdf.js') Or !Exists('Web\vendor\pdfium.wasm') Or !Exists('Web\vendor\pdfium-api.js') Or !Exists('Web\vendor\pdf-lib.js')" Text="Asset EmbedPDF mancanti. Eseguire npm ci e npm run assets dalla radice del repository." />
   </Target>
   <Target Name="RemoveUnusedWpfReference" BeforeTargets="ResolveAssemblyReferences">
     <ItemGroup>

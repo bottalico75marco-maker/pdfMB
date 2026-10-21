@@ -18,6 +18,7 @@ internal sealed class PrintPreviewForm : Form
 
     public PrintPreviewForm(JsonElement pages, string profile)
     {
+        AppIcon.Apply(this);
         _profile = profile;
         Text = "PDF MB · Anteprima di stampa";
         ClientSize = new Size(1050, 800);
@@ -25,6 +26,7 @@ internal sealed class PrintPreviewForm : Form
         bar.Controls.Add(_print);
         bar.Controls.Add(new Label { Text = "Controlla anteprima, stampante, intervallo e orientamento prima di stampare.", AutoSize = true, Padding = new Padding(8) });
         Controls.Add(_view); Controls.Add(bar);
+        CommandIcons.ConfigureDialog(this);
         if (pages.ValueKind != JsonValueKind.Array || pages.GetArrayLength() is < 1 or > 500)
             throw new InvalidDataException("Numero di pagine di stampa non valido (massimo 500).");
         var html = new StringBuilder("<!doctype html><html><head><meta charset='utf-8'><style>body{margin:0;background:#ddd}img{display:block;margin:12px auto;background:white;max-width:95%}@media print{body{background:white}img{margin:0;max-width:100%;max-height:100vh;object-fit:contain;break-after:page}img:last-child{break-after:auto}@page{margin:0;size:auto}}</style></head><body>");

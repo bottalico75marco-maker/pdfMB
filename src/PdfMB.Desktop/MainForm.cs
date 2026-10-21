@@ -11,9 +11,10 @@ internal sealed class MainForm : Form
     private static readonly string AppTitle = $"PDF MB {Application.ProductVersion.Split('+')[0]}";
     private readonly WebView2 _webView = new() { Dock = DockStyle.Fill };
     private readonly ToolStripButton _open = new("Apri PDF") { ToolTipText = "Apri documento (Ctrl+O)" };
+    private readonly ToolStripButton _new = new("Nuovo") { ToolTipText = "Nuovo documento vuoto (Ctrl+N)" };
     private readonly ToolStripButton _save = new("Salva") { ToolTipText = "Salva (Ctrl+S)" };
     private readonly ToolStripButton _saveAs = new("Salva con nome…") { ToolTipText = "Salva con nome (Ctrl+Maiusc+S)" };
-    private readonly ToolStripButton _manage = new("Gestisci pagine");
+    private readonly ToolStripButton _manage = new("Gestisci pagine") { ToolTipText = "Mostra o nascondi Gestisci pagine" };
     private readonly ToolStripButton _highlight = new("Evidenziatore") { ToolTipText = "Attiva il pennarello sul testo del PDF (Esc per uscire)", Overflow = ToolStripItemOverflow.Never };
     private readonly ToolStripComboBox _highlightColor = new()
     {
@@ -24,6 +25,10 @@ internal sealed class MainForm : Form
     private readonly ToolStripButton _text = new("Testo") { ToolTipText = "Modifica le caselle di testo direttamente sulla pagina" };
     private readonly ToolStripDropDownButton _tools = new("Strumenti");
     private readonly ToolStripButton _print = new("Stampa…");
+    private readonly ToolStripButton _forms = new("Progetta modulo") { ToolTipText = "Progetta modulo", AccessibleName = "Progetta modulo", DisplayStyle = ToolStripItemDisplayStyle.ImageAndText, Overflow = ToolStripItemOverflow.Never };
+    private ToolStrip _mainToolbar = null!;
+    private bool _formMode, _canFormDesign;
+    private bool _untitled;
     private bool _canContent, _canPrint;
     private readonly ToolStripButton _undo = new("Annulla") { ToolTipText = "Annulla (Ctrl+Z)" };
     private readonly ToolStripButton _redo = new("Ripeti") { ToolTipText = "Ripeti (Ctrl+Y)" };
@@ -32,22 +37,6 @@ internal sealed class MainForm : Form
     private readonly ToolStripDropDownButton _help = new("Aiuto") { Alignment = ToolStripItemAlignment.Right, Overflow = ToolStripItemOverflow.Never };
     private readonly ToolStripStatusLabel _status = new("Avvio del visualizzatore…") { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly ToolStripStatusLabel _pages = new();
-    private readonly Panel _fileHeader = new()
-    {
-        Dock = DockStyle.Top, Height = 48, Padding = new Padding(14, 0, 14, 0),
-        BackColor = Color.White, Visible = false
-    };
-    private readonly Label _fileName = new()
-    {
-        TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true, UseMnemonic = false,
-        BackColor = Color.White, Font = new Font("Segoe UI", 18, FontStyle.Bold)
-    };
-    private readonly Label _unsavedFile = new()
-    {
-        Text = "file non salvato", TextAlign = ContentAlignment.MiddleLeft,
-        BackColor = Color.White, ForeColor = Color.Firebrick,
-        Font = new Font("Segoe UI", 10), Visible = false
-    };
     private bool? _captionModified;
     private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly string[] _args;
@@ -63,6 +52,7 @@ internal sealed class MainForm : Form
 
     public MainForm(string[] args)
     {
+        AppIcon.Apply(this);
         _args = args;
         _dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PdfMB");
         _recentFiles = new RecentFiles(_dataDirectory);
@@ -79,19 +69,18 @@ internal sealed class MainForm : Form
             GripStyle = ToolStripGripStyle.Hidden, Padding = new Padding(12, 8, 12, 8),
             BackColor = Color.White, Renderer = new ToolStripProfessionalRenderer()
         };
+        _mainToolbar = toolbar;
         toolbar.Items.AddRange([new ToolStripLabel(AppTitle) { Font = new Font("Segoe UI", 12, FontStyle.Bold) },
-            new ToolStripSeparator(), _open, _recent, _save, _saveAs, new ToolStripSeparator(),
-            _manage, _text, _highlight, _highlightColor, _tools, _print, _undo, _redo, new ToolStripSeparator(), _close, _help]);
+            new ToolStripSeparator(), _new, _open, _recent, _save, _saveAs, new ToolStripSeparator(),
+            _manage, _text, _forms, _highlight, _highlightColor, _tools, _print, _undo, _redo, new ToolStripSeparator(), _close, _help]);
         var statusBar = new StatusStrip { BackColor = Color.White, SizingGrip = false };
         statusBar.Items.AddRange([_status, _pages]);
-        _fileHeader.Controls.AddRange([_fileName, _unsavedFile]);
-        _fileHeader.Layout += (_, _) => LayoutFileHeader();
         Controls.Add(_webView);
-        Controls.Add(_fileHeader);
         Controls.Add(toolbar);
         Controls.Add(statusBar);
         RegisterFileDrop(this);
         _open.Click += async (_, _) => await OpenDialogAsync();
+        _new.Click += async (_, _) => await RunHostAsync(NewDocumentCoreAsync);
         _save.Click += async (_, _) => await RunHostAsync(async () => { await SaveCoreAsync(false); });
         _saveAs.Click += async (_, _) => await RunHostAsync(async () => { await SaveCoreAsync(true); });
         _manage.Click += async (_, _) => await EditorCommandAsync("editor.toggle");
@@ -114,6 +103,7 @@ internal sealed class MainForm : Form
             });
             _tools.DropDownItems.Add(item);
         }
+        _forms.Click += async (_, _) => await EditorCommandAsync("editor.forms");
         _print.Click += async (_, _) => await RunHostAsync(PrintCoreAsync);
         _undo.Click += async (_, _) => await EditorCommandAsync("editor.undo");
         _redo.Click += async (_, _) => await EditorCommandAsync("editor.redo");
@@ -132,6 +122,7 @@ internal sealed class MainForm : Form
         Shown += async (_, _) => await StartAsync();
         FormClosing += OnFormClosing;
         FormClosed += (_, _) => _bridge?.Dispose();
+        CommandIcons.ConfigureStrip(_mainToolbar);
         UpdateControls();
     }
 
@@ -193,6 +184,8 @@ internal sealed class MainForm : Form
                     break;
                 case "editor.state": ReadEditorState(payload); break;
                 case "host.open": await OpenDialogAsync(); break;
+                case "host.new": await RunHostAsync(NewDocumentCoreAsync); break;
+                case "host.insertBlank": await RunHostAsync(InsertBlankPageCoreAsync); break;
                 case "host.save": await RunHostAsync(async () => { await SaveCoreAsync(false); }); break;
                 case "host.saveAs": await RunHostAsync(async () => { await SaveCoreAsync(true); }); break;
                 case "host.insert": await RunHostAsync(InsertPagesCoreAsync); break;
@@ -232,6 +225,8 @@ internal sealed class MainForm : Form
         _canText = state.GetProperty("canText").GetBoolean();
         _canContent = state.TryGetProperty("canContent", out var content) && content.GetBoolean();
         _canPrint = state.TryGetProperty("canPrint", out var print) && print.GetBoolean();
+        _formMode = state.TryGetProperty("formMode", out var formMode) && formMode.GetBoolean();
+        _canFormDesign = state.TryGetProperty("canFormDesign", out var canForm) && canForm.GetBoolean();
         _textEditing = state.GetProperty("textEditing").GetBoolean();
         _text.Checked = state.GetProperty("textMode").GetBoolean();
         _highlight.Checked = state.GetProperty("highlightMode").GetBoolean();
@@ -249,11 +244,14 @@ internal sealed class MainForm : Form
         if (IsDisposed) return;
         bool available = !IsBusy && _initialized;
         bool hasDocument = available && _document is not null;
-        _open.Enabled = _recent.Enabled = available;
+        _new.Enabled = _open.Enabled = _recent.Enabled = available;
         _save.Enabled = hasDocument && !_readOnly && _dirty;
         _saveAs.Enabled = _manage.Enabled = _close.Enabled = hasDocument;
         _saveAs.Text = _readOnly ? "Salva copia…" : "Salva con nome…";
+        _saveAs.ToolTipText = _saveAs.AccessibleName = _saveAs.Text;
         _undo.Enabled = hasDocument && _canUndo;
+        _forms.Enabled = hasDocument && _canFormDesign;
+        _mainToolbar.Visible = !_formMode;
         _text.Enabled = hasDocument && _canText;
         _print.Enabled = hasDocument && _canPrint;
         _tools.Enabled = hasDocument && (_canText || _canContent);
@@ -263,26 +261,8 @@ internal sealed class MainForm : Form
         _text.ToolTipText = _canText ? "Modifica le caselle di testo direttamente sulla pagina" : "Testo non disponibile: controllare i permessi del documento";
         _redo.Enabled = hasDocument && _canRedo;
         Text = _document is null ? AppTitle : $"{(_dirty ? "* " : "")}{_document.Name} — {AppTitle}";
-        _fileHeader.Visible = _document is not null;
-        _fileName.Text = _document?.Name ?? "";
-        _fileName.ForeColor = _dirty ? Color.Firebrick : SystemColors.ControlText;
-        _fileName.AccessibleDescription = _dirty ? "Documento con modifiche non salvate" : "Documento salvato";
-        _unsavedFile.Visible = _document is not null && _dirty;
-        _fileHeader.PerformLayout();
         ApplyCaptionColor();
         UseWaitCursor = _hostBusy || _editorBusy;
-    }
-
-    private void LayoutFileHeader()
-    {
-        Rectangle area = _fileHeader.DisplayRectangle;
-        int gap = LogicalToDeviceUnits(16);
-        int statusWidth = _document is not null && _dirty
-            ? _unsavedFile.GetPreferredSize(Size.Empty).Width : 0;
-        int nameWidth = Math.Min(_fileName.GetPreferredSize(Size.Empty).Width,
-            Math.Max(0, area.Width - (statusWidth > 0 ? statusWidth + gap : 0)));
-        _fileName.SetBounds(area.Left, area.Top, nameWidth, area.Height);
-        _unsavedFile.SetBounds(area.Left + nameWidth + gap, area.Top, statusWidth, area.Height);
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -349,12 +329,14 @@ internal sealed class MainForm : Form
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        if (_formMode && (keyData == (Keys.Control | Keys.O) || keyData == (Keys.Control | Keys.P) || keyData == (Keys.Control | Keys.N))) return true;
         if (keyData == Keys.F1) { OpenWindowsGuide(); return true; }
         if (keyData == (Keys.Control | Keys.P)) { _ = RunHostAsync(PrintCoreAsync); return true; }
         // The text field keeps its own clipboard and local undo/redo shortcuts.
         if (_textEditing) return base.ProcessCmdKey(ref msg, keyData);
         switch (keyData)
         {
+            case Keys.Control | Keys.N: _ = RunHostAsync(NewDocumentCoreAsync); return true;
             case Keys.Control | Keys.O: _ = OpenDialogAsync(); return true;
             case Keys.Control | Keys.S: _ = RunHostAsync(async () => { await SaveCoreAsync(false); }); return true;
             case Keys.Control | Keys.Shift | Keys.S: _ = RunHostAsync(async () => { await SaveCoreAsync(true); }); return true;
@@ -407,10 +389,36 @@ internal sealed class MainForm : Form
         _status.Text = "Apertura e controllo documento…";
         var state = await _bridge!.RequestAsync("document.open", new { name = candidate.Name, base64 = Convert.ToBase64String(candidate.Bytes) });
         _document = candidate;
+        _untitled = false;
         _openedPath = candidate.Path;
         _status.Text = candidate.Name;
         ReadEditorState(state, acceptNew: true);
         _recentFiles.Add(candidate.Path);
+    }
+
+    private async Task NewDocumentCoreAsync()
+    {
+        using var options = new BlankPageDialog(insert: false);
+        if (options.ShowDialog(this) != DialogResult.OK || !await ConfirmUnsavedAsync()) return;
+        var result = await _bridge!.RequestAsync("document.create", new { format = options.PaperFormat, landscape = options.Landscape });
+        byte[] bytes = Convert.FromBase64String(result.GetProperty("base64").GetString()!);
+        PdfFile.Validate(bytes);
+        _document = new PdfFile("Nuovo documento.pdf", bytes);
+        _openedPath = null;
+        _untitled = true;
+        _status.Text = $"Nuovo documento {options.PaperFormat} · da salvare";
+        ReadEditorState(result.GetProperty("state"), acceptNew: true);
+    }
+
+    private async Task InsertBlankPageCoreAsync()
+    {
+        if (_document is null || !_canEdit) return;
+        var state = await _bridge!.RequestAsync("editor.blankOptions");
+        if (state.GetProperty("token").GetString() != _token) throw new InvalidOperationException("Il documento è cambiato.");
+        using var options = new BlankPageDialog(insert: true, state.GetProperty("pageCount").GetInt32(), state.GetProperty("page").GetInt32());
+        if (options.ShowDialog(this) != DialogResult.OK) return;
+        ReadEditorState(await _bridge.RequestAsync("editor.insertBlank", new { token = _token, format = options.PaperFormat, landscape = options.Landscape, position = options.Position }));
+        _status.Text = $"Inserita pagina vuota {options.PaperFormat} alla posizione {options.Position}";
     }
 
     private async Task InsertPagesCoreAsync()
@@ -466,7 +474,7 @@ internal sealed class MainForm : Form
         {
             if (dialog.ShowDialog(this) != DialogResult.OK) { _status.Text = _document.Name; return; }
             string destination = Path.GetFullPath(dialog.FileName);
-            if (SamePath(destination, _document.Path) || SamePath(destination, _openedPath))
+            if ((!_untitled && SamePath(destination, _document.Path)) || SamePath(destination, _openedPath))
             {
                 MessageBox.Show(this, "Scegliere un percorso diverso dal documento corrente e dal file originale.",
                     "Estrai pagine", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -502,7 +510,7 @@ internal sealed class MainForm : Form
     private async Task<bool> SaveCoreAsync(bool saveAs)
     {
         if (_document is null) return true;
-        if (_readOnly) saveAs = true;
+        if (_readOnly || _untitled) saveAs = true;
         if (!saveAs && !_dirty) return true;
         while (true)
         {
@@ -512,13 +520,13 @@ internal sealed class MainForm : Form
                 using var dialog = new SaveFileDialog
                 {
                     Filter = "Documento PDF (*.pdf)|*.pdf", DefaultExt = "pdf", AddExtension = true,
-                    FileName = Path.GetFileNameWithoutExtension(_document.Name) + (_readOnly ? " - copia.pdf" : " - modificato.pdf"),
+                    FileName = Path.GetFileNameWithoutExtension(_document.Name) + (_untitled ? ".pdf" : _readOnly ? " - copia.pdf" : " - modificato.pdf"),
                     Title = _readOnly ? "Salva copia originale" : "Salva con nome", OverwritePrompt = true
                 };
                 if (dialog.ShowDialog(this) != DialogResult.OK) return false;
                 destination = Path.GetFullPath(dialog.FileName);
             }
-            bool samePath = SamePath(destination, _document.Path);
+            bool samePath = !_untitled && SamePath(destination, _document.Path);
             if (_readOnly && (samePath || SamePath(destination, _openedPath)))
             {
                 MessageBox.Show(this, "Questo documento è in sola lettura. Scegliere un percorso diverso dall’originale.", "Salva copia", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -542,6 +550,7 @@ internal sealed class MainForm : Form
             }
             // Commit native bytes/path after disk success, then acknowledge the exact revision.
             _document = new PdfFile(destination, bytes);
+            _untitled = false;
             var state = await _bridge.RequestAsync("document.markSaved", new
             {
                 token = _token, revision = exported.GetProperty("revision").GetInt32(), name = _document.Name
@@ -569,6 +578,7 @@ internal sealed class MainForm : Form
         if (_document is null || !await ConfirmUnsavedAsync()) return;
         await _bridge!.RequestAsync("document.close");
         _document = null;
+        _untitled = false;
         _openedPath = _token = null;
         _dirty = _readOnly = _canEdit = _canText = _textEditing = _canUndo = _canRedo = false;
         _canContent = _canPrint = false;
@@ -603,6 +613,7 @@ internal sealed class MainForm : Form
         {
             var item = new ToolStripMenuItem(Path.GetFileName(path)) { ToolTipText = path };
             item.Click += async (_, _) => await RunHostAsync(() => OpenPathCoreAsync(path));
+            CommandIcons.Configure(item, "file", menuEntry: true);
             _recent.DropDownItems.Add(item);
         }
         if (_recent.DropDownItems.Count == 0) _recent.DropDownItems.Add(new ToolStripMenuItem("Nessun file recente") { Enabled = false });

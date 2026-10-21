@@ -7,9 +7,15 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/PdfMB.Desktop/PdfMB.Desktop.csproj" />
     <Compile Include="../../src/PdfMB.Desktop/Services/PdfAssociation.cs" Link="PdfAssociation.cs" />
     <Compile Include="../../src/PdfMB.Desktop/Services/PdfDropFiles.cs" Link="PdfDropFiles.cs" />
     <Compile Include="../../src/PdfMB.Desktop/Services/PngFile.cs" Link="PngFile.cs" />
     <Compile Include="../../src/PdfMB.Desktop/Services/StampLibrary.cs" Link="StampLibrary.cs" />
   </ItemGroup>
+  <Target Name="RemoveUnusedWpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+  </Target>
 </Project>

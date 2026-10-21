@@ -1,10 +1,12 @@
+import { FormSurface } from './form-surface.mjs';
+import { installCommandIcons } from './command-icons.mjs';
 import { WorkbenchSurface } from './workbench-surface.mjs';
 import { printImageBase64 } from './print-image.mjs';
 import { installPdfDrop } from './pdf-drop.mjs';
 import { HighlightSurface } from './highlight-surface.mjs';
 import { createBridge } from './bridge.mjs';
 import { createDocumentSession } from './document-session.mjs';
-import { PageEditor, decodePdf } from './page-editor.mjs';
+import { PageEditor, decodePdf, encodePdf, createBlankPdf } from './page-editor.mjs';
 import { PagesPanel } from './pages-panel.mjs';
 import { TextSurface } from './text-surface.mjs';
 import { italian } from './italian.mjs';
@@ -12,8 +14,9 @@ import { italian } from './italian.mjs';
 const welcome = document.querySelector('#welcome');
 const openButton = document.querySelector('#open');
 const transport = window.chrome?.webview;
-let bridge, registry, session, editor, panel, textSurface, highlightSurface, workbench;
+let bridge, registry, session, editor, panel, textSurface, highlightSurface, workbench, formSurface;
 let locked = false, working = false, panelOpen = false, nextView = null, strategy = 'vertical';
+let deferredFormView = null;
 let tail = Promise.resolve();
 const layouts = new Set();
 const plugin = id => registry.getPlugin(id).provides();
@@ -27,8 +30,8 @@ const enqueue = action => {
 function editorState() {
   return { ...(editor?.state() ?? { token: null, revision: 0, dirty: false, readOnly: true,
     canEdit: false, canText: false, canUndo: false, canRedo: false, blockedReason: '' }),
-    dirty: !!editor?.state().dirty || !!textSurface?.changed() || !!workbench?.pendingShape,
-    busy: locked || working || !!textSurface?.busy || !!workbench?.busy || workbench?.drag != null, textEditing: !!textSurface?.textEditing,
+    dirty: !!editor?.state().dirty || !!textSurface?.changed() || !!workbench?.pendingShape || !!formSurface?.pending || !!formSurface?.pendingValue,
+    busy: locked || working || !!textSurface?.busy || !!workbench?.busy || workbench?.drag != null || !!formSurface?.drag || !!formSurface?.busy, formMode: !!formSurface?.active, textEditing: !!textSurface?.textEditing || !!formSurface?.textEditing,
     textMode: !!textSurface?.active, highlightMode: !!highlightSurface?.active,
     editorOpen: panelOpen && !!editor };
 }
@@ -36,6 +39,7 @@ function viewerState() {
   try {
     const textState = textSurface?.viewState();
     if (textState) return textState;
+    if (formSurface?.active && formSurface.data) return { page: formSurface.pageIndex + 1, pageCount: editor.pages.length, zoom: formSurface.scale || 1, widthMm: Math.round(formSurface.data.width * 25.4 / 72), heightMm: Math.round(formSurface.data.height * 25.4 / 72) };
     const id = session?.currentId;
     const pdf = id && plugin('document-manager').getDocument(id);
     if (pdf) {
@@ -50,7 +54,8 @@ function viewerState() {
   return { page: 0, pageCount: 0, zoom: 1 };
 }
 function notify() {
-  highlightSurface?.sync();
+  formSurface?.sync();
+  if (!formSurface?.active) highlightSurface?.sync();
   const state = editorState();
   document.querySelector('#workspace').inert = locked || working;
   document.querySelector('#text-toolbar').inert = locked || working;
@@ -97,6 +102,9 @@ async function configureView(id) {
     plugin('scroll').forDocument(id).setScrollStrategy(view.strategy);
     plugin('rotate').forDocument(id).setRotation(view.rotation);
   }
+  // The viewer is hidden while designing: its layout cannot become ready.
+  // Keep parsing each replacement transactionally, but restore layout on exit.
+  if (formSurface?.active) { deferredFormView = view; return; }
   await waitForLayout(id);
   await frames();
   if (view) {
@@ -108,7 +116,7 @@ async function configureView(id) {
 async function replaceView(buffer, name, page) {
   const id = session.currentId;
   nextView = id ? {
-    zoom: plugin('zoom').forDocument(id).getState().zoomLevel,
+    zoom: deferredFormView?.zoom ?? plugin('zoom').forDocument(id).getState().zoomLevel,
     spread: plugin('spread').forDocument(id).getSpreadMode(),
     rotation: plugin('rotate').forDocument(id).getRotation(), strategy, page
   } : null;
@@ -125,20 +133,43 @@ function togglePanel() {
   return notify();
 }
 
+async function openDocument(source, name, unsaved = false) {
+  const candidate = new PageEditor(name, replaceView, () => viewerState().page);
+  try {
+    await candidate.initialize(source);
+    nextView = null;
+    const result = await session.openBuffer(candidate.source, name);
+    candidate.finishOpen(result.pageCount);
+    candidate.unsavedDocument = unsaved;
+    editor?.dispose(); editor = candidate;
+    welcome.hidden = true;
+    return notify();
+  } catch (error) { candidate.dispose(); throw error; }
+}
+
 try {
+  installCommandIcons();
   if (!transport) throw new Error('Aprire PDF MB tramite l’applicazione Windows.');
   const handlers = {
     'stamps.set': payload => workbench.setCustomStamps(payload),
     'stamps.error': payload => workbench.stampError(payload.message),
     'editor.lock': async () => {
+      await formSurface?.flush();
       if (textSurface && !await textSurface.flush()) throw new Error('Correggere o annullare la modifica alla casella prima di continuare.');
       if (workbench && !await workbench.flushShapes()) throw new Error('Correggere la forma prima di salvare o cambiare documento.');
       if (workbench && !workbench.close()) throw new Error('Chiudere o completare gli strumenti pagina.');
-      highlightSurface?.suspend();
+      if (!formSurface?.active) highlightSurface?.suspend();
       panel.cancelDialogs(); locked = true; return notify();
     },
     'editor.unlock': () => { locked = false; return notify(); },
     'editor.toggle': togglePanel,
+    'editor.forms': () => withWorking(async () => {
+      if (!locked || !editor?.canFormDesign) throw new Error('Il documento non consente la progettazione di moduli.');
+      if (textSurface.active) textSurface.toggle(false, true);
+      highlightSurface.toggle(false); workbench.close(); panelOpen = false;
+      try { await formSurface.open(); } catch (error) { await formSurface.close(); throw error; }
+      return notify();
+    }),
     'editor.text': () => withWorking(async () => {
       if (!locked || !editor?.canText) throw new Error('Il documento non consente l’inserimento di testo.');
       highlightSurface.toggle(false);
@@ -177,8 +208,8 @@ try {
       return notify();
     },
     'editor.change': payload => withWorking(async () => { if (editor) await editor.change(payload); return editorState(); }),
-    'editor.undo': () => withWorking(async () => { if (editor) await editor.undo(); return editorState(); }),
-    'editor.redo': () => withWorking(async () => { if (editor) await editor.redo(); return editorState(); }),
+    'editor.undo': () => withWorking(async () => { if (editor) await editor.undo(); await formSurface?.refresh(); return editorState(); }),
+    'editor.redo': () => withWorking(async () => { if (editor) await editor.redo(); await formSurface?.refresh(); return editorState(); }),
     'editor.extract': payload => withWorking(async () => {
       if (!locked || !editor || payload.token !== editor.token)
         throw new Error('Documento non disponibile per l’estrazione.');
@@ -204,18 +235,22 @@ try {
     'document.open': payload => withWorking(async () => {
       if (!locked) throw new Error('Operazione documento non sincronizzata con l’applicazione.');
       if (typeof payload.name !== 'string') throw new Error('Nome documento non valido.');
-      const candidate = new PageEditor(payload.name, replaceView, () => viewerState().page);
-      try {
-        await candidate.initialize(decodePdf(payload.base64));
-        // A new input document starts with the default view; edits preserve it.
-        nextView = null;
-        const result = await session.openBuffer(candidate.source, payload.name);
-        candidate.finishOpen(result.pageCount);
-        editor?.dispose();
-        editor = candidate;
-        welcome.hidden = true;
-        return notify();
-      } catch (error) { candidate.dispose(); throw error; }
+      return openDocument(decodePdf(payload.base64), payload.name);
+    }),
+    'document.create': payload => withWorking(async () => {
+      if (!locked) throw new Error('Operazione documento non sincronizzata con l’applicazione.');
+      const bytes = await createBlankPdf(payload);
+      const state = await openDocument(bytes, 'Nuovo documento.pdf', true);
+      return { state, base64: encodePdf(bytes) };
+    }),
+    'editor.blankOptions': () => {
+      if (!locked || !editor?.canEdit) throw new Error('Documento non modificabile.');
+      return { token: editor.token, pageCount: editor.pages.length, page: viewerState().page };
+    },
+    'editor.insertBlank': payload => withWorking(async () => {
+      if (!locked || !editor?.canEdit || payload.token !== editor.token) throw new Error('Documento non disponibile.');
+      await editor.insertBlank(payload);
+      return notify();
     }),
     'document.close': () => withWorking(async () => {
       if (!locked) throw new Error('Operazione documento non sincronizzata con l’applicazione.');
@@ -238,7 +273,7 @@ try {
   };
   bridge = createBridge(transport, Object.fromEntries(Object.entries(handlers)
     .map(([name, handler]) => [name, payload => enqueue(() => handler(payload))])));
-  installPdfDrop({ target: document, unavailable: () => locked || working || !session,
+  installPdfDrop({ target: document, unavailable: () => locked || working || !session || !!formSurface?.active,
     open: file => transport.postMessageWithAdditionalObjects({ version: 1, kind: 'event', type: 'host.drop', payload: {} }, [file]),
     showError });
   const { default: EmbedPDF } = await import('./vendor/embedpdf.js');
@@ -252,7 +287,7 @@ try {
     zoom: { defaultZoomLevel: 'fit-page' },
     disabledCategories: ['annotation', 'redaction', 'form', 'insert', 'signature', 'history',
       'document-open', 'document-close', 'document-export', 'document-print',
-      'document-protect', 'document-capture', 'document-fullscreen', 'security'],
+      'document-protect', 'document-capture', 'document-fullscreen', 'document-menu', 'security'],
     // The snippet remains a viewer. Persistent editing is isolated in our Worker.
     permissions: { enforceDocumentPermissions: true, overrides: {
       modifyContents: false, modifyAnnotations: false, fillForms: false, assembleDocument: false
@@ -268,6 +303,7 @@ try {
     },
     change: payload => uiAction(() => editor.change(payload)),
     insert: () => { if (!locked && !working && editor?.canEdit) bridge.emit('host.insert'); },
+    insertBlank: () => { if (!locked && !working && editor?.canEdit) bridge.emit('host.insertBlank'); },
     extract: () => { if (!locked && !working && editor?.canEdit && editor.selection.size) bridge.emit('host.extract'); },
     toggle: () => { if (!locked && !working) togglePanel(); }
   });
@@ -285,15 +321,31 @@ try {
   workbench = new WorkbenchSurface({ editor: () => editor, plugin, session, read: action => enqueue(action), run: action => enqueue(() => withWorking(action)),
     commit: payload => withWorking(() => editor.changeWorkbench(payload)),
     notify, emit: (type, payload) => bridge.emit(type, payload), unavailable: () => locked || working });
+  formSurface = new FormSurface({ editor: () => editor, currentPage: () => viewerState().page,
+    run: (action, focusOverride) => enqueue(async () => {
+      const focus = focusOverride ?? formSurface.captureFocus();
+      try { return await withWorking(action); } finally { formSurface.restoreFocus(focus); }
+    }), commit: payload => editor.changeForm(payload),
+    unavailable: () => locked || working, notify, showError, emit: type => bridge.emit(type),
+    onPage: () => {},
+    onClose: async page => {
+      const view = deferredFormView; deferredFormView = null;
+      await waitForLayout(session.currentId); await frames();
+      if (view) { plugin('zoom').forDocument(session.currentId).requestZoom(view.zoom); await frames(); }
+      plugin('scroll').forDocument(session.currentId).scrollToPage({ pageNumber: page + 1, behavior: 'instant' });
+    }
+  });
   highlightSurface = new HighlightSurface({ editor: () => editor, plugin, session,
     run: action => enqueue(() => withWorking(action)), notify,
-    unavailable: () => locked || working || !!textSurface?.active || !!workbench?.active, showError });
+    unavailable: () => locked || working || !!textSurface?.active || !!workbench?.active || !!formSurface?.active, showError });
   plugin('scroll').onLayoutReady(event => layouts.add(event.documentId));
   plugin('document-manager').onDocumentClosed(id => layouts.delete(id));
   plugin('scroll').onStateChange(state => { strategy = state.strategy; });
   plugin('scroll').onPageChange(() => bridge.emit('viewer.state', viewerState()));
   plugin('zoom').onZoomChange(() => bridge.emit('viewer.state', viewerState()));
   plugin('rotate').onRotateChange(() => { textSurface.layout(); bridge.emit('viewer.state', viewerState()); });
+  document.querySelector('#new-document').disabled = false;
+  document.querySelector('#new-document').onclick = () => { if (!locked && !working) bridge.emit('host.new'); };
   openButton.disabled = false;
   document.querySelector('#hint').textContent = 'Ctrl+O per aprire · Elaborazione locale';
   openButton.onclick = () => { if (!locked && !working) bridge.emit('host.open'); };
@@ -314,17 +366,20 @@ try {
     }
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
     const key = event.key.toLowerCase();
-    if (!['o', 's', 'p', 'z', 'y'].includes(key)) return;
+    if (!['n', 'o', 's', 'p', 'z', 'y'].includes(key)) return;
     // Text fields keep their own local undo, including the inline page editor.
     const target = event.composedPath()[0];
     if (['z', 'y'].includes(key) && (document.querySelector('dialog[open]') || target?.matches?.('input,textarea'))) return;
     event.preventDefault(); event.stopImmediatePropagation();
     if (locked || working) return;
+    if (formSurface.active && ['n', 'o', 'p'].includes(key)) return;
+    if (key === 'n') bridge.emit('host.new');
     if (key === 'o') bridge.emit('host.open');
     if (key === 'p') bridge.emit('host.print');
     if (key === 's') bridge.emit(event.shiftKey ? 'host.saveAs' : 'host.save');
     if (key === 'z' || key === 'y') enqueue(async () => {
-      if (await textSurface.flush()) await withWorking(() => key === 'z' ? editor?.undo() : editor?.redo());
+      await formSurface.flush();
+      if (await textSurface.flush()) await withWorking(async () => { await (key === 'z' ? editor?.undo() : editor?.redo()); await formSurface.refresh(); });
     }).catch(showError);
   }, true);
   bridge.emit('viewer.ready');

@@ -47,8 +47,13 @@ class EditingWorker {
     this.pending.clear();
   }
 }
+export async function createBlankPdf(options) {
+  const worker = new EditingWorker();
+  try { return await worker.request('create-blank', options); }
+  finally { worker.dispose(); }
+}
 
-const key = pages => JSON.stringify(pages.map(page => [page.id, page.rotation, page.textChanges ?? [], page.highlightChanges ?? [], page.override ?? null]));
+const key = pages => JSON.stringify(pages.map(page => [page.id, page.rotation, page.textChanges ?? [], page.highlightChanges ?? [], page.override ?? null, page.formFields ?? []]));
 // Text records are immutable; snapshots share them and only copy page/array containers.
 const copyPages = pages => pages.map(page => ({ ...page, ...(page.textChanges ? { textChanges: [...page.textChanges] } : {}), ...(page.highlightChanges ? { highlightChanges: [...page.highlightChanges] } : {}) }));
 
@@ -76,19 +81,21 @@ export class PageEditor {
     } catch { this.worker?.dispose(); }
   }
   finishOpen(pageCount) {
-    this.pages = Array.from({ length: pageCount }, (_, id) => ({ id, rotation: 0 }));
+    this.pages = Array.from({ length: pageCount }, (_, id) => ({ id, rotation: 0, formFields: this.policy.formPages?.[id] ?? [] }));
     this.initialKey = this.savedKey = key(this.pages);
     this.selection = new Set([0]);
     this.anchor = 0;
   }
-  get dirty() { return !!this.textRepairPending || key(this.pages) !== this.savedKey; }
+  get dirty() { return !!this.unsavedDocument || !!this.textRepairPending || key(this.pages) !== this.savedKey; }
   get canEdit() { return !this.policy.readOnly && !!this.worker?.alive; }
   get canText() { return this.canEdit && !!this.policy.canAnnotate; }
+  get canFormDesign() { return this.canEdit && !!this.policy.canFormDesign; }
   get blockedReason() {
     return this.policy.blockedReason || (!this.worker?.alive ? 'Motore di modifica non disponibile: salvare il lavoro e riaprire il documento.' : '');
   }
   state() {
     return { token: this.token, revision: this.revision, dirty: this.dirty, readOnly: this.policy.readOnly,
+      canFormDesign: this.canFormDesign, canFormFill: this.canEdit && !!this.policy.canFormFill,
       canEdit: this.canEdit, canText: this.canText, canContent: this.canEdit && !!this.policy.canContent,
       canPrint: !!this.policy.canPrint, blockedReason: this.blockedReason,
       canUndo: this.canEdit && this.past.length > 0, canRedo: this.canEdit && this.future.length > 0 };
@@ -162,6 +169,17 @@ export class PageEditor {
     return { documentToken: this.token, importToken: metadata.token, sourcePages: metadata.pageCount,
       destinationPages: this.pages.length, position: Math.max(1, Math.min(this.currentPage(), this.pages.length + 1)) };
   }
+  async insertBlank({ format, landscape, position }) {
+    if (!this.canEdit) throw new Error(this.blockedReason);
+    if (!Number.isInteger(position) || position < 1 || position > this.pages.length + 1)
+      throw new Error(`Indicare una posizione da 1 a ${this.pages.length + 1}.`);
+    await this.cancelInsert();
+    const buffer = await this.worker.request('create-blank', { format, landscape });
+    const metadata = await this.worker.request('prepare-import', buffer, [buffer]);
+    this.pendingImport = { ...metadata, name: 'Pagina vuota' };
+    try { await this.insert({ importToken: metadata.token, pageIndexes: [0], position }); }
+    finally { await this.cancelInsert(); }
+  }
   async cancelInsert(importToken) {
     if (importToken && this.pendingImport?.token !== importToken) return;
     if (this.pendingImport && this.worker?.alive) await this.worker.request('cancel-import');
@@ -176,6 +194,13 @@ export class PageEditor {
     const before = this.snapshot();
     const target = this.snapshot();
     const imported = await this.worker.request('register-import', { token: importToken, pageIndexes });
+    const formNames = new Set([...(this.policy.externalFormNames ?? []), ...this.pages.flatMap(p => p.formFields ?? []).map(f => f.name)]);
+    for (const page of imported) page.formFields = (page.formFields ?? []).map(f => {
+      let name = f.name, suffix = 2;
+      while (formNames.has(name)) name = `${f.name.slice(0, 70)}_${suffix++}`;
+      formNames.add(name);
+      return { ...f, id: 'pdfmb-f-' + crypto.randomUUID(), name };
+    });
     this.pendingImport = null;
     this.hasImportedSources = true;
     try {
@@ -321,6 +346,7 @@ export class PageEditor {
     try {
       const { override } = await this.worker.request('workbench-change', { buffer, pageIndex, pageId: page.id, pageOverride: page.override, input }, [buffer]);
       page.override = override; page.rotation = 0;
+      if (input.operation === 'redact') page.formFields = [];
       delete page.textChanges; delete page.highlightChanges;
       target.focus = page.id;
       await this.apply(target);
@@ -328,6 +354,34 @@ export class PageEditor {
       if (this.past.length > 100) this.past.shift();
       this.future = [];
     } finally { await this.releaseUnusedSources(); }
+  }
+  async formContext(pageIndex) {
+    if (!this.pages[pageIndex]) throw new Error('Pagina non disponibile.');
+    const buffer = this.bytes.slice(0);
+    return this.worker.request('form-context', { buffer, pageIndex }, [buffer]);
+  }
+  async changeForm({ token, revision, pageIndex, input, remove = false, fillOnly = false }) {
+    if (!this.canFormDesign || token !== this.token || revision !== this.revision || !this.pages[pageIndex])
+      throw new Error('Documento cambiato o moduli non consentiti.');
+    const before = this.snapshot(), target = this.snapshot(), page = target.pages[pageIndex];
+    const previous = (page.formFields ?? []).find(f => f.id === input.id);
+    if ((remove || fillOnly) && !previous) throw new Error('Campo non disponibile.');
+    if (fillOnly && previous.readOnly) throw new Error('Campo in sola lettura.');
+    let value;
+    if (!remove) {
+      if (fillOnly) value = { ...previous, value: input.value };
+      else {
+        const buffer = this.bytes.slice(0);
+        value = await this.worker.request('form-prepare', { buffer, pageIndex, pageId: page.id, input }, [buffer]);
+      }
+    }
+    page.formFields = remove ? (page.formFields ?? []).filter(f => f.id !== input.id) :
+      previous ? page.formFields.map(f => f.id === input.id ? value : f) : [...(page.formFields ?? []), value];
+    if (key(before.pages) === key(target.pages)) return;
+    target.focus = page.id;
+    await this.apply(target);
+    this.past.push(before); if (this.past.length > 100) this.past.shift(); this.future = [];
+    await this.releaseUnusedSources();
   }
   async export() {
     // Old files contain the text but may have a transparent or invalid AP.
@@ -344,6 +398,7 @@ export class PageEditor {
   markSaved({ token, revision, name }) {
     if (token !== this.token || revision !== this.revision) throw new Error('Il documento è cambiato durante il salvataggio.');
     this.savedKey = key(this.pages);
+    this.unsavedDocument = false;
     this.textRepairPending = false;
     this.name = name;
   }

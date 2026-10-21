@@ -1,3 +1,6 @@
+import { createFormTools } from './form-engine.mjs';
+import { paperSize } from './paper-sizes.mjs';
+import { rewriteFormDocument } from './form-document.mjs';
 import { createHighlightTools } from './highlight-engine.mjs';
 import { createStampTools } from './stamp-engine.mjs';
 import { createWorkbenchTools } from './workbench-engine.mjs';
@@ -6,7 +9,8 @@ import { createTextTools } from './text-engine.mjs';
 
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_SOURCE_BYTES = 128 * 1024 * 1024;
-let api, textTools, highlightTools, workbenchTools, stampTools, source, sourceCount, nextPageId, pendingImport;
+let sourceFormPages = [];
+let api, formTools, textTools, highlightTools, workbenchTools, stampTools, source, sourceCount, nextPageId, pendingImport;
 const imports = new Map();
 const catalog = new Map();
 const overrides = new Map();
@@ -17,6 +21,7 @@ async function initialize() {
   api = await init({ wasmBinary: await response.arrayBuffer() });
   api.PDFiumExt_Init();
   textTools = createTextTools(api);
+  formTools = createFormTools(api, textTools);
   highlightTools = createHighlightTools(api, textTools);
   workbenchTools = createWorkbenchTools(api, textTools);
   stampTools = createStampTools(api, textTools);
@@ -39,6 +44,10 @@ function withDocument(action, buffer = source) {
     api.pdfium.wasmExports.free(pointer);
   }
 }
+async function stripManagedForms(buffer) {
+  const hasManaged = withDocument(doc => api.FPDF_GetFormType(doc) !== 0 && formTools.documentFields(doc).some(page => page.length), buffer);
+  return hasManaged ? rewriteFormDocument(buffer) : buffer;
+}
 function pageOrigin(id) {
   if (!Number.isSafeInteger(id) || id < 0) return null;
   return id < sourceCount ? { source: 'base', index: id } : catalog.get(id);
@@ -55,10 +64,10 @@ function prepareImport(buffer) {
     if (policy.readOnly) throw new Error(`Impossibile importare questo PDF. ${policy.blockedReason}`);
     const pageCount = api.FPDF_GetPageCount(handle);
     if (pageCount < 1) throw new Error('Il PDF di origine non contiene pagine.');
-    return { pageCount };
+    return { pageCount, formPages: formTools.documentFields(handle) };
   }, buffer);
   const token = crypto.randomUUID();
-  pendingImport = { token, buffer, pageCount: metadata.pageCount };
+  pendingImport = { token, buffer, pageCount: metadata.pageCount, formPages: metadata.formPages };
   return { token, ...metadata };
 }
 function registerImport({ token, pageIndexes }) {
@@ -74,9 +83,9 @@ function registerImport({ token, pageIndexes }) {
   const pages = pageIndexes.map(index => {
     const id = nextPageId++;
     catalog.set(id, { source: token, index });
-    return { id, rotation: 0 };
+    return { id, rotation: 0, formFields: pendingImport.formPages[index] };
   });
-  imports.set(token, { buffer: pendingImport.buffer, pageCount: pendingImport.pageCount });
+  imports.set(token, { buffer: pendingImport.buffer, pageCount: pendingImport.pageCount, formPages: pendingImport.formPages });
   pendingImport = null;
   return pages;
 }
@@ -101,6 +110,7 @@ function pagePolicy(pageId) {
   const base = withDocument(handle => protection(handle));
   const imported = withDocument(handle => protection(handle), origin.buffer);
   return { canAnnotate: base.canAnnotate && imported.canAnnotate, canContent: base.canContent && imported.canContent,
+    canFormDesign: base.canFormDesign && imported.canFormDesign, canFormFill: base.canFormFill && imported.canFormFill,
     canPrint: base.canPrint && imported.canPrint,
     canPrintHigh: base.canPrintHigh && imported.canPrintHigh };
 }
@@ -127,6 +137,8 @@ function protection(handle) {
     !(permissions & 1024) ? 'Il documento non consente l’assemblaggio delle pagine.' : '';
   return { readOnly: !!reason, blockedReason: reason, signatures, permissions,
     canAnnotate: !reason && !!(permissions & 32), canContent: !reason && !!(permissions & 8),
+    canFormDesign: !reason && !!(permissions & 8) && !!(permissions & 32),
+    canFormFill: !reason && !!(permissions & (256 | 32)),
     canPrint: !!(permissions & 4), canPrintHigh: !!(permissions & 2048) };
 }
 function serialize(handle) {
@@ -147,7 +159,19 @@ function serialize(handle) {
     api.PDFiumExt_CloseFileWriter(writer);
   }
 }
-function rebuild(pages) {
+function createBlank(options) {
+  const { width, height } = paperSize(options);
+  const doc = api.FPDF_CreateNewDocument();
+  if (!doc) throw new Error('Impossibile creare il documento.');
+  try {
+    const page = api.FPDFPage_New(doc, 0, width, height);
+    if (!page) throw new Error('Impossibile creare la pagina vuota.');
+    try { if (!api.FPDFPage_GenerateContent(page)) throw new Error('Pagina vuota non valida.'); }
+    finally { api.FPDF_ClosePage(page); }
+    return serialize(doc);
+  } finally { api.FPDF_CloseDocument(doc); }
+}
+async function rebuild(pages) {
   if (!Array.isArray(pages) || !pages.length)
     throw new Error('Il documento deve conservare almeno una pagina.');
   const ids = new Set();
@@ -156,8 +180,12 @@ function rebuild(pages) {
         !Number.isInteger(page.rotation) || page.rotation < 0 || page.rotation > 3)
       throw new Error('Elenco pagine non valido.');
     ids.add(page.id);
+    const origin = pageOrigin(page.id);
+    const initial = origin.source === 'base' ? sourceFormPages[origin.index] ?? [] : imports.get(origin.source)?.formPages?.[origin.index] ?? [];
+    if (page.formFields && JSON.stringify(page.formFields) !== JSON.stringify(initial) && !pagePolicy(page.id).canFormDesign)
+      throw new Error('La pagina non consente la modifica dei campi del modulo.');
   }
-  return withDocument(handle => {
+  const bytes = withDocument(handle => {
     const policy = protection(handle);
     if (policy.readOnly) throw new Error(policy.blockedReason);
     // Delete backwards so indices refer to the original document until removed.
@@ -244,6 +272,12 @@ function rebuild(pages) {
     }
     return serialize(handle);
   });
+  const fields = pages.map(page => {
+    const origin = pageOrigin(page.id);
+    return page.formFields ?? (origin.source === 'base' ? sourceFormPages[origin.index] ?? [] : imports.get(origin.source)?.formPages?.[origin.index] ?? []);
+  });
+  fields.flat().forEach(formTools.validate);
+  return fields.some(p => p.length) ? rewriteFormDocument(bytes, fields) : bytes;
 }
 
 function withPage(buffer, index, action) {
@@ -371,7 +405,8 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
   try {
     await initialize();
     let result;
-    if (type === 'load') {
+    if (type === 'create-blank') result = createBlank(payload);
+    else if (type === 'load') {
       if (!(payload instanceof ArrayBuffer) || payload.byteLength < 8 || payload.byteLength > MAX_BYTES)
         throw new Error('Dimensione documento non valida (massimo 64 MB).');
       source = payload;
@@ -390,12 +425,26 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
             finally { api.FPDF_ClosePage(page); }
           }
         }
-        return { ...policy, pageCount: sourceCount, textRepairNeeded };
+        const allForms = formTools.documentFields(handle, true);
+        sourceFormPages = allForms.map(page => page.filter(f => f.managed));
+        const externalFormNames = allForms.flat().filter(f => !f.managed).map(f => f.name);
+        return { ...policy, pageCount: sourceCount, textRepairNeeded, formPages: sourceFormPages, externalFormNames };
       });
-    } else if (type === 'rebuild' && source) result = rebuild(payload);
+      if (!result.readOnly && sourceFormPages.some(p => p.length)) source = await rewriteFormDocument(source);
+    } else if (type === 'rebuild' && source) result = await rebuild(payload);
     else if (['text-context', 'text-change'].includes(type) && source) result = textRequest(type, payload);
+    else if (type === 'form-context' && source) result = withPage(payload.buffer, payload.pageIndex, (page, document) => ({
+      ...textTools.geometry(page), fields: formTools.list(document, page), image: textTools.render(page, 1800, 2, document) }));
+    else if (type === 'form-prepare' && source) {
+      const policy = pagePolicy(payload.pageId);
+      if (!policy.canFormDesign) throw new Error('La progettazione dei moduli non è consentita.');
+      result = withPage(payload.buffer, payload.pageIndex, page => formTools.prepare(page, payload.input));
+    }
     else if (type === 'workbench-context' && source) result = workbenchContext(payload);
-    else if (type === 'workbench-change' && source) result = workbenchChange(payload);
+    else if (type === 'workbench-change' && source) {
+      const buffer = payload.input.operation === 'redact' ? payload.buffer : await stripManagedForms(payload.buffer);
+      result = workbenchChange({ ...payload, buffer });
+    }
     else if (type === 'workbench-preview' && source) {
       if (!pagePolicy(payload.pageId).canContent || !['object-text', 'object-transform'].includes(payload.input.operation))
         throw new Error('Anteprima non consentita.');
@@ -427,8 +476,14 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
       });
       result = { value: current, exists };
     }
-    else if (type === 'extract' && source) result = extract(payload);
-    else if (type === 'prepare-import' && source) result = prepareImport(payload);
+    else if (type === 'extract' && source) {
+      const all = withDocument(doc => formTools.documentFields(doc), payload.buffer);
+      const buffer = await stripManagedForms(payload.buffer);
+      const fields = payload.pageIndexes.map(i => all[i]);
+      const bytes = extract({ ...payload, buffer });
+      result = fields.some(p => p.length) ? await rewriteFormDocument(bytes, fields) : bytes;
+    }
+    else if (type === 'prepare-import' && source) { result = prepareImport(payload); pendingImport.buffer = await stripManagedForms(pendingImport.buffer); }
     else if (type === 'register-import' && source) result = registerImport(payload);
     else if (type === 'retain-pages' && source) result = retainPages(payload);
     else if (type === 'cancel-import' && source) { pendingImport = null; result = {}; }

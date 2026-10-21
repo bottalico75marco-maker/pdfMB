@@ -7,6 +7,70 @@ internal static class Program
     private static void Main()
     {
         static void Check(bool success, string message) { if (!success) throw new Exception(message); }
+        // Check the real native layout without showing/starting the application.
+        var desktop = System.Reflection.Assembly.Load("PdfMB.Desktop");
+        var mainType = desktop.GetType("PdfMB.Desktop.MainForm")!;
+        using (var window = (Form)Activator.CreateInstance(mainType, [Array.Empty<string>()])!)
+        {
+            Check(window.Icon is not null, "Application window icon missing");
+            using (var icon = new Icon(window.Icon!, new Size(32, 32)))
+            using (var image = icon.ToBitmap())
+            {
+                Check(image.GetPixel(0, 0).A == 0, "Application icon lost its transparent border");
+                Check(Enumerable.Range(0, image.Width).Any(x => Enumerable.Range(0, image.Height).Any(y =>
+                {
+                    var color = image.GetPixel(x, y);
+                    return color.A > 200 && color.B > 150 && color.B > color.R * 1.5 && color.G > color.R;
+                })), "Window does not use the blue biscione icon");
+                Directory.CreateDirectory("artifacts/test");
+                image.Save("artifacts/test/app-icon-32.png", System.Drawing.Imaging.ImageFormat.Png);
+                Console.WriteLine("Application icon: embedded biscione, blue artwork and transparent border OK");
+            }
+            window.ClientSize = new Size(960, 600);
+            window.PerformLayout();
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var toolbar = (ToolStrip)mainType.GetField("_mainToolbar", flags)!.GetValue(window)!;
+            var modules = (ToolStripButton)mainType.GetField("_forms", flags)!.GetValue(window)!;
+            toolbar.PerformLayout();
+            Check(modules.Placement == ToolStripItemPlacement.Main && modules.Bounds.Right <= toolbar.Width,
+                "Module command overflows at minimum window width");
+            Check(modules.Text == "Progetta modulo" && modules.DisplayStyle == ToolStripItemDisplayStyle.Image && modules.Image is not null && modules.ToolTipText?.Contains("Progetta modulo") == true,
+                "Module command has no icon, accessible name or tooltip");
+            Check(toolbar.Items.Cast<ToolStripItem>().Where(item => item is ToolStripButton or ToolStripDropDownButton).All(item => item.Image is not null && item.DisplayStyle == ToolStripItemDisplayStyle.Image && !string.IsNullOrEmpty(item.AccessibleName)), "A native command has no accessible icon");
+            Check(toolbar.ShowItemToolTips && toolbar.Items.Cast<ToolStripItem>().Where(item => item is ToolStripButton or ToolStripDropDownButton).All(item => !string.IsNullOrWhiteSpace(item.ToolTipText)), "An icon command has no explicit tooltip");
+            var manage = (ToolStripButton)mainType.GetField("_manage", flags)!.GetValue(window)!;
+            Check(manage.ToolTipText?.Contains("Gestisci pagine") == true, "Page management tooltip is missing");
+            var text = (ToolStripButton)mainType.GetField("_text", flags)!.GetValue(window)!;
+            var highlight = (ToolStripButton)mainType.GetField("_highlight", flags)!.GetValue(window)!;
+            Check(toolbar.Items.IndexOf(modules) == toolbar.Items.IndexOf(text) + 1 && toolbar.Items.IndexOf(highlight) == toolbar.Items.IndexOf(modules) + 1,
+                "Module command is not between Text and Highlight");
+            Check(window.MainMenuStrip is null && window.Controls.OfType<ToolStrip>().Count(strip => strip.Dock == DockStyle.Top) == 1 && toolbar.Top == 0,
+                "Extra command/header rows remain above the toolbar");
+            Check(!window.Controls.OfType<Panel>().Any(panel => panel.Dock == DockStyle.Top), "Document header row remains");
+            Directory.CreateDirectory("artifacts/test");
+            using var preview = new Bitmap(toolbar.Width, toolbar.Height);
+            toolbar.DrawToBitmap(preview, new Rectangle(Point.Empty, preview.Size));
+            preview.Save("artifacts/test/native-toolbar.png", System.Drawing.Imaging.ImageFormat.Png);
+            Console.WriteLine("Native toolbar at 960px: one top row, Progetta modulo between Text and Highlight, all commands have accessible icons");
+        }
+        var blankType = desktop.GetType("PdfMB.Desktop.BlankPageDialog")!;
+        using (var blank = (Form)Activator.CreateInstance(blankType, [true, 5, 2])!)
+        {
+            Check(Equals(blankType.GetProperty("Position")!.GetValue(blank), 3), "Blank page default position is not after the current page");
+            Check(Equals(blankType.GetProperty("PaperFormat")!.GetValue(blank), "A4"), "Blank page has no A4 default");
+            blank.Controls.OfType<ComboBox>().Single().SelectedIndex = 2;
+            Check(Equals(blankType.GetProperty("PaperFormat")!.GetValue(blank), "A3"), "A3 selection not passed to the document");
+            var actions = blank.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<Button>().ToArray();
+            Check(actions.All(button => button.Text == "" && button.Image is not null && button.Image.Height <= button.Height && !string.IsNullOrEmpty(button.AccessibleName)), "Dialog icon is missing, clipped or unnamed");
+            blank.StartPosition = FormStartPosition.Manual;
+            blank.Location = new Point(-10000, -10000);
+            blank.Opacity = 0;
+            blank.Show(); // Only this isolated, invisible dialog; never start MainForm.
+            using var preview = new Bitmap(blank.Width, blank.Height);
+            blank.DrawToBitmap(preview, new Rectangle(Point.Empty, preview.Size));
+            preview.Save("artifacts/test/blank-page-dialog.png", System.Drawing.Imaging.ImageFormat.Png);
+            Console.WriteLine("Blank page dialog: format, position and accessible icon buttons OK");
+        }
         string directory = Path.Combine(Path.GetTempPath(), "pdfmb-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         string pdf = Path.Combine(directory, "documento con spazi.PDF");

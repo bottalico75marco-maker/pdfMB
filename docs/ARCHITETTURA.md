@@ -133,3 +133,45 @@ La preview live (`workbench-preview`) muta soltanto il documento temporaneo aper
 `stamp-engine.mjs` crea annotazioni Stamp native con un oggetto immagine BGRA e maschera alpha. La matrice usa le coordinate PDF della pagina, comprese rotazioni permanenti e CropBox. I timbri standard sono bitmap trasparenti generate localmente; la data viene congelata nell’immagine e nei Contents al momento dell’inserimento. La libreria personale conserva soltanto PNG ottimizzati e metadati, tramite `StampLibrary`, in `%LOCALAPPDATA%\PdfMB\Stamps`; l’importazione non modifica il PDF. Nessun file personale viene caricato su servizi esterni.
 
 Verifiche: suite del controller e dei pixel; integrazione WASM reale su note/forme, oggetti, riapertura e Worker completo; smoke test Chromium del viewer con trasporto WebView2 simulato. La workflow desktop.yml esegue i test, compila/pubblica Windows e rende disponibile l’artefatto della 0.8.0. Il test browser non esegue WinForms né il dialogo della stampante.
+
+
+## Moduli compilabili 0.9.0
+
+`form-surface.mjs` presenta una superficie paginata dedicata e una barra a icone. Il flag `formMode` nasconde la ToolStrip nativa e la classe `form-mode` esclude viewer e toolbar ordinarie. Progettazione e compilazione condividono campi, comandi di salvataggio e cronologia; input a fuoco e bozze sono acquisiti da `editor.lock`. Tooltip e aria-label identificano i pulsanti senza descrizioni visibili.
+
+`form-engine.mjs` legge widget e valori con PDFium e converte le geometrie tramite DeviceToPage/PageToDevice. `form-document.mjs` usa pdf-lib 1.17.1 per struttura AcroForm, valori Unicode e AP; il bundle ESM e le licenze vengono copiati localmente da `npm run assets`. La prova iniziale ha mostrato che la rimozione dei widget mediante le sole API PDFium lasciava riferimenti nell'albero Fields. Anche removeField di pdf-lib 1.17.1 richiede il distacco esplicito dei riferimenti widget dalle pagine prima della rimozione dell'albero.
+
+I campi gestiti hanno marcatore PDFMBForm, NM univoco e metadati PDFMBFormData. Il valore corrente è riletto dal campo PDF nativo e non dai metadati. `PageEditor.formFields` conserva record immutabili per pagina negli snapshot e nella chiave dirty. Le sorgenti di lavoro sono private dei campi gestiti; dopo la ricostruzione del documento il Worker riapplica lo stato desiderato e rigenera albero, widget e aspetti. Ciò evita campi orfani o duplicati durante sostituzioni di pagina, estrazione e importazione. I nomi importati in conflitto ricevono suffissi e i widget importati nuovi identificativi.
+
+I campi esterni vengono conservati e i loro nomi sono riservati. Questa versione modifica e compila soltanto testo e checkbox creati da PDF MB. La progettazione richiede i permessi di modifica del contenuto e annotazione, oltre alla policy corrente di modificabilità del documento. Firmati e cifrati restano in consultazione. L'oscuramento svuota formFields della pagina; Undo lo ripristina nella sessione. Il risultato bonificato non ricrea quei campi.
+
+Verifiche aggiunte: albero/valori/aspetti dopo riapertura e rimozione, confronto indipendente pypdf, CropBox e tutte le rotazioni permanenti, cronologia e rollback del controller, ricostruzione/estrazione/oscuramento del Worker e flusso completo con Edge attraverso Playwright. La compatibilità manuale con Acrobat Reader resta nella checklist.
+
+
+## Navigazione e pagine vuote 0.9.1
+
+La ToolStrip mantiene Progetta modulo all'inizio con Overflow.Never e un MenuStrip dedicato File/Pagine/Moduli fornisce accessi stabili. `CommandIcons.cs` disegna le icone native, assegna tooltip/nomi accessibili e decora i pulsanti dei dialoghi. `command-icons.mjs` riusa le icone SVG nelle toolbar web e nei menu contestuali; non vengono sostituite le etichette delle proprietà e delle scelte di formato. La categoria document-menu del viewer è disabilitata per eliminare il menu vuoto duplicato. Anche il MenuStrip viene nascosto nella modalità modulo.
+
+`paper-sizes.mjs` valida A4/A5/A3 e converte i millimetri in punti. Il comando Worker create-blank genera un PDF nativo con una pagina; non richiede un documento già aperto e non cambia le sorgenti correnti. document.create apre la pagina attraverso lo stesso percorso transazionale di document.open. PageEditor.unsavedDocument mantiene dirty fino a markSaved; MainForm._untitled forza il dialogo al primo salvataggio e non aggiunge percorsi fittizi ai Recenti. L'inserimento usa il flusso di importazione e la cronologia già esistenti, con controlli di posizione e permessi.
+
+Prima della conversione generale dei comandi in icone è stato pubblicato lo stato intermedio in artifacts/app-0.9.1-prima-icone e nel relativo ZIP. I test desktop verificano la barra reale a 960 px senza avviare l'app; i test browser coprono creazione, stato non salvato, inserimento, formati e cronologia.
+
+
+La progettazione 0.9.1 evita waitForLayout sul viewer nascosto: la sostituzione continua a validare il nuovo PDF, mentre zoom e pagina vengono ripristinati quando si esce dalla modalità. Il trascinamento aggiorna solo la geometria del nodo esistente. Le checkbox partono da 16 × 16 pt e la bozza può essere subito spostata o ridimensionata.
+
+Il nuovo tipo dropdown usa un campo AcroForm /Ch con flag Combo, senza Edit o MultiSelect, opzioni univoche (1–200) e scelta singola. PDFium rilegge opzioni e valore canonici; pdf-lib conserva /Opt, /V, /DV e appearance. Test nativi e browser verificano Unicode, valore vuoto, default, modifica da lettore esterno, salvataggio/riapertura e importazione con nomi in conflitto. Il test browser verifica anche che Applica non attenda i tre secondi del layout nascosto.
+
+
+## Barra compatta 0.9.2
+
+MainForm rimuove il pannello fileHeader e il MenuStrip superiore; la toolbar unica contiene Progetta modulo fra Testo ed Evidenziatore. Il nome e lo stato modificato restano nel titolo della finestra; Nuovo/Apri sono nella toolbar, mentre inserimento pagina vuota e importazione mantengono i comandi del menu contestuale delle miniature. I controlli desktop verificano assenza delle righe e ordine dei comandi a 960 px. La build 0.9.1 precedente resta in artifacts.
+
+
+## Tooltip espliciti 0.9.3
+
+ToolStripItem.ToolTipText può restituire implicitamente Text mentre AutoToolTip è attivo. CommandIcons.Configure conserva il valore prima di disattivare AutoToolTip, quindi lo assegna esplicitamente: i comandi a icona mantengono il suggerimento. Gestisci pagine ha inoltre un testo esplicito. I controlli desktop verificano tooltip non vuoti per tutti i comandi della barra.
+
+
+## Identità applicazione 0.9.4
+
+`Assets/pdfmb.ico` deriva dal PNG approvato in docs/branding e contiene sette immagini RGBA (16–256 px). `scripts/build-app-icon.ps1` rende riproducibile la conversione di formato tramite System.Drawing. ApplicationIcon incorpora la risorsa PE nell’eseguibile; la stessa ICO è una EmbeddedResource caricata da AppIcon.Apply per le finestre, con rilascio alla loro chiusura. La registrazione DefaultIcon dei PDF già punta all’indice 0 dell’eseguibile, quindi usa il nuovo disegno quando associata a questa build. Non occorrono file grafici esterni all’avvio.

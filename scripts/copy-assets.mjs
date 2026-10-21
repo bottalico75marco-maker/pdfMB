@@ -11,6 +11,7 @@ for (const name of await readdir(path.join(snippet, 'dist'))) {
 }
 await copyFile(path.join(root, 'node_modules/@embedpdf/pdfium/dist/pdfium.wasm'), path.join(target, 'pdfium.wasm'));
 await copyFile(path.join(root, 'node_modules/@embedpdf/pdfium/dist/index.browser.js'), path.join(target, 'pdfium-api.js'));
+await copyFile(path.join(root, 'node_modules/pdf-lib/dist/pdf-lib.esm.min.js'), path.join(target, 'pdf-lib.js'));
 const notices = ['Third-party package inventory and the license/notice files distributed by their authors.'];
 const lock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));
 for (const [relative, pkg] of Object.entries(lock.packages)) {
