@@ -9,6 +9,12 @@ Questo è il riferimento per provare insieme evidenziatore e nuovi punti 2–5. 
 - [ ] Preparare: PDF testuale di almeno 3 pagine; PDF con immagini e tracciati; scansione senza testo; pagina con CropBox/rotazioni; PDF con note/moduli/link/segnalibri; PDF firmato/cifrato/con permessi ridotti. Per l’oscuramento usare una parola di prova univoca e una zona di immagine riconoscibile.
 - [ ] Registrare per ogni problema file, pagina, comando, risultato atteso/osservato e screenshot. Non inviare referti o altri dati personali se non necessari: si possono riprodurre i casi su dati di prova.
 
+## Guida e barra Windows
+
+- [ ] In alto a destra non compare la scritta Gestione pagine; il pulsante Gestisci pagine continua a funzionare.
+- [ ] Aiuto → Guida Windows apre la guida locale nel browser predefinito anche senza un PDF aperto. F1 apre la stessa guida, anche con il focus sul viewer.
+- [ ] La cartella estratta contiene GUIDA-WINDOWS.html accanto all’EXE; la guida è consultabile offline, indice e collegamenti interni funzionano e la stampa dal browser è leggibile.
+
 ## 1. Evidenziatore nel PDF
 
 - [ ] Pulsante attivo → cursore a pennarello sul PDF; select del colore adiacente con Giallo/Verde/Azzurro/Rosa/Arancione. Nessuna finestra alternativa.

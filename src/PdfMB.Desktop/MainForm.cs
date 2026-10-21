@@ -31,7 +31,7 @@ internal sealed class MainForm : Form
     private readonly ToolStripButton _redo = new("Ripeti") { ToolTipText = "Ripeti (Ctrl+Y)" };
     private readonly ToolStripButton _close = new("Chiudi documento");
     private readonly ToolStripDropDownButton _recent = new("Recenti");
-    private readonly ToolStripLabel _mode = new("Consultazione") { Alignment = ToolStripItemAlignment.Right, ForeColor = Color.DimGray };
+    private readonly ToolStripDropDownButton _help = new("Aiuto") { Alignment = ToolStripItemAlignment.Right, Overflow = ToolStripItemOverflow.Never };
     private readonly ToolStripStatusLabel _status = new("Avvio del visualizzatore…") { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly ToolStripStatusLabel _pages = new();
     private readonly Panel _fileHeader = new()
@@ -81,7 +81,7 @@ internal sealed class MainForm : Form
         };
         toolbar.Items.AddRange([new ToolStripLabel(AppTitle) { Font = new Font("Segoe UI", 12, FontStyle.Bold) },
             new ToolStripSeparator(), _open, _recent, _save, _saveAs, new ToolStripSeparator(),
-            _manage, _text, _highlight, _highlightColor, _highlightDelete, _tools, _print, _undo, _redo, new ToolStripSeparator(), _close, _mode]);
+            _manage, _text, _highlight, _highlightColor, _highlightDelete, _tools, _print, _undo, _redo, new ToolStripSeparator(), _close, _help]);
         var statusBar = new StatusStrip { BackColor = Color.White, SizingGrip = false };
         statusBar.Items.AddRange([_status, _pages]);
         _fileHeader.Controls.AddRange([_fileName, _unsavedFile]);
@@ -119,6 +119,9 @@ internal sealed class MainForm : Form
         _redo.Click += async (_, _) => await EditorCommandAsync("editor.redo");
         _close.Click += async (_, _) => await RunHostAsync(CloseDocumentCoreAsync);
         _recent.DropDownOpening += (_, _) => PopulateRecentFiles();
+        var guide = new ToolStripMenuItem("Guida Windows") { ShortcutKeyDisplayString = "F1" };
+        guide.Click += (_, _) => OpenWindowsGuide();
+        _help.DropDownItems.Add(guide);
         Shown += async (_, _) => await StartAsync();
         FormClosing += OnFormClosing;
         FormClosed += (_, _) => _bridge?.Dispose();
@@ -181,6 +184,7 @@ internal sealed class MainForm : Form
                 case "host.save": await RunHostAsync(async () => { await SaveCoreAsync(false); }); break;
                 case "host.saveAs": await RunHostAsync(async () => { await SaveCoreAsync(true); }); break;
                 case "host.insert": await RunHostAsync(InsertPagesCoreAsync); break;
+                case "host.guide": OpenWindowsGuide(); break;
                 case "host.print": await RunHostAsync(PrintCoreAsync); break;
                 case "host.capture": await RunHostAsync(() => CaptureCoreAsync(payload)); break;
                 case "host.extract": await RunHostAsync(ExtractPagesCoreAsync); break;
@@ -216,8 +220,6 @@ internal sealed class MainForm : Form
         _editorBusy = state.GetProperty("busy").GetBoolean();
         _manage.Checked = state.GetProperty("editorOpen").GetBoolean();
         string reason = state.GetProperty("blockedReason").GetString() ?? "";
-        _mode.Text = token is null ? "Consultazione" : _readOnly ? "Sola lettura" : "Gestione pagine";
-        _mode.ToolTipText = reason;
         if (reason.Length > 0 && _document is not null) _status.Text = reason;
         UpdateControls();
     }
@@ -300,6 +302,17 @@ internal sealed class MainForm : Form
         }
     }
 
+    private void OpenWindowsGuide()
+    {
+        try
+        {
+            string path = Path.Combine(AppContext.BaseDirectory, "GUIDA-WINDOWS.html");
+            if (!File.Exists(path)) throw new FileNotFoundException("Guida non trovata. Estrarre tutta la cartella di PDF MB, compreso GUIDA-WINDOWS.html.", path);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
+
     private Task EditorCommandAsync(string command) => RunHostAsync(async () =>
     {
         if (_document is not null) ReadEditorState(await _bridge!.RequestAsync(command));
@@ -334,6 +347,7 @@ internal sealed class MainForm : Form
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        if (keyData == Keys.F1) { OpenWindowsGuide(); return true; }
         if (keyData == (Keys.Control | Keys.P)) { _ = RunHostAsync(PrintCoreAsync); return true; }
         // The text field keeps its own clipboard and local undo/redo shortcuts.
         if (_textEditing) return base.ProcessCmdKey(ref msg, keyData);
@@ -530,7 +544,6 @@ internal sealed class MainForm : Form
         _canContent = _canPrint = _canCapture = false;
         _manage.Checked = false;
         _text.Checked = _highlight.Checked = false;
-        _mode.Text = "Consultazione";
         _status.Text = "Pronto · Apri un documento PDF";
         _pages.Text = "";
     }

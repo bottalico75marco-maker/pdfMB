@@ -67,6 +67,10 @@ La selezione della casella e quella dei caratteri sono distinte: clic sul bordo 
 
 Dalla 0.6.5 l'aspetto viene generato direttamente nell'annotazione del documento di destinazione, senza esportazioni/importazioni intermedie: stream e risorse font restano nello stesso contesto. L'opacità nativa è impostata a 255 (100%). I PDF MB delle versioni precedenti con caselle trasparenti o aspetti non validi vengono rilevati all'apertura e segnalati come da salvare: **Salva** o **Salva con nome** rigenera le caselle, conserva contenuti e geometria e aggiorna il viewer. Non è necessario riscrivere il testo. Solo la scrittura riuscita rimuove l'indicazione di modifiche non salvate. Sorgente iniziale e cronologia restano conservate; documenti protetti e annotazioni estranee sono esclusi dalla riparazione.
 
+## Guida Windows
+
+Il menu **Aiuto → Guida Windows** e il tasto **F1** aprono la [guida utente](docs/GUIDA-WINDOWS.html) nel browser predefinito. Il file `GUIDA-WINDOWS.html` è incluso accanto all’EXE nella build e si consulta offline. In alto a destra rimane il menu Aiuto: la scritta fissa Gestione pagine è stata rimossa; il pulsante Gestisci pagine mantiene le sue funzioni.
+
 ## Strumenti 0.8.0
 
 Il menu **Strumenti** apre una superficie di lavoro sulla pagina corrente, con pulsanti per passare alla precedente/successiva. Le selezioni e il testo vengono confermati con **Applica**; una modifica riuscita entra nella cronologia comune ed è conservata nel file con Salva/Salva con nome. Cambiando strumento o chiudendo con una bozza viene chiesto se scartarla.

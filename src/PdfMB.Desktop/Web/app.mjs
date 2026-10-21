@@ -296,6 +296,9 @@ try {
     if (event.key === 'Enter') { event.preventDefault(); document.querySelector('#move-confirm').click(); }
   };
   document.addEventListener('keydown', event => {
+    if (event.key === 'F1') {
+      event.preventDefault(); event.stopImmediatePropagation(); bridge.emit('host.guide'); return;
+    }
     if (event.key === 'Escape' && highlightSurface.active && !locked && !working) {
       highlightSurface.toggle(false); notify(); return;
     }
