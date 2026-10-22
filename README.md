@@ -6,6 +6,13 @@
 
 | Riferimento | Stato |
 | --- | --- |
+| **0.10.6** | Lucchetto aperto e comando Rimuovi password quando il PDF è protetto; clic per rimuovere la protezione, da confermare con Salva. Barra principale, Strumenti e modulo sincronizzati. Build locale in `artifacts/app-0.10.6`. |
+| **0.10.5** | Miniature del viewer e di Gestisci pagine complete di testo, data/ora e pulsanti del modulo, anche su pagine senza contenuti statici. Build locale in `artifacts/app-0.10.5`. |
+| **0.10.4** | Moduli compilabili anche nella vista normale: pulsante email visibile, data/ora modificabili da tastiera e selettore, salvataggio e cronologia condivisi con la progettazione. Build locale in `artifacts/app-0.10.4`. |
+| **0.10.3** | Avviso regex all’uscita dal campo, script PDF compatibili ECMAScript 5, riparazione delle validazioni precedenti e nuovo Strumenti → Immagine con upload e incorporamento statico al salvataggio. Build locale in `artifacts/app-0.10.3`. |
+| **0.10.2** | Corretto Invio PDF nei lettori esterni: destinazione email URL ASCII, senza interpretazione come file locale. I pulsanti delle versioni precedenti sono riparati riaprendo e salvando il PDF. Build locale in `artifacts/app-0.10.2`. |
+| **0.10.1** | Default `NOW()` per data e ora, upload immagine visibile nel campo e nelle proprietà anche in progettazione, lucchetto nella barra principale. Build locale in `artifacts/app-0.10.1`. |
+| **0.10.0** | Validazione regex, campo data/ora con formati e calendario, upload immagini, pulsante email con PDF compilato e password AES-256. Build locale in `artifacts/app-0.10.0`. |
 | **0.9.5** | Logo del biscione nerazzurro nella schermata iniziale al posto del riquadro PDF. Build locale in `artifacts/app-0.9.5`. |
 | **0.9.4** | Icona del biscione nerazzurro applicata all’eseguibile e alle finestre. ICO trasparente in sette dimensioni, da 16 a 256 px. Build locale in `artifacts/app-0.9.4`. |
 | **0.9.3** | Ripristinati i tooltip dei comandi a icona, incluso Gestisci pagine. Proposta grafica nero/azzurro con biscione in `docs/branding`, separata dall’icona dell’app. Build locale in `artifacts/app-0.9.3`. |
@@ -18,13 +25,13 @@
 | **0.8.0** | Versione di sviluppo più recente, con tutte le funzioni descritte qui e guida Windows. Disponibile nel [ramo di sviluppo](https://github.com/bottalico75marco-maker/pdfMB/tree/codex/evidenziatore-0.7.0) e nella [PR #1](https://github.com/bottalico75marco-maker/pdfMB/pull/1), ancora in bozza per le prove Windows. |
 | **0.6.5** | Versione dei sorgenti su `main` al momento della pubblicazione di questo README e ultima cartella binaria storica inclusa nel repository. |
 
-Questo README presenta le funzioni aggiornate alla **0.9.5** locale. Aggiornare la documentazione nella pagina principale non unisce automaticamente la PR: per usare le nuove funzioni scegliere la build corrispondente.
+Questo README presenta le funzioni aggiornate alla **0.10.6** locale. Aggiornare la documentazione nella pagina principale non unisce automaticamente la PR: per usare le nuove funzioni scegliere la build corrispondente.
 
 **Collegamenti:** [Guida Windows](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/GUIDA-WINDOWS.html) · [Checklist unica delle prove](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/CHECKLIST-MANUALE.md) · [Build Windows su GitHub Actions](https://github.com/bottalico75marco-maker/pdfMB/actions) · [Architettura](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/ARCHITETTURA.md)
 
 ## Installazione su Windows
 
-1. Aprire il risultato della workflow **Verifica e build Windows** relativo al commit desiderato e scaricare l’artefatto **PDF-MB-0.9.5-win-x64**, quando la compilazione è terminata con successo.
+1. Aprire il risultato della workflow **Verifica e build Windows** relativo al commit desiderato e scaricare l’artefatto **PDF-MB-0.10.6-win-x64**, quando la compilazione è terminata con successo.
 2. Estrarre **l’intera cartella** dello ZIP.
 3. Verificare la presenza di **.NET Desktop Runtime 10** e **Microsoft Edge WebView2 Runtime** su Windows a 64 bit.
 4. Avviare **PdfMB.Desktop.exe**.
@@ -33,7 +40,7 @@ Tenere insieme EXE, DLL, cartelle `Web` e `ThirdParty` e `GUIDA-WINDOWS.html`. P
 
 La guida si apre offline con **Aiuto → Guida Windows** o **F1**, nel browser predefinito. Include istruzioni per tutti gli strumenti e per la risoluzione dei problemi più comuni. La scritta fissa “Gestione pagine” in alto a destra è stata rimossa; il pulsante **Gestisci pagine** resta disponibile.
 
-## Tutte le funzionalità disponibili nella 0.9.5
+## Tutte le funzionalità disponibili nella 0.10.6
 
 ### Nuovo documento e pagine vuote
 
@@ -114,6 +121,15 @@ Dal menu **Strumenti** sono disponibili **Nota adesiva, Rettangolo, Ellisse, Lin
 - Le annotazioni sono PDF native; quelle di altri programmi vengono conservate e non sono modificabili dall’elenco dell’app.
 - I pulsanti Pagina precedente/successiva navigano il PDF aperto; si può anche scorrere o iniziare una selezione su un’altra pagina.
 
+### Immagini statiche
+
+**Strumenti → Immagine** permette di disegnare un riquadro e cliccarlo per caricare o sostituire un PNG/JPEG. Un singolo clic crea il riquadro iniziale e apre direttamente il caricamento; è disponibile anche il selettore file nella barra.
+
+- Anteprima nel riquadro con proporzioni e trasparenza conservate; stessi limiti di upload dei campi immagine.
+- **Applica** oppure direttamente **Salva** incorpora l’immagine nel contenuto della pagina, senza widget, azioni o possibilità di ricaricarla facendo clic nel lettore PDF. Un riquadro senza immagine richiede di completare il caricamento o scartare la selezione.
+- Annulla/Ripeti comune, conservazione di testi e campi esistenti, estrazione e riapertura. È richiesto il permesso di modifica del contenuto.
+- Il campo immagine nella progettazione modulo resta invece un controllo di upload interattivo.
+
 ### Modifica del testo e degli oggetti originali
 
 **Strumenti → Modifica testo e oggetti** permette di selezionare un oggetto sulla pagina o dall’elenco.
@@ -144,9 +160,15 @@ L'icona **Progetta modulo** apre una modalità dedicata: nasconde gli altri stru
 - Dropdown con **1–200 opzioni**, una per riga, scelta singola e valore predefinito facoltativo. Opzioni, scelta corrente e proprietà restano nel PDF salvato.
 - Aggiornamenti senza attesa del visualizzatore nascosto e trascinamento diretto dei campi.
 - Nome univoco, descrizione, valore predefinito, obbligatorio e sola lettura; per il testo multilinea, limite caratteri, font, dimensione e colore.
+- I campi PDF MB si compilano anche nella **vista normale**: testo, data/ora con selettore, checkbox, dropdown, immagine da upload e pulsante email. La compilazione usa la stessa cronologia e lo stesso salvataggio della progettazione; i campi in sola lettura conservano la restrizione. `NOW()` resta un valore predefinito e non blocca la modifica di data/ora.
 - L'occhio alterna progettazione e compilazione; il dischetto salva anche la bozza del campo e l'ultimo valore digitato. La porta con freccia ripristina gli strumenti ordinari.
 - Campi AcroForm interattivi dopo riapertura, Annulla/Ripeti comune, conservazione durante le operazioni sulle pagine; nomi in conflitto rinominati durante l'importazione.
-- Fino a 1.000 campi; caratteri occidentali, accenti ed euro. Modifica e compilazione riguardano i campi creati da PDF MB. Radio, elenchi a selezione multipla, XFA e script non sono inclusi.
+- **Regex** nelle proprietà del testo, senza delimitatori `/.../`: corrispondenza dell’intero valore e messaggio personalizzabile. Esempio: `[A-Z]{2}[0-9]{6}`. Una regex o un valore non valido mantiene la bozza correggibile. Un valore non valido mostra un avviso all’uscita dal campo in Compila modulo. Gli script dei PDF esportati usano sintassi compatibile ECMAScript 5; nei lettori esterni le azioni JavaScript devono essere abilitate. I moduli precedenti con regex/data si aggiornano riaprendo e salvando nella nuova versione.
+- **Data e ora**: un unico campo con nove formati per sola data, sola ora o entrambe, tra cui `gg/mm/aaaa`, `aaaa-mm-gg`, `HH:mm`, `HH:mm:ss` e `gg/mm/aaaa HH:mm`. Valore predefinito `NOW()` per data e ora locali correnti, calcolato quando si applica il campo nel formato scelto; i valori compilati restano conservati. Digitazione e selettore calendario/orario; controllo dei giorni del mese, anni bisestili e intervalli dell’ora.
+- **Immagine da upload**: **Carica immagine…** direttamente nel campo selezionato o nelle proprietà, disponibile anche in progettazione; in Compila modulo, clic sul campo per scegliere PNG/JPEG fino a 8 MB e 16 milioni di pixel. Riduzione a 1200 pixel sul lato maggiore e massimo circa 1 MB incorporato, proporzioni conservate, sostituzione/rimozione e Annulla/Ripeti.
+- **Pulsante email**: etichetta e destinatario facoltativo. In compilazione controlla i campi obbligatori e apre il client di posta con il PDF aggiornato allegato, anche prima di Salva. Usa MAPI; se non disponibile apre una bozza `.eml` con allegato, quando il sistema dispone di un’app associata. Nei PDF salvati la destinazione `mailto:` è una specifica URL esplicita in ASCII. Per aggiornare un PDF delle versioni 0.10.0/0.10.1, riaprirlo nella nuova app e premere Salva, senza dover ricreare i campi. Un lettore esterno può comunque chiedere una conferma prima di aprire il client email. Le bozze `.eml` restano nella cartella temporanea `%TEMP%\PdfMB\Email`.
+- **Proteggi con password**: lucchetto nella barra principale accanto a Salva, nella barra del modulo oppure Strumenti → Proteggi con password. Password ripetuta due volte, applicata con Salva mediante AES-256. Riapertura con password e protezione mantenuta nei salvataggi, negli allegati email e nelle estrazioni; campi e immagini restano modificabili. Quando il PDF è protetto il pulsante diventa un lucchetto aperto con il comando **Rimuovi password**: cliccarlo e salvare per rimuovere la protezione.
+- Fino a 1.000 campi; caratteri occidentali, accenti ed euro. Modifica e compilazione riguardano i campi creati da PDF MB. Radio, elenchi a selezione multipla, XFA e calcoli non sono inclusi. Nei lettori esterni regex, importazione immagini e invio email dipendono dal supporto alle azioni PDF e dalle impostazioni di sicurezza; in PDF MB sono gestiti dall’app.
 
 ### Stampa
 
@@ -172,7 +194,7 @@ Annulla può ripristinare la sorgente nella sessione: condividere soltanto il PD
 - Nessun server HTTP locale avviato dall’applicazione; contenuti del viewer esposti tramite mapping locale WebView2.
 - Percorsi di apertura/salvataggio gestiti dai dialoghi Windows, non scelti dal codice web.
 - Permessi separati per annotazioni, modifica del contenuto, copia e stampa, ricontrollati anche sulle sorgenti importate.
-- Documenti firmati, cifrati, senza permessi di assemblaggio o con controlli falliti mantenuti in sola consultazione secondo la policy dell’app.
+- Documenti firmati, senza permessi di assemblaggio o con controlli falliti mantenuti in sola consultazione. I PDF protetti creati da PDF MB si riaprono con la password e mantengono la cifratura nei successivi salvataggi; per PDF con password proprietario distinta occorre quella del proprietario. I documenti con sole restrizioni e password di apertura vuota restano in sola consultazione.
 - Profili WebView2 ed elenco dei Recenti conservati in `%LOCALAPPDATA%\PdfMB`; i Recenti contengono percorsi locali.
 
 ## Scorciatoie
@@ -192,7 +214,7 @@ Annulla può ripristinare la sorgente nella sessione: condividere soltanto il PD
 ## Limiti attuali
 
 - **64 MB** per PDF aperto, importato o risultante; **128 MB** complessivi per sorgenti e cronologia. Salvare e riaprire libera la cronologia.
-- Password di apertura e OCR non ancora gestiti; moduli limitati a testo, checkbox e dropdown a scelta singola creati da PDF MB.
+- OCR non ancora gestito; progettazione e compilazione dedicate ai campi creati da PDF MB. L’apertura di PDF cifrati e firmati insieme non è supportata. Per l’inserimento di pagine da un PDF protetto aprirlo prima con la password e salvarne una copia senza protezione.
 - Font remoti di fallback disabilitati: un PDF con font mancanti può richiedere una verifica sull’originale.
 - Fino a 1.000 modifiche a caselle o evidenziazioni per pagina; fino a 1.000 rettangoli per tratto di evidenziatore e pagina.
 - La superficie Strumenti ispeziona pagine con un massimo di 2.000 oggetti/annotazioni.
@@ -242,7 +264,7 @@ dotnet run --project src/PdfMB.Desktop
 Pubblicazione della cartella Windows a 64 bit:
 
 ```powershell
-dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.9.5
+dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.10.6
 ```
 
 Prova browser facoltativa:

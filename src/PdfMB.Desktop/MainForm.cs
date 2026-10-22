@@ -14,6 +14,11 @@ internal sealed class MainForm : Form
     private readonly ToolStripButton _new = new("Nuovo") { ToolTipText = "Nuovo documento vuoto (Ctrl+N)" };
     private readonly ToolStripButton _save = new("Salva") { ToolTipText = "Salva (Ctrl+S)" };
     private readonly ToolStripButton _saveAs = new("Salva con nome…") { ToolTipText = "Salva con nome (Ctrl+Maiusc+S)" };
+    private readonly ToolStripButton _protect = new("Proteggi con password") { ToolTipText = "Proteggi il PDF con password", Overflow = ToolStripItemOverflow.Never };
+    private readonly ToolStripMenuItem _protectMenu = new("Proteggi con password…") { Tag = "protect" };
+    private readonly Image _protectIcon;
+    private readonly Image _unprotectIcon = CommandIcons.Create("unprotect");
+    private bool _passwordProtected;
     private readonly ToolStripButton _manage = new("Gestisci pagine") { ToolTipText = "Mostra o nascondi Gestisci pagine" };
     private readonly ToolStripButton _highlight = new("Evidenziatore") { ToolTipText = "Attiva il pennarello sul testo del PDF (Esc per uscire)", Overflow = ToolStripItemOverflow.Never };
     private readonly ToolStripComboBox _highlightColor = new()
@@ -71,7 +76,7 @@ internal sealed class MainForm : Form
         };
         _mainToolbar = toolbar;
         toolbar.Items.AddRange([new ToolStripLabel(AppTitle) { Font = new Font("Segoe UI", 12, FontStyle.Bold) },
-            new ToolStripSeparator(), _new, _open, _recent, _save, _saveAs, new ToolStripSeparator(),
+            new ToolStripSeparator(), _new, _open, _recent, _save, _protect, _saveAs, new ToolStripSeparator(),
             _manage, _text, _forms, _highlight, _highlightColor, _tools, _print, _undo, _redo, new ToolStripSeparator(), _close, _help]);
         var statusBar = new StatusStrip { BackColor = Color.White, SizingGrip = false };
         statusBar.Items.AddRange([_status, _pages]);
@@ -83,6 +88,7 @@ internal sealed class MainForm : Form
         _new.Click += async (_, _) => await RunHostAsync(NewDocumentCoreAsync);
         _save.Click += async (_, _) => await RunHostAsync(async () => { await SaveCoreAsync(false); });
         _saveAs.Click += async (_, _) => await RunHostAsync(async () => { await SaveCoreAsync(true); });
+        _protect.Click += async (_, _) => await RunHostAsync(ProtectCoreAsync);
         _manage.Click += async (_, _) => await EditorCommandAsync("editor.toggle");
         _highlightColor.Items.AddRange(["Giallo", "Verde", "Azzurro", "Rosa", "Arancione"]);
         _highlightColor.SelectedIndex = 0;
@@ -94,7 +100,7 @@ internal sealed class MainForm : Form
         });
         _highlight.Click += async (_, _) => await EditorCommandAsync("editor.highlight");
         _text.Click += async (_, _) => await EditorCommandAsync("editor.text");
-        foreach (var tool in new (string Name, string Mode)[] { ("Nota adesiva", "note"), ("Rettangolo", "square"), ("Ellisse", "circle"), ("Linea", "line"), ("Penna", "ink"), ("Timbri", "stamp"), ("Modifica testo e oggetti", "objects"), ("Oscuramento effettivo", "redact") })
+        foreach (var tool in new (string Name, string Mode)[] { ("Nota adesiva", "note"), ("Rettangolo", "square"), ("Ellisse", "circle"), ("Linea", "line"), ("Penna", "ink"), ("Timbri", "stamp"), ("Immagine", "image"), ("Modifica testo e oggetti", "objects"), ("Oscuramento effettivo", "redact") })
         {
             var item = new ToolStripMenuItem(tool.Name) { Tag = tool.Mode };
             item.Click += async (_, _) => await RunHostAsync(async () =>
@@ -104,6 +110,8 @@ internal sealed class MainForm : Form
             _tools.DropDownItems.Add(item);
         }
         _forms.Click += async (_, _) => await EditorCommandAsync("editor.forms");
+        _protectMenu.Click += async (_, _) => await RunHostAsync(ProtectCoreAsync);
+        _tools.DropDownItems.Add(_protectMenu);
         _print.Click += async (_, _) => await RunHostAsync(PrintCoreAsync);
         _undo.Click += async (_, _) => await EditorCommandAsync("editor.undo");
         _redo.Click += async (_, _) => await EditorCommandAsync("editor.redo");
@@ -123,6 +131,8 @@ internal sealed class MainForm : Form
         FormClosing += OnFormClosing;
         FormClosed += (_, _) => _bridge?.Dispose();
         CommandIcons.ConfigureStrip(_mainToolbar);
+        _protectIcon = _protect.Image!;
+        Disposed += (_, _) => _unprotectIcon.Dispose();
         UpdateControls();
     }
 
@@ -188,6 +198,8 @@ internal sealed class MainForm : Form
                 case "host.insertBlank": await RunHostAsync(InsertBlankPageCoreAsync); break;
                 case "host.save": await RunHostAsync(async () => { await SaveCoreAsync(false); }); break;
                 case "host.saveAs": await RunHostAsync(async () => { await SaveCoreAsync(true); }); break;
+                case "host.protect": await RunHostAsync(ProtectCoreAsync); break;
+                case "host.formEmail": await RunHostAsync(() => FormEmailCoreAsync(payload)); break;
                 case "host.insert": await RunHostAsync(InsertPagesCoreAsync); break;
                 case "host.guide": OpenWindowsGuide(); break;
                 case "host.print": await RunHostAsync(PrintCoreAsync); break;
@@ -222,6 +234,7 @@ internal sealed class MainForm : Form
         _dirty = state.GetProperty("dirty").GetBoolean();
         _readOnly = state.GetProperty("readOnly").GetBoolean();
         _canEdit = state.GetProperty("canEdit").GetBoolean();
+        _passwordProtected = state.TryGetProperty("passwordProtected", out var passwordProtected) && passwordProtected.GetBoolean();
         _canText = state.GetProperty("canText").GetBoolean();
         _canContent = state.TryGetProperty("canContent", out var content) && content.GetBoolean();
         _canPrint = state.TryGetProperty("canPrint", out var print) && print.GetBoolean();
@@ -246,6 +259,13 @@ internal sealed class MainForm : Form
         bool hasDocument = available && _document is not null;
         _new.Enabled = _open.Enabled = _recent.Enabled = available;
         _save.Enabled = hasDocument && !_readOnly && _dirty;
+        _protect.Enabled = hasDocument && _canEdit;
+        string protectionAction = _passwordProtected ? "Rimuovi password" : "Proteggi con password";
+        _protect.Text = _protect.ToolTipText = _protect.AccessibleName = protectionAction;
+        _protect.Image = _passwordProtected ? _unprotectIcon : _protectIcon;
+        _protectMenu.Text = protectionAction + (_passwordProtected ? "" : "…");
+        _protectMenu.ToolTipText = _protectMenu.AccessibleName = protectionAction;
+        _protectMenu.Image = _protect.Image;
         _saveAs.Enabled = _manage.Enabled = _close.Enabled = hasDocument;
         _saveAs.Text = _readOnly ? "Salva copia…" : "Salva con nome…";
         _saveAs.ToolTipText = _saveAs.AccessibleName = _saveAs.Text;
@@ -254,9 +274,9 @@ internal sealed class MainForm : Form
         _mainToolbar.Visible = !_formMode;
         _text.Enabled = hasDocument && _canText;
         _print.Enabled = hasDocument && _canPrint;
-        _tools.Enabled = hasDocument && (_canText || _canContent);
+        _tools.Enabled = hasDocument && (_canText || _canContent || _canEdit);
         foreach (ToolStripMenuItem item in _tools.DropDownItems)
-            item.Enabled = (string)item.Tag! switch { "objects" or "redact" => _canContent, _ => _canText };
+            item.Enabled = (string)item.Tag! switch { "objects" or "redact" or "image" => _canContent, "protect" => _canEdit, _ => _canText };
         _highlight.Enabled = _highlightColor.Enabled = hasDocument && _canText;
         _text.ToolTipText = _canText ? "Modifica le caselle di testo direttamente sulla pagina" : "Testo non disponibile: controllare i permessi del documento";
         _redo.Enabled = hasDocument && _canRedo;
@@ -387,7 +407,18 @@ internal sealed class MainForm : Form
         // newly saved bytes rather than a snapshot from before the dialog.
         var candidate = await PdfFile.ReadAsync(path);
         _status.Text = "Apertura e controllo documento…";
-        var state = await _bridge!.RequestAsync("document.open", new { name = candidate.Name, base64 = Convert.ToBase64String(candidate.Bytes) });
+        JsonElement state;
+        string password = "";
+        while (true)
+        {
+            try { state = await _bridge!.RequestAsync("document.open", new { name = candidate.Name, base64 = Convert.ToBase64String(candidate.Bytes), password }); break; }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("[PASSWORD]", StringComparison.Ordinal))
+            {
+                using var prompt = new PasswordDialog(create: false, ex.Message.Replace("[PASSWORD] ", ""));
+                if (prompt.ShowDialog(this) != DialogResult.OK) return;
+                password = prompt.Password;
+            }
+        }
         _document = candidate;
         _untitled = false;
         _openedPath = candidate.Path;
@@ -562,6 +593,32 @@ internal sealed class MainForm : Form
         }
     }
 
+    private async Task ProtectCoreAsync()
+    {
+        if (_document is null || _readOnly) return;
+        if (_passwordProtected)
+        {
+            ReadEditorState(await _bridge!.RequestAsync("document.protect", new { password = "" }));
+            _status.Text = "Rimozione password da confermare con Salva";
+            return;
+        }
+        using var dialog = new PasswordDialog(create: true);
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        ReadEditorState(await _bridge!.RequestAsync("document.protect", new { password = dialog.Password }));
+        _status.Text = dialog.Password.Length == 0 ? "Rimozione password da confermare con Salva" : "Protezione password da confermare con Salva";
+    }
+
+    private async Task FormEmailCoreAsync(JsonElement payload)
+    {
+        if (_document is null || _readOnly || payload.GetProperty("token").GetString() != _token) return;
+        var exported = await _bridge!.RequestAsync("document.email", new { token = _token, fieldId = payload.GetProperty("fieldId").GetString() });
+        if (exported.GetProperty("token").GetString() != _token) throw new InvalidOperationException("Il documento è cambiato.");
+        var base64 = exported.GetProperty("base64").GetString()!;
+        if (base64.Length > ((PdfFile.MaximumBytes + 2L) / 3) * 4) throw new InvalidDataException("Il PDF supera 64 MB.");
+        FormEmail.Compose(Handle, Convert.FromBase64String(base64), exported.GetProperty("email").GetString()!);
+        _status.Text = "Bozza email aperta con il PDF compilato allegato";
+    }
+
     private async Task<bool> ConfirmUnsavedAsync()
     {
         if (!_dirty || _document is null) return true;
@@ -580,7 +637,7 @@ internal sealed class MainForm : Form
         _document = null;
         _untitled = false;
         _openedPath = _token = null;
-        _dirty = _readOnly = _canEdit = _canText = _textEditing = _canUndo = _canRedo = false;
+        _dirty = _readOnly = _canEdit = _canText = _textEditing = _canUndo = _canRedo = _passwordProtected = false;
         _canContent = _canPrint = false;
         _manage.Checked = false;
         _text.Checked = _highlight.Checked = false;

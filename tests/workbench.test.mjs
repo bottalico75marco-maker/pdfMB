@@ -117,6 +117,7 @@ test('content, annotations and print enforce separate permissions', async () => 
   editor.policy.canContent = false;
   await assert.rejects(change({ operation: 'object-delete' }));
   await assert.rejects(change({ operation: 'redact' }));
+  await assert.rejects(change({ operation: 'image' }));
   assert.equal(requests.length, 0);
   await change({ operation: 'note' });
   editor.policy.canPrint = false; await assert.rejects(editor.outputPage(0, 'print'));

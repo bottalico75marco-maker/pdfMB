@@ -1,4 +1,6 @@
-import { installFormIcons } from './form-icons.mjs';
+import { installFormIcons, commandIcon } from './form-icons.mjs';
+import { FORM_FORMATS, fieldValueError, uploadedFormImage, isNowDefault } from './form-validation.mjs';
+import { appendFormControl } from './form-controls.mjs';
 const $ = id => document.querySelector('#form-' + id);
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clone = v => structuredClone(v);
@@ -9,6 +11,23 @@ export class FormSurface {
     this.root = $('workspace'); this.toolbar = $('toolbar'); this.sheet = $('sheet'); this.layer = $('fields'); this.canvas = $('canvas');
     this.pageIndex = 0; this.tool = 'select'; this.zoom = 1; this.active = false;
     installFormIcons(this.toolbar); installFormIcons($('properties'));
+    $('format').replaceChildren(...FORM_FORMATS.map(value => new Option(value, value)));
+    $('protect').onclick = () => this.emit('host.protect');
+    $('imageUpload').onchange = () => {
+      const file = $('imageUpload').files[0];
+      if (!file || this.draft?.kind !== 'image') return;
+      this.action(async () => {
+        try {
+          this.draft.value = await uploadedFormImage(file);
+          this.pending = true; this.controls(); this.renderFields();
+          this.status('Immagine caricata. Applica o Salva per conservarla nel PDF.');
+        } finally { $('imageUpload').value = ''; }
+      });
+    };
+    $('imageRemove').onclick = () => {
+      if (this.draft?.kind !== 'image' || this.unavailable()) return;
+      this.draft.value = ''; this.pending = true; this.controls(); this.renderFields(); this.notify();
+    };
     for (const button of this.toolbar.querySelectorAll('[data-tool]')) button.onclick = () => this.action(async () => { await this.flush(); this.tool = button.dataset.tool; this.controls(); });
     $('preview').onclick = () => this.action(async () => { await this.flush(); this.preview = !this.preview; this.tool = 'select'; this.draft = null; this.controls(); this.renderFields(); });
     $('exit').onclick = () => this.action(async () => { await this.flush(); await this.close(); });
@@ -24,7 +43,7 @@ export class FormSurface {
     for (const [id, delta] of [['previous', -1], ['next', 1]]) $(id).onclick = () => this.action(async () => { await this.flush(); this.pageIndex += delta; this.draft = null; await this.refresh(); });
     for (const [id, delta] of [['zoomIn', .25], ['zoomOut', -.25]]) $(id).onclick = () => { this.zoom = clamp(this.zoom + delta, .5, 3); this.layout(); };
     $('fit').onclick = () => { this.zoom = 1; this.layout(); };
-    for (const input of $('properties').querySelectorAll('input,select,textarea')) input.addEventListener('input', () => {
+    for (const input of $('properties').querySelectorAll('input:not([type="file"]),select,textarea')) input.addEventListener('input', () => {
       if (!this.draft || this.preview || this.unavailable()) return;
       this.readProperties(input.id); this.pending = true; this.renderFields(); this.notify();
     });
@@ -58,12 +77,14 @@ export class FormSurface {
     const element = focus.field ? [...this.layer.querySelectorAll('[data-field]')].find(input => input.dataset.field === focus.field) : document.getElementById(focus.id);
     if (!element || element.disabled || element.closest('[hidden]')) return;
     element.focus({ preventScroll: true });
-    if (typeof focus.start === 'number' && element.type !== 'checkbox') element.setSelectionRange?.(focus.start, focus.end);
+    if (typeof focus.start === 'number' && ['text', 'search', 'tel', 'url', 'password', 'textarea'].includes(element.type)) element.setSelectionRange?.(focus.start, focus.end);
   }
   status(message) { $('status').textContent = message; }
   action(fn, focus = null) {
     if (this.unavailable() || this.drag || this.busy) return;
-    return this.run(async () => { try { await fn(); } finally { this.notify(); } }, focus).catch(error => { this.status(error.message); this.showError(error); });
+    return this.run(async () => { try { await fn(); } finally { this.notify(); } }, focus).catch(error => {
+      this.status(error.message); this.showError(error);
+    });
   }
   async open() {
     const startingPage = this.currentPage();
@@ -83,6 +104,9 @@ export class FormSurface {
     if (!this.active) return;
     this.toolbar.inert = this.root.inert = this.unavailable() || !!this.busy;
     const e = this.editor(); $('undo').disabled = !e?.past.length; $('redo').disabled = !e?.future.length;
+    const protectionIcon = e?.password ? 'unprotect' : 'protect';
+    if ($('protect').dataset.icon !== protectionIcon)
+      commandIcon($('protect'), protectionIcon, e?.password ? 'Rimuovi password' : 'Proteggi con password');
     $('save').disabled = !e?.dirty && !this.pending && !this.pendingValue;
   }
   async refresh() {
@@ -113,6 +137,18 @@ export class FormSurface {
       $('defaultChecked').checked = f.kind === 'checkbox' && f.defaultValue;
       $('text-properties').hidden = f.kind !== 'text'; $('check-properties').hidden = f.kind !== 'checkbox';
       $('dropdown-properties').hidden = f.kind !== 'dropdown';
+      $('datetime-properties').hidden = f.kind !== 'datetime';
+      $('button-properties').hidden = f.kind !== 'button';
+      $('image-properties').hidden = f.kind !== 'image';
+      $('imagePreview').hidden = f.kind !== 'image' || !f.value;
+      if (f.kind === 'image' && f.value) $('imagePreview').src = f.value; else $('imagePreview').removeAttribute('src');
+      $('imageInfo').textContent = f.kind === 'image' && f.value ? 'Immagine caricata. Puoi sostituirla o rimuoverla.' : 'Nessuna immagine caricata.';
+      $('imageRemove').disabled = f.kind !== 'image' || !f.value;
+      $('required').closest('label').hidden = f.kind === 'button';
+      $('pattern').value = f.pattern ?? ''; $('validationMessage').value = f.validationMessage ?? '';
+      $('format').value = f.format ?? FORM_FORMATS[0]; $('dateDefault').value = f.kind === 'datetime' ? f.defaultValue : '';
+      $('dateDefault').placeholder = `${f.format ?? FORM_FORMATS[0]} oppure NOW()`;
+      $('caption').value = f.caption ?? 'Invia PDF'; $('email').value = f.email ?? '';
       $('font-properties').hidden = f.kind === 'checkbox';
       if (f.kind === 'dropdown') {
         $('options').value = f.options.join('\n'); this.dropdownDefaults(f);
@@ -131,6 +167,14 @@ export class FormSurface {
     for (const key of ['size', 'maxLength']) f[key] = Number($(key).value);
     for (const key of ['multiline', 'readOnly', 'required']) f[key] = $(key).checked;
     f.defaultValue = f.kind === 'checkbox' ? $('defaultChecked').checked : $('defaultValue').value.replace(/\r\n?/g, '\n');
+    if (f.kind === 'text') { f.pattern = $('pattern').value; f.validationMessage = $('validationMessage').value; }
+    if (f.kind === 'datetime') {
+      f.format = $('format').value; f.defaultValue = $('dateDefault').value;
+      $('dateDefault').placeholder = `${f.format} oppure NOW()`;
+      if (changed === 'form-dateDefault' || changed === 'form-format' && isNowDefault(f.defaultValue)) f.value = f.defaultValue;
+    }
+    if (f.kind === 'button') { f.caption = $('caption').value; f.email = $('email').value; f.defaultValue = ''; }
+    if (f.kind === 'image') f.defaultValue = '';
     if (f.kind === 'dropdown') {
       f.defaultValue = $('defaultOption').value;
       if (changed === 'form-options') {
@@ -174,33 +218,62 @@ export class FormSurface {
       const box = document.createElement('div'); box.className = 'form-widget' + (f.id === this.draft?.id && !this.preview ? ' selected' : '');
       box.dataset.id = f.id; Object.assign(box.style, { left: `${p.x / this.data.width * 100}%`, top: `${p.y / this.data.height * 100}%`, width: `${p.width / this.data.width * 100}%`, height: `${p.height / this.data.height * 100}%` });
       if (this.preview) {
-        const input = document.createElement(f.kind === 'dropdown' ? 'select' : f.kind === 'text' && f.multiline ? 'textarea' : 'input');
-        input.dataset.field = f.id; input.setAttribute('aria-label', f.label || f.name); input.title = f.label || f.name;
-        const value = this.pendingValue && this.valueDraft?.id === f.id ? this.valueDraft.value : f.value;
-        if (f.kind === 'checkbox') { input.type = 'checkbox'; input.checked = value; }
-        else if (f.kind === 'dropdown') { input.append(new Option('—', ''), ...f.options.map(v => new Option(v, v))); input.value = value; }
-        else { input.value = value; input.maxLength = f.maxLength; }
-        input.disabled = !!f.readOnly;
-        input.setAttribute('aria-required', String(!!f.required));
-        Object.assign(input.style, { fontFamily: { Helvetica: 'Arial', Times: 'Times New Roman', Courier: 'Courier New' }[f.font], fontSize: `${f.size * (this.scale || 1)}px`, color: f.color });
-        const angle = ((this.data.rotation * 90 - (f.rotation ?? 0)) % 360 + 360) % 360;
-        if (angle && f.kind !== 'checkbox') Object.assign(input.style, { position: 'absolute', left: '50%', top: '50%',
-          width: `${(angle % 180 ? p.height : p.width) * this.scale}px`, height: `${(angle % 180 ? p.width : p.height) * this.scale}px`, transform: `translate(-50%, -50%) rotate(${angle}deg)` });
-        input.addEventListener('input', () => { this.valueDraft = { id: f.id, value: f.kind === 'checkbox' ? input.checked : input.value }; this.pendingValue = true; this.notify(); });
-        input.addEventListener('change', () => this.action(() => this.flushValue()));
-        input.addEventListener('keydown', event => {
-          if (event.key !== 'Tab' || event.ctrlKey || event.altKey || this.unavailable()) return;
-          event.preventDefault();
-          const inputs = [...this.layer.querySelectorAll('input,textarea,select')].filter(node => !node.disabled);
-          const next = inputs[inputs.indexOf(input) + (event.shiftKey ? -1 : 1)];
-          const focus = next ? { token: this.token, field: next.dataset.field } : { token: this.token, id: event.shiftKey ? 'form-exit' : 'form-preview' };
-          this.action(() => this.flushValue(), focus);
+        appendFormControl(box, f, {
+          value: this.pendingValue && this.valueDraft?.id === f.id ? this.valueDraft.value : f.value,
+          scale: this.scale || 1, rotation: this.data.rotation, position: p,
+          onEmail: async () => {
+            let ready = false;
+            await this.action(async () => {
+              await this.flushValue();
+              for (const field of this.editor().pages.flatMap(p => p.formFields ?? [])) {
+                const error = fieldValueError(field, field.value, true);
+                if (error) throw new Error(`${field.label || field.name}: ${error}`);
+              }
+              ready = true;
+            });
+            if (ready) this.emit('host.formEmail', { token: this.token, fieldId: f.id });
+          },
+          onUpload: read => this.action(async () => {
+            const value = await read(); await this.flushValue();
+            this.valueDraft = { id: f.id, value }; this.pendingValue = true; await this.flushValue();
+          }),
+          onDate: value => this.action(async () => {
+            if (this.valueDraft?.id !== f.id) await this.flushValue();
+            this.valueDraft = { id: f.id, value }; this.pendingValue = true; await this.flushValue();
+          }),
+          onValue: (value, input) => {
+            if (this.pendingValue && this.valueDraft?.id !== f.id) {
+              [...this.layer.querySelectorAll('[data-field]')].find(node => node.dataset.field === this.valueDraft.id)?.focus();
+              this.status('Correggere o annullare il valore precedente prima di compilare un altro campo.'); return false;
+            }
+            this.valueDraft = { id: f.id, value }; this.pendingValue = true;
+            const error = fieldValueError(f, value); input.setCustomValidity?.(error); input.setAttribute('aria-invalid', String(!!error));
+            this.status(error || 'Valore pronto per il salvataggio.'); this.notify();
+          },
+          onCommit: () => this.action(() => this.flushValue(true)),
+          onKeyDown: (event, input) => {
+            if (event.key !== 'Tab' || event.ctrlKey || event.altKey || this.unavailable()) return;
+            event.preventDefault();
+            const inputs = [...this.layer.querySelectorAll('[data-field]')].filter(node => !node.disabled);
+            const next = inputs[inputs.indexOf(input) + (event.shiftKey ? -1 : 1)];
+            const focus = next ? { token: this.token, field: next.dataset.field } : { token: this.token, id: event.shiftKey ? 'form-exit' : 'form-preview' };
+            this.action(() => this.flushValue(true), focus);
+          }
         });
-        box.append(input);
       } else {
-        box.tabIndex = 0; box.setAttribute('role', 'button'); box.setAttribute('aria-label', `${{ text: 'Campo testo', checkbox: 'Casella di spunta', dropdown: 'Elenco a tendina' }[f.kind]}: ${f.name}`);
-        const label = document.createElement('span'); label.textContent = `${{ text: 'T', checkbox: '☑', dropdown: '▾' }[f.kind]} ${f.name}`; box.append(label);
-        box.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.action(async () => { await this.flush(); this.draft = clone(f); this.isNew = false; this.controls(); this.renderFields(); }); } };
+        box.tabIndex = 0; box.setAttribute('role', 'button'); box.setAttribute('aria-label', `${{ text: 'Campo testo', checkbox: 'Casella di spunta', dropdown: 'Elenco a tendina', datetime: 'Data e ora', button: 'Pulsante email', image: 'Campo immagine' }[f.kind]}: ${f.name}`);
+        const label = document.createElement('span'); label.textContent = `${{ text: 'T', checkbox: '☑', dropdown: '▾', datetime: '◷', button: '✉', image: '▧' }[f.kind]} ${f.name}`; box.append(label);
+        if (f.kind === 'image') {
+          if (f.value) { const image = document.createElement('img'); image.className = 'form-design-image'; image.src = f.value; image.alt = f.label || f.name; box.append(image); }
+          if (f.id === this.draft?.id) {
+            const upload = document.createElement('button'); upload.type = 'button'; upload.className = 'form-design-upload'; upload.dataset.imageUpload = 'true';
+            upload.textContent = f.value ? 'Sostituisci immagine…' : 'Carica immagine…';
+            upload.onclick = () => $('imageUpload').click(); box.append(upload);
+          } else if (!f.value) {
+            const hint = document.createElement('div'); hint.className = 'form-image-hint'; hint.textContent = 'Carica immagine…'; box.append(hint);
+          }
+        }
+        box.onkeydown = e => { if (e.target.closest('[data-image-upload]')) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.action(async () => { await this.flush(); this.draft = clone(f); this.isNew = false; this.controls(); this.renderFields(); }); } };
         if (f.id === this.draft?.id) { const handle = document.createElement('i'); handle.className = 'form-resize'; box.append(handle); }
       }
       this.layer.append(box);
@@ -211,15 +284,19 @@ export class FormSurface {
     }
     if (focus) this.layer.querySelector(`[data-field="${focus}"]`)?.focus();
   }
-  async flushValue() {
+  async flushValue(showAlert = false) {
     if (!this.pendingValue) return;
     const value = clone(this.valueDraft);
+    const field = this.data.fields.find(f => f.id === value.id);
+    const error = field && fieldValueError(field, value.value);
+    if (error) { if (showAlert) alert(error); throw new Error(error); }
     await this.commit({ ...this.payload(value), fillOnly: true });
     this.pendingValue = false; this.valueDraft = null; await this.refresh();
   }
   point(event) { const r = this.sheet.getBoundingClientRect(); return { x: clamp((event.clientX - r.left) / r.width * this.data.width, 0, this.data.width), y: clamp((event.clientY - r.top) / r.height * this.data.height, 0, this.data.height) }; }
   pointerDown(event) {
     if (event.button !== 0 || this.preview || this.unavailable() || this.drag) return;
+    if (event.target.closest('[data-image-upload]')) return;
     const target = event.target.closest('[data-id]');
     if (this.pending && target?.dataset.id !== this.draft?.id) {
       const id = target?.dataset.id;
@@ -254,9 +331,11 @@ export class FormSurface {
     if (d.creating) {
       if (d.position.width < 12 || d.position.height < 12) { this.renderFields(); this.notify(); return; }
       const names = new Set([...(this.editor().policy.externalFormNames ?? []), ...this.editor().pages.flatMap(p => p.formFields ?? []).map(f => f.name)]);
-      const prefix = { checkbox: 'spunta', text: 'testo', dropdown: 'elenco' }[this.tool]; let n = 1; while (names.has(`${prefix}_${n}`)) n++;
+      const prefix = { checkbox: 'spunta', text: 'testo', dropdown: 'elenco', datetime: 'data_ora', button: 'pulsante', image: 'immagine' }[this.tool]; let n = 1; while (names.has(`${prefix}_${n}`)) n++;
       this.draft = { id: 'pdfmb-f-' + crypto.randomUUID(), kind: this.tool, name: `${prefix}_${n}`, label: '', value: this.tool === 'checkbox' ? false : '', defaultValue: this.tool === 'checkbox' ? false : '',
         ...(this.tool === 'dropdown' ? { options: ['Opzione 1', 'Opzione 2'] } : {}),
+        ...(this.tool === 'datetime' ? { format: FORM_FORMATS[0] } : {}),
+        ...(this.tool === 'button' ? { caption: 'Invia PDF', email: '' } : {}),
         font: 'Helvetica', size: 12, color: '#202020', maxLength: 1000, multiline: false, readOnly: false, required: false, position: d.position };
       this.isNew = true;
     } else {

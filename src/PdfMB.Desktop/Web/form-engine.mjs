@@ -1,10 +1,11 @@
+import { validateFieldRule, isNowDefault, formatCurrentDate } from './form-validation.mjs';
 // Native AcroForms. Managed fields have document-wide unique names and one widget.
 export function createFormTools(api, text) {
   const alloc = n => { const p = api.pdfium.wasmExports.malloc(n); if (!p) throw new Error('Memoria insufficiente.'); return p; };
   const free = p => api.pdfium.wasmExports.free(p);
   const check = (ok, message = 'Impossibile elaborare il modulo PDF.') => { if (!ok) throw new Error(message); };
   function read(fn) {
-    const n = fn(0, 0); if (n < 2) return ''; check(n <= 40000, 'Valore del campo troppo lungo.');
+    const n = fn(0, 0); if (n < 2) return ''; check(n <= 3000000, 'Valore del campo troppo lungo.');
     const p = alloc(n); try { check(fn(p, n)); return new TextDecoder('utf-16le').decode(api.pdfium.HEAPU8.slice(p, p + n - 2)); } finally { free(p); }
   }
   const string = (a, key) => read((p, n) => api.FPDFAnnot_GetStringValue(a, key, p, n));
@@ -32,12 +33,12 @@ export function createFormTools(api, text) {
             check(api.FPDFAnnot_GetRect(a, p));
             const rect = [...api.pdfium.HEAPF32.slice(p / 4, p / 4 + 4)];
             const type = api.FPDFAnnot_GetFormFieldType(form, a);
-            check(type === 6 || type === 2 || type === 4, 'Tipo di campo PDF MB non supportato.');
-            const value = type === 2 ? !!api.FPDFAnnot_IsChecked(form, a) : read((p, n) => api.FPDFAnnot_GetFormFieldValue(form, a, p, n));
+            check([1, 2, 4, 6].includes(type), 'Tipo di campo PDF MB non supportato.');
+            const value = type === 1 ? data.imageValue ?? '' : type === 2 ? !!api.FPDFAnnot_IsChecked(form, a) : read((p, n) => api.FPDFAnnot_GetFormFieldValue(form, a, p, n));
             const flags = api.FPDFAnnot_GetFormFieldFlags(form, a);
             const options = type === 4 ? Array.from({ length: api.FPDFAnnot_GetOptionCount(form, a) }, (_, index) =>
               read((p, n) => api.FPDFAnnot_GetOptionLabel(form, a, index, p, n))) : undefined;
-            fields.push({ ...data, ...(options ? { options } : {}), id: string(a, 'NM'), name, kind: type === 2 ? 'checkbox' : type === 4 ? 'dropdown' : 'text', value, rect,
+            fields.push({ ...data, ...(options ? { options } : {}), id: string(a, 'NM'), name, kind: type === 1 ? data.kind : type === 2 ? 'checkbox' : type === 4 ? 'dropdown' : data.kind === 'datetime' ? 'datetime' : 'text', value, rect,
               required: !!(flags & 2), readOnly: !!(flags & 1), multiline: !!(flags & 4096), position: text.screenRect(page, rect), managed: true });
           } finally { api.FPDFPage_CloseAnnot(a); }
         }
@@ -47,12 +48,13 @@ export function createFormTools(api, text) {
   }
   function validate(f) {
     check(f && /^pdfmb-f-[0-9a-f-]{36}$/.test(f.id), 'Identificativo campo non valido.');
-    check(['text', 'checkbox', 'dropdown'].includes(f.kind), 'Tipo di campo non valido.');
+    check(['text', 'checkbox', 'dropdown', 'datetime', 'button', 'image'].includes(f.kind), 'Tipo di campo non valido.');
     check(typeof f.name === 'string' && /^[A-Za-z_][A-Za-z0-9_-]{0,79}$/.test(f.name), 'Nome: usare lettere, numeri, _ e -, iniziando con una lettera.');
     check(typeof f.label === 'string' && f.label.length <= 160, 'Descrizione troppo lunga.');
     check(f.kind === 'checkbox' ? typeof f.value === 'boolean' && typeof f.defaultValue === 'boolean' :
       typeof f.value === 'string' && typeof f.defaultValue === 'string', 'Valore del campo non valido.');
-    if (f.kind === 'text') {
+    validateFieldRule(f);
+    if (['text', 'datetime'].includes(f.kind)) {
       check(Number.isInteger(f.maxLength) && f.maxLength >= 1 && f.maxLength <= 10000, 'Lunghezza massima: da 1 a 10.000.');
       for (const value of [f.value, f.defaultValue]) {
         check(value.length <= f.maxLength, 'Il testo supera la lunghezza massima del campo.');
@@ -81,6 +83,13 @@ export function createFormTools(api, text) {
     const a = text.point(page, p.x, p.y), b = text.point(page, p.x + p.width, p.y + p.height);
     const f = { ...input, rotation: input.rotation ?? g.rotation * 90,
       rect: [Math.min(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[0], b[0]), Math.min(a[1], b[1])] };
+    if (f.kind === 'datetime' && isNowDefault(f.defaultValue)) {
+      f.defaultValue = 'NOW()';
+      if (isNowDefault(f.value) || f.resolvedDefaultValue === undefined) {
+        f.resolvedDefaultValue = formatCurrentDate(f.format);
+        if (isNowDefault(f.value) || f.value === '') f.value = f.resolvedDefaultValue;
+      }
+    } else delete f.resolvedDefaultValue;
     delete f.position; delete f.managed; validate(f); return f;
   }
   function documentFields(doc, all = false) {

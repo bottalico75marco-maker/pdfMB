@@ -52,6 +52,12 @@ export async function createBlankPdf(options) {
   try { return await worker.request('create-blank', options); }
   finally { worker.dispose(); }
 }
+export async function openProtectedPdf(buffer, password = '') {
+  const worker = new EditingWorker();
+  const copy = buffer.slice(0);
+  try { return await worker.request('security', { buffer: copy, password, encrypt: false }, [copy]); }
+  finally { worker.dispose(); }
+}
 
 const key = pages => JSON.stringify(pages.map(page => [page.id, page.rotation, page.textChanges ?? [], page.highlightChanges ?? [], page.override ?? null, page.formFields ?? []]));
 // Text records are immutable; snapshots share them and only copy page/array containers.
@@ -78,6 +84,7 @@ export class PageEditor {
       const workerSource = source.slice(0);
       this.policy = await this.worker.request('load', workerSource, [workerSource]);
       this.legacyTextSource = this.textRepairPending = !!this.policy.textRepairNeeded;
+      this.formRepairPending = !!this.policy.formRepairNeeded;
     } catch { this.worker?.dispose(); }
   }
   finishOpen(pageCount) {
@@ -86,7 +93,7 @@ export class PageEditor {
     this.selection = new Set([0]);
     this.anchor = 0;
   }
-  get dirty() { return !!this.unsavedDocument || !!this.textRepairPending || key(this.pages) !== this.savedKey; }
+  get dirty() { return (this.password ?? '') !== (this.savedPassword ?? '') || !!this.unsavedDocument || !!this.textRepairPending || !!this.formRepairPending || key(this.pages) !== this.savedKey; }
   get canEdit() { return !this.policy.readOnly && !!this.worker?.alive; }
   get canText() { return this.canEdit && !!this.policy.canAnnotate; }
   get canFormDesign() { return this.canEdit && !!this.policy.canFormDesign; }
@@ -95,6 +102,7 @@ export class PageEditor {
   }
   state() {
     return { token: this.token, revision: this.revision, dirty: this.dirty, readOnly: this.policy.readOnly,
+      passwordProtected: !!this.password,
       canFormDesign: this.canFormDesign, canFormFill: this.canEdit && !!this.policy.canFormFill,
       canEdit: this.canEdit, canText: this.canText, canContent: this.canEdit && !!this.policy.canContent,
       canPrint: !!this.policy.canPrint, blockedReason: this.blockedReason,
@@ -246,7 +254,8 @@ export class PageEditor {
     // Use the committed result so imported pages and permanent rotations are
     // included. Transfer a copy: the open document keeps its own byte buffer.
     const buffer = this.bytes.slice(0);
-    const extracted = await this.worker.request('extract', { buffer, pageIndexes }, [buffer]);
+    let extracted = await this.worker.request('extract', { buffer, pageIndexes }, [buffer]);
+    if (this.password) extracted = (await this.worker.request('security', { buffer: extracted, password: this.password, encrypt: true }, [extracted])).buffer;
     return { token: this.token, revision: this.revision, pageCount: pageIndexes.length, base64: encodePdf(extracted) };
   }
   async textContext(pageIndex, omitId) {
@@ -338,7 +347,7 @@ export class PageEditor {
   }
   async changeWorkbench({ pageIndex, token, revision, input }) {
     if (token !== this.token || revision !== this.revision || !this.pages[pageIndex]) throw new Error('Il documento è cambiato. Riaprire gli strumenti.');
-    const content = input.operation.startsWith('object-') || input.operation === 'redact';
+    const content = input.operation.startsWith('object-') || ['redact', 'image'].includes(input.operation);
     if (content ? !this.canEdit || !this.policy.canContent : !this.canText) throw new Error('Operazione non consentita.');
     const before = this.snapshot(), target = this.snapshot(), page = target.pages[pageIndex];
     const buffer = this.bytes.slice(0);
@@ -360,13 +369,18 @@ export class PageEditor {
     const buffer = this.bytes.slice(0);
     return this.worker.request('form-context', { buffer, pageIndex }, [buffer]);
   }
+  async formLayout(pageIndex) {
+    if (!this.pages[pageIndex]) throw new Error('Pagina non disponibile.');
+    const buffer = this.bytes.slice(0);
+    return this.worker.request('form-layout', { buffer, pageIndex }, [buffer]);
+  }
   async changeForm({ token, revision, pageIndex, input, remove = false, fillOnly = false }) {
     if (!this.canFormDesign || token !== this.token || revision !== this.revision || !this.pages[pageIndex])
       throw new Error('Documento cambiato o moduli non consentiti.');
     const before = this.snapshot(), target = this.snapshot(), page = target.pages[pageIndex];
     const previous = (page.formFields ?? []).find(f => f.id === input.id);
     if ((remove || fillOnly) && !previous) throw new Error('Campo non disponibile.');
-    if (fillOnly && previous.readOnly) throw new Error('Campo in sola lettura.');
+    if (fillOnly && (previous.readOnly || previous.kind === 'button')) throw new Error('Campo in sola lettura.');
     let value;
     if (!remove) {
       if (fillOnly) value = { ...previous, value: input.value };
@@ -384,22 +398,30 @@ export class PageEditor {
     await this.releaseUnusedSources();
   }
   async export() {
-    // Old files contain the text but may have a transparent or invalid AP.
+    // Repair legacy appearances, mail destinations and validation scripts even
+    // when the user simply reopens and saves an otherwise unchanged form.
     // Repair even when the user simply reopens and saves, preserving source
     // bytes and undo history. Only a successful disk write clears the flag.
-    if (this.textRepairPending) {
+    if (this.textRepairPending || this.formRepairPending) {
       const bytes = await this.worker.request('rebuild', this.pages);
       if (bytes.byteLength > MAX_BYTES) throw new Error('Il risultato supera il limite di 64 MB.');
       await this.replaceView(bytes, this.name, Math.max(1, this.currentPage()));
       this.bytes = bytes;
     }
-    return { token: this.token, revision: this.revision, base64: encodePdf(this.bytes) };
+    let bytes = this.bytes;
+    if (this.password) {
+      const buffer = bytes.slice(0);
+      bytes = (await this.worker.request('security', { buffer, password: this.password, encrypt: true }, [buffer])).buffer;
+    }
+    return { token: this.token, revision: this.revision, base64: encodePdf(bytes) };
   }
   markSaved({ token, revision, name }) {
     if (token !== this.token || revision !== this.revision) throw new Error('Il documento è cambiato durante il salvataggio.');
     this.savedKey = key(this.pages);
+    this.savedPassword = this.password;
     this.unsavedDocument = false;
     this.textRepairPending = false;
+    this.formRepairPending = false;
     this.name = name;
   }
   dispose() { this.worker?.dispose(); }

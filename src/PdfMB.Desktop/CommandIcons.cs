@@ -18,6 +18,8 @@ internal static class CommandIcons
         void Plus(float x, float y) { Line(x - 3, y, x + 3, y); Line(x, y - 3, x, y + 3); }
         switch (kind)
         {
+            case "protect": Rect(4, 10, 16, 12); g.DrawArc(pen, 8, 2, 8, 12, 180, 180); Line(12, 15, 12, 18); break;
+            case "unprotect": Rect(4, 10, 16, 12); g.DrawArc(pen, 11, 1, 10, 10, 180, 180); Line(11, 6, 11, 10); Line(12, 15, 12, 18); break;
             case "new": case "blank": Sheet(); Plus(12, 14); break;
             case "open": Poly(new(2, 7), new(2, 20), new(20, 20), new(22, 9), new(10, 9), new(7, 5), new(2, 5), new(2, 7)); Line(2, 10, 19, 10); break;
             case "recent": g.DrawEllipse(pen, 3, 3, 18, 18); Poly(new(12, 6), new(12, 12), new(16, 14)); break;
@@ -42,6 +44,7 @@ internal static class CommandIcons
             case "line": Line(3, 20, 21, 4); break;
             case "ink": g.DrawBezier(pen, 3, 19, 7, -4, 12, 27, 21, 5); break;
             case "stamp": Poly(new(8, 14), new(8, 11), new(10, 8), new(10, 3), new(14, 3), new(14, 8), new(16, 11), new(16, 14)); Rect(4, 15, 16, 5); Line(4, 23, 20, 23); break;
+            case "image": Rect(3, 3, 18, 18); g.DrawEllipse(pen, 6, 6, 4, 4); Poly(new(3, 18), new(9, 12), new(14, 17), new(18, 13), new(21, 16)); break;
             case "objects": Rect(4, 3, 16, 15); Poly(new(4, 13), new(10, 8), new(15, 14), new(20, 10)); Plus(16, 20); break;
             case "redact": Rect(3, 5, 18, 14); g.FillRectangle(Brushes.Black, 6, 9, 12, 6); break;
             case "guide": Poly(new(2, 4), new(9, 4), new(12, 6), new(15, 4), new(22, 4), new(22, 21), new(15, 21), new(12, 23), new(9, 21), new(2, 21), new(2, 4)); Line(12, 6, 12, 22); break;
@@ -57,13 +60,14 @@ internal static class CommandIcons
 
     private static string Key(string text) => text.Replace("&", "").TrimEnd('…').Trim() switch
     {
-        "Nuovo" or "Nuovo documento" or "Crea" => "new", "Apri PDF" => "open", "Recenti" => "recent",
+        "Nuovo" or "Nuovo documento" or "Crea" => "new", "Apri PDF" or "Apri" => "open", "Recenti" => "recent", "Applica" => "apply",
         "Salva" => "save", "Salva con nome" or "Salva copia" => "saveAs", "Non salvare" => "saveOff",
         "Gestisci pagine" or "Pagine" => "pages", "Testo" => "text", "Evidenziatore" => "highlight",
         "Strumenti" => "tools", "Progetta modulo" or "Moduli" => "forms", "Stampa" => "print",
         "Annulla" => "cancel", "Ripeti" => "redo", "Chiudi documento" => "exit", "Aiuto" => "help",
         "Nota adesiva" => "note", "Rettangolo" => "square", "Ellisse" => "circle", "Linea" => "line", "Penna" => "ink",
-        "Timbri" => "stamp", "Modifica testo e oggetti" => "objects", "Oscuramento effettivo" => "redact",
+        "Timbri" => "stamp", "Immagine" => "image", "Modifica testo e oggetti" => "objects", "Oscuramento effettivo" => "redact",
+        "Proteggi con password" => "protect",
         "Guida Windows" => "guide", "Imposta come lettore PDF predefinito" => "settings",
         "Inserisci pagina vuota" => "blank", "Inserisci pagine da PDF" or "Inserisci" => "import", _ => "file"
     };

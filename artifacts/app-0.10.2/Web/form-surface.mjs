@@ -1,0 +1,371 @@
+import { installFormIcons } from './form-icons.mjs';
+import { FORM_FORMATS, fieldValueError, uploadedFormImage, formatPickedDate, isNowDefault } from './form-validation.mjs';
+const $ = id => document.querySelector('#form-' + id);
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+const clone = v => structuredClone(v);
+
+export class FormSurface {
+  constructor(options) {
+    Object.assign(this, options);
+    this.root = $('workspace'); this.toolbar = $('toolbar'); this.sheet = $('sheet'); this.layer = $('fields'); this.canvas = $('canvas');
+    this.pageIndex = 0; this.tool = 'select'; this.zoom = 1; this.active = false;
+    installFormIcons(this.toolbar); installFormIcons($('properties'));
+    $('format').replaceChildren(...FORM_FORMATS.map(value => new Option(value, value)));
+    $('protect').onclick = () => this.emit('host.protect');
+    $('imageUpload').onchange = () => {
+      const file = $('imageUpload').files[0];
+      if (!file || this.draft?.kind !== 'image') return;
+      this.action(async () => {
+        try {
+          this.draft.value = await uploadedFormImage(file);
+          this.pending = true; this.controls(); this.renderFields();
+          this.status('Immagine caricata. Applica o Salva per conservarla nel PDF.');
+        } finally { $('imageUpload').value = ''; }
+      });
+    };
+    $('imageRemove').onclick = () => {
+      if (this.draft?.kind !== 'image' || this.unavailable()) return;
+      this.draft.value = ''; this.pending = true; this.controls(); this.renderFields(); this.notify();
+    };
+    for (const button of this.toolbar.querySelectorAll('[data-tool]')) button.onclick = () => this.action(async () => { await this.flush(); this.tool = button.dataset.tool; this.controls(); });
+    $('preview').onclick = () => this.action(async () => { await this.flush(); this.preview = !this.preview; this.tool = 'select'; this.draft = null; this.controls(); this.renderFields(); });
+    $('exit').onclick = () => this.action(async () => { await this.flush(); await this.close(); });
+    $('apply').onclick = () => this.action(() => this.flush());
+    $('cancel').onclick = () => { this.draft = null; this.pending = false; this.controls(); this.renderFields(); this.notify(); };
+    $('delete').onclick = () => this.action(async () => {
+      if (!this.draft) return;
+      if (!this.isNew) await this.commit({ ...this.payload(this.draft), remove: true });
+      this.draft = null; this.pending = false; await this.refresh();
+    });
+    for (const [id, command] of [['save', 'host.save'], ['saveAs', 'host.saveAs']]) $(id).onclick = () => this.emit(command);
+    for (const [id, change] of [['undo', 'undo'], ['redo', 'redo']]) $(id).onclick = () => this.action(async () => { await this.flush(); await this.editor()[change](); this.draft = null; await this.refresh(); });
+    for (const [id, delta] of [['previous', -1], ['next', 1]]) $(id).onclick = () => this.action(async () => { await this.flush(); this.pageIndex += delta; this.draft = null; await this.refresh(); });
+    for (const [id, delta] of [['zoomIn', .25], ['zoomOut', -.25]]) $(id).onclick = () => { this.zoom = clamp(this.zoom + delta, .5, 3); this.layout(); };
+    $('fit').onclick = () => { this.zoom = 1; this.layout(); };
+    for (const input of $('properties').querySelectorAll('input:not([type="file"]),select,textarea')) input.addEventListener('input', () => {
+      if (!this.draft || this.preview || this.unavailable()) return;
+      this.readProperties(input.id); this.pending = true; this.renderFields(); this.notify();
+    });
+    this.sheet.addEventListener('pointerdown', event => this.pointerDown(event));
+    this.sheet.addEventListener('pointermove', event => this.pointerMove(event));
+    this.sheet.addEventListener('pointerup', event => this.pointerUp(event));
+    this.sheet.addEventListener('pointercancel', () => { this.drag = null; this.renderFields(); this.notify(); });
+    document.addEventListener('keydown', event => {
+      if (!this.active || this.unavailable()) return;
+      if (event.key === 'Escape') {
+        event.preventDefault(); event.stopImmediatePropagation();
+        if (this.drag) { this.drag = null; this.renderFields(); this.notify(); }
+        else if (this.pendingValue) { this.pendingValue = false; this.valueDraft = null; this.renderFields(); this.notify(); }
+        else if (this.pending) { this.draft = null; this.pending = false; this.controls(); this.renderFields(); this.notify(); }
+        else this.action(async () => { await this.flush(); await this.close(); });
+      }
+      if (event.key === 'Delete' && !event.target.matches('input,textarea,select')) { event.preventDefault(); $('delete').click(); }
+      if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); $('apply').click(); }
+    }, true);
+    new ResizeObserver(() => this.layout()).observe($('pages'));
+    for (const type of ['focusin', 'focusout']) this.root.addEventListener(type, () => queueMicrotask(() => this.notify()));
+  }
+  get textEditing() { return this.active && this.root.contains(document.activeElement) && document.activeElement.matches('input,textarea,select'); }
+  captureFocus() {
+    const element = document.activeElement;
+    if (!this.active || !(this.root.contains(element) || this.toolbar.contains(element))) return null;
+    return { token: this.token, field: element.dataset.field, id: element.id, start: element.selectionStart, end: element.selectionEnd };
+  }
+  restoreFocus(focus) {
+    if (!focus || !this.active || focus.token !== this.token || this.unavailable()) return;
+    const element = focus.field ? [...this.layer.querySelectorAll('[data-field]')].find(input => input.dataset.field === focus.field) : document.getElementById(focus.id);
+    if (!element || element.disabled || element.closest('[hidden]')) return;
+    element.focus({ preventScroll: true });
+    if (typeof focus.start === 'number' && ['text', 'search', 'tel', 'url', 'password', 'textarea'].includes(element.type)) element.setSelectionRange?.(focus.start, focus.end);
+  }
+  status(message) { $('status').textContent = message; }
+  action(fn, focus = null) {
+    if (this.unavailable() || this.drag || this.busy) return;
+    return this.run(async () => { try { await fn(); } finally { this.notify(); } }, focus).catch(error => { this.status(error.message); this.showError(error); });
+  }
+  async open() {
+    const startingPage = this.currentPage();
+    this.active = true; this.token = this.editor().token; this.preview = false; this.pending = false;
+    this.pageIndex = Math.max(0, startingPage - 1); this.draft = null; this.tool = 'select';
+    document.body.classList.add('form-mode'); this.root.hidden = this.toolbar.hidden = false;
+    await this.refresh(); $('select').focus();
+  }
+  async close(restore = true) {
+    this.active = false; this.draft = null; this.pending = false; this.pendingValue = false; this.valueDraft = null; this.drag = null;
+    this.root.hidden = this.toolbar.hidden = true; document.body.classList.remove('form-mode');
+    if (restore) await this.onClose?.(this.pageIndex);
+    this.notify();
+  }
+  sync() {
+    if (this.active && this.token !== this.editor()?.token) this.close(false);
+    if (!this.active) return;
+    this.toolbar.inert = this.root.inert = this.unavailable() || !!this.busy;
+    const e = this.editor(); $('undo').disabled = !e?.past.length; $('redo').disabled = !e?.future.length;
+    $('save').disabled = !e?.dirty && !this.pending && !this.pendingValue;
+  }
+  async refresh() {
+    if (!this.active) return;
+    this.pageIndex = clamp(this.pageIndex, 0, this.editor().pages.length - 1);
+    this.data = await this.editor().formContext(this.pageIndex);
+    const image = this.data.image;
+    this.canvas.width = image.width; this.canvas.height = image.height;
+    this.canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(image.pixels), image.width, image.height), 0, 0);
+    if (this.draft && !this.pending) this.draft = clone(this.data.fields.find(f => f.id === this.draft.id) ?? null);
+    this.controls(); this.renderFields(); this.layout();
+    this.onPage(this.pageIndex);
+  }
+  controls() {
+    $('mode').textContent = this.preview ? 'Compila modulo' : 'Progetta modulo';
+    $('preview').setAttribute('aria-pressed', String(!!this.preview));
+    for (const button of this.toolbar.querySelectorAll('[data-tool]')) { button.hidden = !!this.preview; button.setAttribute('aria-pressed', String(button.dataset.tool === this.tool)); }
+    $('page').textContent = `${this.pageIndex + 1} / ${this.editor().pages.length}`;
+    $('previous').disabled = this.pageIndex === 0; $('next').disabled = this.pageIndex === this.editor().pages.length - 1;
+    $('properties').hidden = !!this.preview; $('delete').hidden = !!this.preview; $('delete').disabled = !this.draft;
+    $('empty').hidden = !!this.draft; $('property-fields').hidden = !this.draft;
+    $('apply').disabled = !this.draft; $('cancel').disabled = !this.draft;
+    if (this.draft) {
+      const f = this.draft;
+      for (const key of ['name', 'label', 'font', 'size', 'color', 'maxLength']) $(key).value = f[key];
+      $('defaultValue').value = f.kind === 'text' ? f.defaultValue : '';
+      for (const key of ['multiline', 'readOnly', 'required']) $(key).checked = !!f[key];
+      $('defaultChecked').checked = f.kind === 'checkbox' && f.defaultValue;
+      $('text-properties').hidden = f.kind !== 'text'; $('check-properties').hidden = f.kind !== 'checkbox';
+      $('dropdown-properties').hidden = f.kind !== 'dropdown';
+      $('datetime-properties').hidden = f.kind !== 'datetime';
+      $('button-properties').hidden = f.kind !== 'button';
+      $('image-properties').hidden = f.kind !== 'image';
+      $('imagePreview').hidden = f.kind !== 'image' || !f.value;
+      if (f.kind === 'image' && f.value) $('imagePreview').src = f.value; else $('imagePreview').removeAttribute('src');
+      $('imageInfo').textContent = f.kind === 'image' && f.value ? 'Immagine caricata. Puoi sostituirla o rimuoverla.' : 'Nessuna immagine caricata.';
+      $('imageRemove').disabled = f.kind !== 'image' || !f.value;
+      $('required').closest('label').hidden = f.kind === 'button';
+      $('pattern').value = f.pattern ?? ''; $('validationMessage').value = f.validationMessage ?? '';
+      $('format').value = f.format ?? FORM_FORMATS[0]; $('dateDefault').value = f.kind === 'datetime' ? f.defaultValue : '';
+      $('dateDefault').placeholder = `${f.format ?? FORM_FORMATS[0]} oppure NOW()`;
+      $('caption').value = f.caption ?? 'Invia PDF'; $('email').value = f.email ?? '';
+      $('font-properties').hidden = f.kind === 'checkbox';
+      if (f.kind === 'dropdown') {
+        $('options').value = f.options.join('\n'); this.dropdownDefaults(f);
+      }
+      for (const key of ['x', 'y', 'width', 'height']) $(key).value = Math.round(f.position[key] * 10) / 10;
+    }
+    this.status(this.preview ? 'Compila i campi. I valori vengono conservati con Salva.' : this.tool === 'select' ? 'Seleziona un campo per modificarlo. Trascina il bordo per spostarlo.' : this.tool === 'checkbox' ? 'Clicca per inserire una casella di 16 × 16 pt. Trascina l’angolo per ingrandirla.' : 'Trascina sulla pagina per inserire il campo.');
+  }
+  dropdownDefaults(f) {
+    $('defaultOption').replaceChildren(new Option('Nessuna scelta', ''), ...f.options.map(value => new Option(value, value)));
+    $('defaultOption').value = f.defaultValue;
+  }
+  readProperties(changed) {
+    const f = this.draft;
+    for (const key of ['name', 'label', 'font', 'color']) f[key] = $(key).value;
+    for (const key of ['size', 'maxLength']) f[key] = Number($(key).value);
+    for (const key of ['multiline', 'readOnly', 'required']) f[key] = $(key).checked;
+    f.defaultValue = f.kind === 'checkbox' ? $('defaultChecked').checked : $('defaultValue').value.replace(/\r\n?/g, '\n');
+    if (f.kind === 'text') { f.pattern = $('pattern').value; f.validationMessage = $('validationMessage').value; }
+    if (f.kind === 'datetime') {
+      f.format = $('format').value; f.defaultValue = $('dateDefault').value;
+      $('dateDefault').placeholder = `${f.format} oppure NOW()`;
+      if (changed === 'form-dateDefault' || changed === 'form-format' && isNowDefault(f.defaultValue)) f.value = f.defaultValue;
+    }
+    if (f.kind === 'button') { f.caption = $('caption').value; f.email = $('email').value; f.defaultValue = ''; }
+    if (f.kind === 'image') f.defaultValue = '';
+    if (f.kind === 'dropdown') {
+      f.defaultValue = $('defaultOption').value;
+      if (changed === 'form-options') {
+        f.options = $('options').value.replace(/\r\n?/g, '\n').split('\n').map(v => v.trim()).filter(Boolean);
+        if (!f.options.includes(f.defaultValue)) f.defaultValue = '';
+        if (!f.options.includes(f.value)) f.value = '';
+        this.dropdownDefaults(f);
+      }
+    }
+    if (['form-defaultValue', 'form-defaultChecked', 'form-defaultOption'].includes(changed)) f.value = f.defaultValue;
+    f.position = Object.fromEntries(['x', 'y', 'width', 'height'].map(k => [k, Number($(k).value)]));
+  }
+  payload(input) { return { token: this.token, revision: this.editor().revision, pageIndex: this.pageIndex, input }; }
+  async flush() {
+    if (!this.active) return;
+    if (this.drag) throw new Error('Terminare il trascinamento del campo.');
+    this.busy = true; this.notify();
+    try {
+      await this.flushValue();
+      if (this.pending && this.draft) {
+        await this.commit(this.payload(clone(this.draft)));
+        this.pending = false; this.isNew = false; await this.refresh();
+      }
+    } finally { this.busy = false; this.notify(); }
+  }
+  layout() {
+    if (!this.active || !this.data) return;
+    const container = $('pages');
+    this.scale = Math.min((container.clientWidth - 56) / this.data.width, 1.6) * this.zoom;
+    this.scale = Math.max(.2, this.scale);
+    this.sheet.style.width = `${this.data.width * this.scale}px`; this.sheet.style.height = `${this.data.height * this.scale}px`;
+    this.renderFields();
+  }
+  renderFields() {
+    if (!this.data) return;
+    const focus = this.layer.contains(document.activeElement) ? document.activeElement.dataset.field : null;
+    this.layer.replaceChildren();
+    const fields = [...this.data.fields.filter(f => f.id !== this.draft?.id), ...(this.draft ? [this.draft] : [])];
+    for (const f of fields) {
+      const p = this.drag?.id === f.id ? this.drag.position : f.position;
+      const box = document.createElement('div'); box.className = 'form-widget' + (f.id === this.draft?.id && !this.preview ? ' selected' : '');
+      box.dataset.id = f.id; Object.assign(box.style, { left: `${p.x / this.data.width * 100}%`, top: `${p.y / this.data.height * 100}%`, width: `${p.width / this.data.width * 100}%`, height: `${p.height / this.data.height * 100}%` });
+      if (this.preview) {
+        const input = document.createElement(['button', 'image'].includes(f.kind) ? 'button' : f.kind === 'dropdown' ? 'select' : f.kind === 'text' && f.multiline ? 'textarea' : 'input');
+        input.dataset.field = f.id; input.setAttribute('aria-label', f.label || f.name); input.title = f.label || f.name;
+        const value = this.pendingValue && this.valueDraft?.id === f.id ? this.valueDraft.value : f.value;
+        if (f.kind === 'button') {
+          input.type = 'button'; input.textContent = f.caption;
+          input.onclick = async () => {
+            let ready = false;
+            await this.action(async () => {
+              await this.flushValue();
+              for (const field of this.editor().pages.flatMap(p => p.formFields ?? [])) {
+                const error = fieldValueError(field, field.value, true);
+                if (error) throw new Error(`${field.label || field.name}: ${error}`);
+              }
+              ready = true;
+            });
+            // Publish only after the final idle state: the Windows host ignores
+            // commands while an editing transaction is still marked busy.
+            if (ready) this.emit('host.formEmail', { token: this.token, fieldId: f.id });
+          };
+        }
+        else if (f.kind === 'image') {
+          input.type = 'button'; input.className = 'form-image-upload';
+          if (value) { const image = document.createElement('img'); image.src = value; image.alt = f.label || f.name; input.append(image); }
+          else input.textContent = 'Carica immagine…';
+          const picker = document.createElement('input'); picker.type = 'file'; picker.accept = 'image/png,image/jpeg'; picker.hidden = true;
+          picker.addEventListener('change', () => this.action(async () => {
+            if (!picker.files[0]) return;
+            const image = await uploadedFormImage(picker.files[0]);
+            await this.flushValue(); this.valueDraft = { id: f.id, value: image }; this.pendingValue = true;
+            await this.flushValue();
+          }));
+          input.onclick = () => picker.click(); box.append(picker);
+          if (value && !f.readOnly) {
+            const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'form-image-remove'; remove.textContent = '×'; remove.title = 'Rimuovi immagine'; remove.setAttribute('aria-label', 'Rimuovi immagine');
+            remove.onclick = () => this.action(async () => { await this.flushValue(); this.valueDraft = { id: f.id, value: '' }; this.pendingValue = true; await this.flushValue(); }); box.append(remove);
+          }
+        }
+        else if (f.kind === 'checkbox') { input.type = 'checkbox'; input.checked = value; }
+        else if (f.kind === 'dropdown') { input.append(new Option('—', ''), ...f.options.map(v => new Option(v, v))); input.value = value; }
+        else { input.value = value; input.maxLength = f.maxLength; if (f.kind === 'datetime') input.placeholder = f.format; }
+        if (f.kind === 'datetime') {
+          const picker = document.createElement('input'); picker.type = f.format.includes('HH') ? f.format.includes('aaaa') ? 'datetime-local' : 'time' : 'date';
+          picker.className = 'form-date-picker'; picker.setAttribute('aria-label', `Seleziona ${f.label || f.name}`); picker.title = 'Seleziona data e ora'; picker.disabled = !!f.readOnly;
+          if (f.format.includes('ss')) picker.step = '1';
+          picker.onchange = () => this.action(async () => {
+            if (!picker.value) return;
+            if (this.valueDraft?.id !== f.id) await this.flushValue();
+            this.valueDraft = { id: f.id, value: formatPickedDate(f.format, picker.value) }; this.pendingValue = true; await this.flushValue();
+          });
+          input.style.paddingRight = '32px'; box.append(picker);
+        }
+        input.disabled = !!f.readOnly;
+        input.setAttribute('aria-required', String(!!f.required));
+        Object.assign(input.style, { fontFamily: { Helvetica: 'Arial', Times: 'Times New Roman', Courier: 'Courier New' }[f.font], fontSize: `${f.size * (this.scale || 1)}px`, color: f.color });
+        const angle = ((this.data.rotation * 90 - (f.rotation ?? 0)) % 360 + 360) % 360;
+        if (angle && f.kind !== 'checkbox') Object.assign(input.style, { position: 'absolute', left: '50%', top: '50%',
+          width: `${(angle % 180 ? p.height : p.width) * this.scale}px`, height: `${(angle % 180 ? p.width : p.height) * this.scale}px`, transform: `translate(-50%, -50%) rotate(${angle}deg)` });
+        input.addEventListener('input', () => {
+          if (this.pendingValue && this.valueDraft?.id !== f.id) {
+            if (f.kind === 'checkbox') input.checked = f.value; else input.value = f.value;
+            [...this.layer.querySelectorAll('[data-field]')].find(node => node.dataset.field === this.valueDraft.id)?.focus();
+            this.status('Correggere o annullare il valore precedente prima di compilare un altro campo.'); return;
+          }
+          this.valueDraft = { id: f.id, value: f.kind === 'checkbox' ? input.checked : input.value }; this.pendingValue = true;
+          const error = fieldValueError(f, this.valueDraft.value); input.setCustomValidity?.(error); input.setAttribute('aria-invalid', String(!!error)); this.status(error || 'Valore pronto per il salvataggio.'); this.notify(); });
+        input.addEventListener('change', () => this.action(() => this.flushValue()));
+        input.addEventListener('keydown', event => {
+          if (event.key !== 'Tab' || event.ctrlKey || event.altKey || this.unavailable()) return;
+          event.preventDefault();
+          const inputs = [...this.layer.querySelectorAll('[data-field]')].filter(node => !node.disabled);
+          const next = inputs[inputs.indexOf(input) + (event.shiftKey ? -1 : 1)];
+          const focus = next ? { token: this.token, field: next.dataset.field } : { token: this.token, id: event.shiftKey ? 'form-exit' : 'form-preview' };
+          this.action(() => this.flushValue(), focus);
+        });
+        box.append(input);
+      } else {
+        box.tabIndex = 0; box.setAttribute('role', 'button'); box.setAttribute('aria-label', `${{ text: 'Campo testo', checkbox: 'Casella di spunta', dropdown: 'Elenco a tendina', datetime: 'Data e ora', button: 'Pulsante email', image: 'Campo immagine' }[f.kind]}: ${f.name}`);
+        const label = document.createElement('span'); label.textContent = `${{ text: 'T', checkbox: '☑', dropdown: '▾', datetime: '◷', button: '✉', image: '▧' }[f.kind]} ${f.name}`; box.append(label);
+        if (f.kind === 'image') {
+          if (f.value) { const image = document.createElement('img'); image.className = 'form-design-image'; image.src = f.value; image.alt = f.label || f.name; box.append(image); }
+          if (f.id === this.draft?.id) {
+            const upload = document.createElement('button'); upload.type = 'button'; upload.className = 'form-design-upload'; upload.dataset.imageUpload = 'true';
+            upload.textContent = f.value ? 'Sostituisci immagine…' : 'Carica immagine…';
+            upload.onclick = () => $('imageUpload').click(); box.append(upload);
+          } else if (!f.value) {
+            const hint = document.createElement('div'); hint.className = 'form-image-hint'; hint.textContent = 'Carica immagine…'; box.append(hint);
+          }
+        }
+        box.onkeydown = e => { if (e.target.closest('[data-image-upload]')) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.action(async () => { await this.flush(); this.draft = clone(f); this.isNew = false; this.controls(); this.renderFields(); }); } };
+        if (f.id === this.draft?.id) { const handle = document.createElement('i'); handle.className = 'form-resize'; box.append(handle); }
+      }
+      this.layer.append(box);
+    }
+    if (this.drag?.creating) {
+      const r = this.drag.position, box = document.createElement('div'); box.className = 'form-widget selected form-drawing';
+      Object.assign(box.style, { left: `${r.x / this.data.width * 100}%`, top: `${r.y / this.data.height * 100}%`, width: `${r.width / this.data.width * 100}%`, height: `${r.height / this.data.height * 100}%` }); this.layer.append(box);
+    }
+    if (focus) this.layer.querySelector(`[data-field="${focus}"]`)?.focus();
+  }
+  async flushValue() {
+    if (!this.pendingValue) return;
+    const value = clone(this.valueDraft);
+    await this.commit({ ...this.payload(value), fillOnly: true });
+    this.pendingValue = false; this.valueDraft = null; await this.refresh();
+  }
+  point(event) { const r = this.sheet.getBoundingClientRect(); return { x: clamp((event.clientX - r.left) / r.width * this.data.width, 0, this.data.width), y: clamp((event.clientY - r.top) / r.height * this.data.height, 0, this.data.height) }; }
+  pointerDown(event) {
+    if (event.button !== 0 || this.preview || this.unavailable() || this.drag) return;
+    if (event.target.closest('[data-image-upload]')) return;
+    const target = event.target.closest('[data-id]');
+    if (this.pending && target?.dataset.id !== this.draft?.id) {
+      const id = target?.dataset.id;
+      event.preventDefault();
+      this.action(async () => {
+        await this.flush();
+        this.draft = clone(this.data.fields.find(f => f.id === id) ?? null);
+        this.isNew = false; this.controls(); this.renderFields();
+      });
+      return;
+    }
+    const f = target?.dataset.id === this.draft?.id ? this.draft : this.data.fields.find(f => f.id === target?.dataset.id);
+    if (f) { if (!this.pending) { this.draft = clone(f); this.isNew = false; } this.controls(); }
+    else if (this.tool === 'select') { this.draft = null; this.controls(); this.renderFields(); return; }
+    const start = this.point(event), original = f?.position;
+    this.drag = { id: f?.id, start, original, position: original ? clone(original) : this.tool === 'checkbox' ?
+      { x: clamp(start.x, 0, this.data.width - 16), y: clamp(start.y, 0, this.data.height - 16), width: 16, height: 16 } : { ...start, width: 0, height: 0 }, creating: !f, resize: event.target.classList.contains('form-resize') };
+    this.sheet.setPointerCapture(event.pointerId); event.preventDefault(); this.renderFields(); this.notify();
+  }
+  pointerMove(event) {
+    const d = this.drag; if (!d) return; const p = this.point(event), dx = p.x - d.start.x, dy = p.y - d.start.y;
+    if (d.creating && this.tool !== 'checkbox') d.position = { x: Math.min(p.x, d.start.x), y: Math.min(p.y, d.start.y), width: Math.abs(dx), height: Math.abs(dy) };
+    else if (d.creating) return;
+    else if (d.resize) d.position = { ...d.original, width: clamp(d.original.width + dx, 12, this.data.width - d.original.x), height: clamp(d.original.height + dy, 12, this.data.height - d.original.y) };
+    else d.position = { ...d.original, x: clamp(d.original.x + dx, 0, this.data.width - d.original.width), y: clamp(d.original.y + dy, 0, this.data.height - d.original.height) };
+    // Drag only changes geometry. Keep the existing DOM and focus intact.
+    const box = d.creating ? this.layer.querySelector('.form-drawing') : [...this.layer.children].find(box => box.dataset.id === d.id);
+    if (box) Object.assign(box.style, { left: `${d.position.x / this.data.width * 100}%`, top: `${d.position.y / this.data.height * 100}%`, width: `${d.position.width / this.data.width * 100}%`, height: `${d.position.height / this.data.height * 100}%` });
+  }
+  pointerUp(event) {
+    const d = this.drag; if (!d) return; this.pointerMove(event); this.drag = null; this.sheet.releasePointerCapture(event.pointerId);
+    if (d.creating) {
+      if (d.position.width < 12 || d.position.height < 12) { this.renderFields(); this.notify(); return; }
+      const names = new Set([...(this.editor().policy.externalFormNames ?? []), ...this.editor().pages.flatMap(p => p.formFields ?? []).map(f => f.name)]);
+      const prefix = { checkbox: 'spunta', text: 'testo', dropdown: 'elenco', datetime: 'data_ora', button: 'pulsante', image: 'immagine' }[this.tool]; let n = 1; while (names.has(`${prefix}_${n}`)) n++;
+      this.draft = { id: 'pdfmb-f-' + crypto.randomUUID(), kind: this.tool, name: `${prefix}_${n}`, label: '', value: this.tool === 'checkbox' ? false : '', defaultValue: this.tool === 'checkbox' ? false : '',
+        ...(this.tool === 'dropdown' ? { options: ['Opzione 1', 'Opzione 2'] } : {}),
+        ...(this.tool === 'datetime' ? { format: FORM_FORMATS[0] } : {}),
+        ...(this.tool === 'button' ? { caption: 'Invia PDF', email: '' } : {}),
+        font: 'Helvetica', size: 12, color: '#202020', maxLength: 1000, multiline: false, readOnly: false, required: false, position: d.position };
+      this.isNew = true;
+    } else {
+      this.draft.position = d.position;
+      if (JSON.stringify(d.position) === JSON.stringify(d.original)) { this.controls(); this.renderFields(); this.notify(); return; }
+    }
+    this.pending = true; this.tool = 'select'; this.controls(); this.renderFields(); this.notify();
+  }
+}

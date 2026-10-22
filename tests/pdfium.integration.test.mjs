@@ -8,6 +8,7 @@ import { createTextTools } from '../src/PdfMB.Desktop/Web/text-engine.mjs';
 import { createWorkbenchTools } from '../src/PdfMB.Desktop/Web/workbench-engine.mjs';
 import { createHighlightTools } from '../src/PdfMB.Desktop/Web/highlight-engine.mjs';
 import { createStampTools } from '../src/PdfMB.Desktop/Web/stamp-engine.mjs';
+import { createStaticImageTools } from '../src/PdfMB.Desktop/Web/static-image-engine.mjs';
 
 const wasm = await readFile(new URL('../node_modules/@embedpdf/pdfium/dist/pdfium.wasm', import.meta.url));
 const api = await init({ wasmBinary: wasm }); api.PDFiumExt_Init();
@@ -42,6 +43,28 @@ function reopen(buffer, fn) {
   try { return fn(doc, page); } finally { api.FPDF_ClosePage(page); api.FPDF_CloseDocument(doc); free(p); }
 }
 const region = { x: 10, y: 30, width: 120, height: 50 };
+
+test('static uploaded images are page content without widgets or actions, preserving alpha and aspect on every rotation', () => {
+  const staticImages = createStaticImageTools(api, textTools);
+  for (let rotation = 0; rotation < 4; rotation++) {
+    const f = fixture();
+    try {
+      api.FPDFPage_SetRotation(f.page, rotation);
+      const pixels = new Uint8Array(16 * 8 * 4);
+      for (let y = 0; y < 8; y++) for (let x = 8; x < 16; x++) { const i = (y * 16 + x) * 4; pixels[i] = 255; pixels[i + 3] = 255; }
+      staticImages.apply(f.doc, f.page, { image: { width: 16, height: 8, pixels: pixels.buffer }, region: { x: 100, y: 90, width: 80, height: 80 } });
+      reopen(save(f.doc), (doc, page) => {
+        assert.equal(api.FPDFPage_GetAnnotCount(page), 0); assert.equal(api.FPDF_GetFormType(doc), 0);
+        const imageObject = tools.objects(page, true).find(o => o.type === 3); assert.ok(imageObject);
+        assert.ok(Math.abs(imageObject.position.width - 80) < .1); assert.ok(Math.abs(imageObject.position.height - 40) < .1);
+        const rendered = textTools.render(page), data = new Uint8Array(rendered.pixels), geometry = textTools.geometry(page);
+        const at = (x, y) => { const i = (Math.round(y * rendered.height / geometry.height) * rendered.width + Math.round(x * rendered.width / geometry.width)) * 4; return [...data.slice(i, i + 4)]; };
+        assert.deepEqual(at(110, 130), [255, 255, 255, 255], 'Transparent portion reveals the page');
+        assert.deepEqual(at(165, 130), [255, 0, 0, 255], 'RGBA red retains its channel order');
+      });
+    } finally { f.close(); }
+  }
+});
 
 test('transparent native stamps survive save/reopen with all permanent rotations', () => {
   const stamps = createStampTools(api, textTools);
@@ -170,6 +193,24 @@ async function request(type, payload) {
   response = null; await self.onmessage({ data: { id: ++requestId, type, payload } });
   assert.equal(response.ok, true, response.error); return response.result;
 }
+
+test('static image Worker operation preserves existing text and produces no form or annotation after reopen and extraction', async () => {
+  const f = fixture(), source = save(f.doc); f.close();
+  await request('load', source);
+  const pixels = new Uint8Array(16 * 8 * 4).fill(255);
+  const input = { operation: 'image', region: { x: 100, y: 90, width: 80, height: 80 }, image: { width: 16, height: 8, pixels: pixels.buffer } };
+  const change = await request('workbench-change', { buffer: source, pageIndex: 0, pageId: 0, input });
+  const bytes = await request('rebuild', [{ id: 0, rotation: 0, override: change.override, formFields: [] }]);
+  const verify = buffer => reopen(buffer, (doc, page) => {
+    assert.equal(api.FPDF_GetFormType(doc), 0); assert.equal(api.FPDFPage_GetAnnotCount(page), 0);
+    const objects = tools.objects(page, true); assert.equal(objects.filter(o => o.type === 3).length, 1);
+    assert.deepEqual(objects.filter(o => o.type === 1).map(o => o.text), ['SECRET', 'VISIBLE']);
+  });
+  verify(bytes);
+  verify(await request('extract', { buffer: bytes, pageIndexes: [0] }));
+  assert.equal((await request('load', bytes)).formPages[0].length, 0);
+  await assert.rejects(request('workbench-change', { buffer: bytes, pageIndex: 0, pageId: 0, input: { ...input, image: { ...input.image, pixels: new ArrayBuffer(2) } } }), /Immagine/);
+});
 
 test('blank PDF formats have correct physical sizes and insertion leaves source content intact', async () => {
   const expected = { A4: [210, 297], A5: [148, 210], A3: [297, 420] };

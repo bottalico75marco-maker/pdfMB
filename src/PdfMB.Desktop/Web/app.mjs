@@ -1,4 +1,5 @@
 import { FormSurface } from './form-surface.mjs';
+import { FormReader } from './form-reader.mjs';
 import { installCommandIcons } from './command-icons.mjs';
 import { WorkbenchSurface } from './workbench-surface.mjs';
 import { printImageBase64 } from './print-image.mjs';
@@ -6,7 +7,8 @@ import { installPdfDrop } from './pdf-drop.mjs';
 import { HighlightSurface } from './highlight-surface.mjs';
 import { createBridge } from './bridge.mjs';
 import { createDocumentSession } from './document-session.mjs';
-import { PageEditor, decodePdf, encodePdf, createBlankPdf } from './page-editor.mjs';
+import { PageEditor, decodePdf, encodePdf, createBlankPdf, openProtectedPdf } from './page-editor.mjs';
+import { fieldValueError } from './form-validation.mjs';
 import { PagesPanel } from './pages-panel.mjs';
 import { TextSurface } from './text-surface.mjs';
 import { italian } from './italian.mjs';
@@ -14,7 +16,7 @@ import { italian } from './italian.mjs';
 const welcome = document.querySelector('#welcome');
 const openButton = document.querySelector('#open');
 const transport = window.chrome?.webview;
-let bridge, registry, session, editor, panel, textSurface, highlightSurface, workbench, formSurface;
+let bridge, registry, session, editor, panel, textSurface, highlightSurface, workbench, formSurface, formReader;
 let locked = false, working = false, panelOpen = false, nextView = null, strategy = 'vertical';
 let deferredFormView = null;
 let tail = Promise.resolve();
@@ -30,8 +32,8 @@ const enqueue = action => {
 function editorState() {
   return { ...(editor?.state() ?? { token: null, revision: 0, dirty: false, readOnly: true,
     canEdit: false, canText: false, canUndo: false, canRedo: false, blockedReason: '' }),
-    dirty: !!editor?.state().dirty || !!textSurface?.changed() || !!workbench?.pendingShape || !!formSurface?.pending || !!formSurface?.pendingValue,
-    busy: locked || working || !!textSurface?.busy || !!workbench?.busy || workbench?.drag != null || !!formSurface?.drag || !!formSurface?.busy, formMode: !!formSurface?.active, textEditing: !!textSurface?.textEditing || !!formSurface?.textEditing,
+    dirty: !!editor?.state().dirty || !!textSurface?.changed() || !!workbench?.pendingShape || !!formSurface?.pending || !!formSurface?.pendingValue || !!formReader?.changed,
+    busy: locked || working || !!textSurface?.busy || !!workbench?.busy || workbench?.drag != null || !!formSurface?.drag || !!formSurface?.busy, formMode: !!formSurface?.active, textEditing: !!textSurface?.textEditing || !!formSurface?.textEditing || !!formReader?.textEditing,
     textMode: !!textSurface?.active, highlightMode: !!highlightSurface?.active,
     editorOpen: panelOpen && !!editor };
 }
@@ -63,6 +65,7 @@ function notify() {
   workbench?.sync();
   panel?.refresh(panelOpen && !!editor);
   textSurface?.sync();
+  formReader?.sync();
   bridge.emit('editor.state', state);
   bridge.emit('viewer.state', viewerState());
   return state;
@@ -133,7 +136,9 @@ function togglePanel() {
   return notify();
 }
 
-async function openDocument(source, name, unsaved = false) {
+async function openDocument(source, name, unsaved = false, password = '') {
+  const opened = await openProtectedPdf(source, password);
+  source = opened.buffer;
   const candidate = new PageEditor(name, replaceView, () => viewerState().page);
   try {
     await candidate.initialize(source);
@@ -141,6 +146,7 @@ async function openDocument(source, name, unsaved = false) {
     const result = await session.openBuffer(candidate.source, name);
     candidate.finishOpen(result.pageCount);
     candidate.unsavedDocument = unsaved;
+    candidate.password = candidate.savedPassword = opened.protected ? password : '';
     editor?.dispose(); editor = candidate;
     welcome.hidden = true;
     return notify();
@@ -154,9 +160,10 @@ try {
     'stamps.set': payload => workbench.setCustomStamps(payload),
     'stamps.error': payload => workbench.stampError(payload.message),
     'editor.lock': async () => {
+      await formReader?.flush();
       await formSurface?.flush();
       if (textSurface && !await textSurface.flush()) throw new Error('Correggere o annullare la modifica alla casella prima di continuare.');
-      if (workbench && !await workbench.flushShapes()) throw new Error('Correggere la forma prima di salvare o cambiare documento.');
+      if (workbench && !await workbench.flushShapes()) throw new Error('Completare l’immagine o la forma prima di salvare o cambiare documento.');
       if (workbench && !workbench.close()) throw new Error('Chiudere o completare gli strumenti pagina.');
       if (!formSurface?.active) highlightSurface?.suspend();
       panel.cancelDialogs(); locked = true; return notify();
@@ -235,7 +242,7 @@ try {
     'document.open': payload => withWorking(async () => {
       if (!locked) throw new Error('Operazione documento non sincronizzata con l’applicazione.');
       if (typeof payload.name !== 'string') throw new Error('Nome documento non valido.');
-      return openDocument(decodePdf(payload.base64), payload.name);
+      return openDocument(decodePdf(payload.base64), payload.name, false, payload.password ?? '');
     }),
     'document.create': payload => withWorking(async () => {
       if (!locked) throw new Error('Operazione documento non sincronizzata con l’applicazione.');
@@ -265,6 +272,19 @@ try {
       if (!locked || !editor) throw new Error('Documento non disponibile per il salvataggio.');
       return editor.export();
     }),
+    'document.protect': payload => {
+      if (!locked || !editor?.canEdit || typeof payload.password !== 'string' || new TextEncoder().encode(payload.password).length > 127 || payload.password.includes('\0')) throw new Error('Password non valida o documento non modificabile.');
+      editor.password = payload.password; editor.revision++;
+      return notify();
+    },
+    'document.email': payload => withWorking(async () => {
+      if (!locked || !editor?.canFormDesign || payload.token !== editor.token) throw new Error('Documento cambiato.');
+      const fields = editor.pages.flatMap(p => p.formFields ?? []);
+      const button = fields.find(f => f.id === payload.fieldId && f.kind === 'button' && !f.readOnly);
+      if (!button) throw new Error('Pulsante non disponibile.');
+      for (const field of fields) { const error = fieldValueError(field, field.value, true); if (error) throw new Error(`${field.label || field.name}: ${error}`); }
+      return { ...await editor.export(), email: button.email || '' };
+    }),
     'document.markSaved': payload => {
       if (!locked || !editor) throw new Error('Documento non disponibile per il salvataggio.');
       editor.markSaved(payload);
@@ -285,6 +305,8 @@ try {
     i18n: { defaultLocale: 'it', fallbackLocale: 'en', locales: [italian] },
     tabBar: 'never', documentManager: { maxDocuments: 2 },
     zoom: { defaultZoomLevel: 'fit-page' },
+    // Thumbnails use the same render plugin: include AcroForm appearances there too.
+    render: { withForms: true },
     disabledCategories: ['annotation', 'redaction', 'form', 'insert', 'signature', 'history',
       'document-open', 'document-close', 'document-export', 'document-print',
       'document-protect', 'document-capture', 'document-fullscreen', 'document-menu', 'security'],
@@ -326,7 +348,7 @@ try {
       const focus = focusOverride ?? formSurface.captureFocus();
       try { return await withWorking(action); } finally { formSurface.restoreFocus(focus); }
     }), commit: payload => editor.changeForm(payload),
-    unavailable: () => locked || working, notify, showError, emit: type => bridge.emit(type),
+    unavailable: () => locked || working, notify, showError, emit: (type, payload) => bridge.emit(type, payload),
     onPage: () => {},
     onClose: async page => {
       const view = deferredFormView; deferredFormView = null;
@@ -338,6 +360,10 @@ try {
   highlightSurface = new HighlightSurface({ editor: () => editor, plugin, session,
     run: action => enqueue(() => withWorking(action)), notify,
     unavailable: () => locked || working || !!textSurface?.active || !!workbench?.active || !!formSurface?.active, showError });
+  formReader = new FormReader({ editor: () => editor, plugin, session, notify, showError,
+    unavailable: () => locked || working,
+    suspended: () => !!formSurface?.active || !!textSurface?.active || !!workbench?.active || !!highlightSurface?.active,
+    read: action => enqueue(action), run: action => enqueue(() => withWorking(action)), emit: (type, payload) => bridge.emit(type, payload) });
   plugin('scroll').onLayoutReady(event => layouts.add(event.documentId));
   plugin('document-manager').onDocumentClosed(id => layouts.delete(id));
   plugin('scroll').onStateChange(state => { strategy = state.strategy; });

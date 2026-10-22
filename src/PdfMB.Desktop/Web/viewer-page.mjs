@@ -12,16 +12,21 @@ export function pagePoint(event, host, geometry, rotation = 0) {
 // The pinned viewer renders an exclusive interaction layer directly inside
 // each page pointer host. Discover those hosts before a first mouse entry, so
 // dropdown selection and keyboard style changes can show a preview at once.
-export function renderedPageHosts(viewer) {
+export function renderedPageHosts(viewer, includeDefaultMode = false) {
   const result = [];
   const visit = root => {
     for (const element of root.querySelectorAll('*')) {
       if (element.shadowRoot) visit(element.shadowRoot);
+      // The default interaction mode has no exclusive z-index 10 overlay.
+      // The pinned page pointer host still has explicit page dimensions and a
+      // cursor assigned by the interaction manager in that mode.
+      if (includeDefaultMode && element.style?.position === 'relative' && element.style.width.endsWith('px') &&
+          element.style.height.endsWith('px') && element.style.cursor) result.push(element);
       if (element.style?.position !== 'absolute' || element.style.zIndex !== '10' || element.children.length) continue;
       if (['top', 'left', 'right', 'bottom'].every(side => ['0px', '0'].includes(element.style[side]))) result.push(element.parentElement);
     }
   };
-  visit(viewer); return result;
+  visit(viewer); return [...new Set(result)];
 }
 
 export class ViewerPagePreview {

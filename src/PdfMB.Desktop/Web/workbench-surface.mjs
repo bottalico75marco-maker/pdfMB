@@ -1,5 +1,7 @@
 import { pagePoint, ViewerPagePreview, renderedPageHosts } from './viewer-page.mjs';
 import { stampPresets, stampDimensions, presetImage, personalImage, readStampPng } from './stamps.mjs';
+import { uploadedFormImage } from './form-validation.mjs';
+import { containImage } from './static-image-engine.mjs';
 
 export class WorkbenchSurface {
   constructor({ editor, plugin, session, read, run, commit, notify, emit, unavailable }) {
@@ -24,6 +26,7 @@ export class WorkbenchSurface {
     this.field = name => document.querySelector('#tools-' + name);
     this.mode.onchange = () => {
       const next = this.mode.value; this.mode.value = this.lastMode;
+      if (this.busy || this.unavailable()) return;
       if (this.changed() && !confirm('Scartare le modifiche non ancora applicate?')) return;
       this.mode.value = next; this.region = null; this.points = []; this.reloadItems();
       if (next === 'stamp') this.selectStamp();
@@ -38,6 +41,22 @@ export class WorkbenchSurface {
     for (const name of ['color', 'stroke']) this.field(name).addEventListener('input', () => { this.paint(); this.notify(); });
     this.field('reset-preview').onclick = () => this.selectItem();
     this.initializeStamps();
+    this.field('image-upload').onchange = event => {
+      const file = event.target.files[0];
+      if (!file || this.unavailable() || this.busy) return;
+      this.busy = true; this.notify();
+      this.imageLoading = this.run(async () => {
+        const source = new Image(); source.src = await uploadedFormImage(file); await source.decode();
+        const canvas = document.createElement('canvas'); canvas.width = source.naturalWidth; canvas.height = source.naturalHeight;
+        const context = canvas.getContext('2d'); context.drawImage(source, 0, 0);
+        this.toolImage = { canvas, image: { width: canvas.width, height: canvas.height, pixels: context.getImageData(0, 0, canvas.width, canvas.height).data.buffer } };
+        this.field('image-name').textContent = file.name;
+        this.status.textContent = 'Immagine caricata. Clicca il riquadro per sostituirla. Applica o Salva la incorpora come immagine statica.';
+        this.paint();
+      }).catch(error => { this.status.textContent = error.message; }).finally(() => {
+        this.busy = false; event.target.value = ''; this.notify(); this.imageLoading = null;
+      });
+    };
     plugin('scroll').onPageChange(event => this.followPage(event));
   }
   followPage({ documentId, pageNumber }) {
@@ -113,7 +132,11 @@ export class WorkbenchSurface {
   get shapeStyleChanged() {
     return this.shapeMode && !!this.items.value && (this.field('color').value !== this.originalColor || this.field('stroke').value !== this.originalStroke);
   }
-  get pendingShape() { return this.active && this.shapeMode && (!!this.region || this.shapeStyleChanged); }
+  get pendingShape() { return this.active && (this.shapeMode && (!!this.region || this.shapeStyleChanged) || this.mode.value === 'image' && !!this.region); }
+  imageInput() {
+    if (!this.region || !this.toolImage) throw new Error('Clicca il riquadro e carica un’immagine prima di salvare.');
+    return { operation: 'image', region: this.region, image: this.toolImage.image };
+  }
   shapeInput() {
     return { operation: this.items.value ? 'annotation-update' : this.mode.value,
       ...(this.items.value ? { id: this.items.value } : { region: this.region, points: this.points }),
@@ -124,7 +147,7 @@ export class WorkbenchSurface {
     if (this.busy || this.drag != null) return false;
     this.busy = true;
     try {
-      await this.commit({ pageIndex: this.pageIndex, token: this.token, revision: this.revision, input: this.shapeInput() });
+      await this.commit({ pageIndex: this.pageIndex, token: this.token, revision: this.revision, input: this.mode.value === 'image' ? this.imageInput() : this.shapeInput() });
       await this.load(); return true;
     } catch (error) { this.status.textContent = error.message; return false; }
     finally { this.busy = false; this.notify(); }
@@ -132,6 +155,9 @@ export class WorkbenchSurface {
   point(event, host = this.preview.host) { return pagePoint(event, host, this.data, this.rotation()); }
   async pointerDown(pageIndex, event) {
     if (this.busy || this.drag != null || this.unavailable() || event.button !== 0) return;
+    if (this.mode.value === 'image' && this.region && pageIndex === this.pageIndex && this.contains(this.region, this.point(event, event.currentTarget))) {
+      event.preventDefault(); event.stopPropagation(); this.field('image-upload').click(); return;
+    }
     if (this.mode.value === 'stamp' && !this.field('stamp-width').checkValidity()) { this.field('stamp-width').reportValidity(); return; }
     if (pageIndex !== this.pageIndex && this.changed() && !confirm('Scartare le modifiche non ancora applicate?')) return;
     event.preventDefault(); event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId);
@@ -189,7 +215,11 @@ export class WorkbenchSurface {
     const hit = this.gesture?.hit;
     this.drag = null; this.gesture = null;
     if (hit && this.points.length === 1) { this.items.value = hit.id; this.selectItem(); return; }
-    if (this.mode.value === 'stamp' && this.points.length === 1) {
+    if (this.mode.value === 'image' && this.points.length === 1) {
+      const width = Math.min(160, this.data.width), height = Math.min(100, this.data.height), [x, y] = this.points[0];
+      this.region = { x: Math.max(0, Math.min(x, this.data.width - width)), y: Math.max(0, Math.min(y, this.data.height - height)), width, height };
+      this.field('image-upload').click();
+    } else if (this.mode.value === 'stamp' && this.points.length === 1) {
       this.region = this.placedStamp(this.points[0]);
     } else if (this.mode.value === 'note' && this.points.length === 1) {
       const [x, y] = this.points[0];
@@ -231,6 +261,7 @@ export class WorkbenchSurface {
     this.unbind(); this.region = null; this.drag = null; this.gesture = null; return true;
   }
   async open(pageIndex, mode = 'note') {
+    this.toolImage = null; this.field('image-name').textContent = 'Nessuna immagine caricata';
     this.pageIndex = pageIndex; this.mode.value = mode;
     await this.load(); this.active = true; this.toolbar.hidden = false; this.preview.layer.hidden = false; this.sync();
     if (mode === 'stamp') await this.selectStamp();
@@ -241,7 +272,7 @@ export class WorkbenchSurface {
     this.data = await editor.workbenchContext(this.pageIndex);
     this.region = null; this.points = [];
     this.field('dx').value = this.field('dy').value = this.field('angle').value = '0'; this.field('scale').value = '1';
-    for (const option of this.mode.options) option.disabled = ['objects', 'redact'].includes(option.value) ? !this.data.canContent : !this.data.canAnnotate;
+    for (const option of this.mode.options) option.disabled = ['objects', 'redact', 'image'].includes(option.value) ? !this.data.canContent : !this.data.canAnnotate;
     if (this.mode.selectedOptions[0]?.disabled) this.mode.value = [...this.mode.options].find(option => !option.disabled)?.value ?? '';
     this.canvas.width = this.data.image.width; this.canvas.height = this.data.image.height;
     this.field('title').textContent = `Strumenti · pagina ${this.pageIndex + 1} / ${editor.pages.length}`;
@@ -258,20 +289,22 @@ export class WorkbenchSurface {
     if (objects) this.data.objects.forEach(item => this.items.add(new Option(`${item.index + 1} · ${['', 'Testo', 'Tracciato', 'Immagine', 'Ombreggiatura', 'Gruppo'][item.type] ?? 'Oggetto'} ${item.text.slice(0, 45)}`, String(item.index))));
     else this.data.annotations.filter(item => item.type === this.annotationType()).forEach((item, i) => this.items.add(new Option(`${i + 1} · ${item.type === 1 ? 'Nota: ' + item.contents.slice(0, 45) : item.type === 13 ? 'Timbro: ' + item.contents.slice(0, 45) : 'Forma / disegno'}`, item.id)));
     this.field('object-controls').hidden = !objects;
-    this.field('annotation-controls').hidden = objects || redact || this.mode.value === 'stamp';
+    this.field('annotation-controls').hidden = objects || redact || ['stamp', 'image'].includes(this.mode.value);
     this.field('stamp-controls').hidden = this.mode.value !== 'stamp';
+    this.field('image-controls').hidden = this.mode.value !== 'image';
     this.contents.closest('label').hidden = !['note', 'objects'].includes(this.mode.value);
     this.field('content-label').textContent = objects ? 'Nuovo testo dell’oggetto' : 'Contenuto nota';
-    this.items.disabled = redact;
+    this.items.disabled = redact || this.mode.value === 'image';
     this.contents.value = ''; this.originalContents = '';
     this.field('apply').setAttribute('aria-label', redact ? 'Applica oscuramento' : 'Applica');
     this.field('apply').title = redact ? 'Applica oscuramento' : 'Applica';
     this.field('apply').disabled = false;
-    this.field('delete').hidden = redact;
+    this.field('delete').hidden = redact || this.mode.value === 'image';
     this.field('warning').hidden = !redact;
     this.status.textContent = objects ? 'Seleziona un oggetto sulla pagina o dall’elenco. I gruppi si modificano come oggetto unico.' :
       redact ? 'Trascina l’area da eliminare, quindi applica. Prima di condividere salva il PDF risultante.' :
       this.mode.value === 'stamp' ? 'Scegli un timbro: clicca per inserirlo oppure trascina per dimensionarlo. Applica lo aggiunge al PDF.' :
+      this.mode.value === 'image' ? 'Clicca per creare il riquadro e caricare un’immagine, oppure trascina per dimensionarlo. Salva incorpora l’immagine statica.' :
       'Nota: clicca sul punto desiderato. Forme e penna: trascina sulla pagina. Premi Applica per confermare.';
     this.hoverStamp = null; this.resizeStamp(); this.paint();
   }
@@ -429,6 +462,17 @@ export class WorkbenchSurface {
     if (stampRegion && this.stamp) ctx.drawImage(this.stamp.canvas, stampRegion.x * image.width / this.data.width, stampRegion.y * image.height / this.data.height,
       stampRegion.width * image.width / this.data.width, stampRegion.height * image.height / this.data.height);
     const p = this.region ?? this.livePreview?.position ?? object?.position ?? stampRegion;
+    if (this.mode.value === 'image' && this.region) {
+      const bounds = this.toolImage ? containImage(this.toolImage.image, this.region) : this.region;
+      const sx = image.width / this.data.width, sy = image.height / this.data.height;
+      if (this.toolImage) ctx.drawImage(this.toolImage.canvas, bounds.x * sx, bounds.y * sy, bounds.width * sx, bounds.height * sy);
+      else {
+        ctx.fillStyle = '#edf4ff'; ctx.fillRect(bounds.x * sx, bounds.y * sy, bounds.width * sx, bounds.height * sy);
+        ctx.save(); ctx.beginPath(); ctx.rect(bounds.x * sx, bounds.y * sy, bounds.width * sx, bounds.height * sy); ctx.clip();
+        ctx.fillStyle = '#174c8c'; ctx.font = `${Math.max(10, 10 * sx)}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('Clicca per caricare immagine…', (bounds.x + bounds.width / 2) * sx, (bounds.y + bounds.height / 2) * sy); ctx.restore();
+      }
+    }
     if (p) {
       ctx.save(); ctx.scale(image.width / this.data.width, image.height / this.data.height);
       ctx.strokeStyle = this.region ? this.field('color').value : '#1266cc';
@@ -461,6 +505,8 @@ export class WorkbenchSurface {
     if (this.mode.value === 'objects') {
       if (!this.items.value) { this.status.textContent = 'Seleziona un oggetto.'; return; }
       input = this.objectInput(remove);
+    } else if (this.mode.value === 'image') {
+      try { input = this.imageInput(); } catch (error) { this.status.textContent = error.message; return; }
     } else if (this.shapeMode && !remove) {
       if (this.items.value && !this.shapeStyleChanged) { this.status.textContent = 'La forma è già applicata. Salva il PDF per conservarla nel file.'; return; }
       input = this.shapeInput();
@@ -485,10 +531,10 @@ export class WorkbenchSurface {
     } catch (error) { this.status.textContent = error.message; }
     finally {
       this.busy = false; this.toolbar.querySelectorAll('button,input,select,textarea').forEach(el => { el.disabled = false; });
-      this.items.disabled = this.mode.value === 'redact';
+      this.items.disabled = ['redact', 'image'].includes(this.mode.value);
       this.field('previous').disabled = this.pageIndex === 0;
       this.field('next').disabled = this.pageIndex === editor.pages.length - 1;
-      for (const option of this.mode.options) option.disabled = ['objects', 'redact'].includes(option.value) ? !this.data.canContent : !this.data.canAnnotate;
+      for (const option of this.mode.options) option.disabled = ['objects', 'redact', 'image'].includes(option.value) ? !this.data.canContent : !this.data.canAnnotate;
       this.notify();
     }
   }

@@ -1,6 +1,8 @@
 import { createFormTools } from './form-engine.mjs';
+import { transformPdfSecurity } from './pdf-security.mjs';
 import { paperSize } from './paper-sizes.mjs';
-import { rewriteFormDocument } from './form-document.mjs';
+import { rewriteFormDocument, FORM_EMAIL_ACTION_VERSION, FORM_VALIDATION_VERSION } from './form-document.mjs';
+import { createStaticImageTools } from './static-image-engine.mjs';
 import { createHighlightTools } from './highlight-engine.mjs';
 import { createStampTools } from './stamp-engine.mjs';
 import { createWorkbenchTools } from './workbench-engine.mjs';
@@ -10,7 +12,7 @@ import { createTextTools } from './text-engine.mjs';
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_SOURCE_BYTES = 128 * 1024 * 1024;
 let sourceFormPages = [];
-let api, formTools, textTools, highlightTools, workbenchTools, stampTools, source, sourceCount, nextPageId, pendingImport;
+let api, formTools, textTools, highlightTools, workbenchTools, stampTools, staticImageTools, source, sourceCount, nextPageId, pendingImport;
 const imports = new Map();
 const catalog = new Map();
 const overrides = new Map();
@@ -25,6 +27,7 @@ async function initialize() {
   highlightTools = createHighlightTools(api, textTools);
   workbenchTools = createWorkbenchTools(api, textTools);
   stampTools = createStampTools(api, textTools);
+  staticImageTools = createStaticImageTools(api, textTools);
 }
 function allocate(length) {
   const pointer = api.pdfium.wasmExports.malloc(length);
@@ -362,7 +365,7 @@ function workbenchContext({ buffer, pageIndex, pageId }) {
 }
 function workbenchChange({ buffer, pageIndex, pageId, pageOverride, input }) {
   const policy = pagePolicy(pageId);
-  const content = input.operation.startsWith('object-') || input.operation === 'redact';
+  const content = input.operation.startsWith('object-') || ['redact', 'image'].includes(input.operation);
   if (content ? !policy.canContent : !policy.canAnnotate) throw new Error('Operazione non consentita dal documento.');
   const single = api.FPDF_CreateNewDocument();
   if (!single) throw new Error('Impossibile creare la pagina.');
@@ -389,6 +392,7 @@ function workbenchChange({ buffer, pageIndex, pageId, pageOverride, input }) {
     try {
       if (input.operation === 'redact') { /* Sanitized from the complete current document, including form appearances. */ }
       else if (input.operation === 'stamp') stampTools.apply(single, page, input);
+      else if (input.operation === 'image') staticImageTools.apply(single, page, input);
       else if (input.operation.startsWith('object-')) workbenchTools.mutateObject(single, page, input);
       else workbenchTools.mutateAnnotation(page, input);
     } finally { api.FPDF_ClosePage(page); }
@@ -405,7 +409,8 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
   try {
     await initialize();
     let result;
-    if (type === 'create-blank') result = createBlank(payload);
+    if (type === 'security') result = transformPdfSecurity(api, payload.buffer, payload.password, payload.encrypt);
+    else if (type === 'create-blank') result = createBlank(payload);
     else if (type === 'load') {
       if (!(payload instanceof ArrayBuffer) || payload.byteLength < 8 || payload.byteLength > MAX_BYTES)
         throw new Error('Dimensione documento non valida (massimo 64 MB).');
@@ -428,13 +433,18 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
         const allForms = formTools.documentFields(handle, true);
         sourceFormPages = allForms.map(page => page.filter(f => f.managed));
         const externalFormNames = allForms.flat().filter(f => !f.managed).map(f => f.name);
-        return { ...policy, pageCount: sourceCount, textRepairNeeded, formPages: sourceFormPages, externalFormNames };
+        const formRepairNeeded = policy.canFormDesign && sourceFormPages.flat().some(f =>
+          f.kind === 'button' && f.emailActionVersion !== FORM_EMAIL_ACTION_VERSION ||
+          ((f.kind === 'text' && f.pattern) || f.kind === 'datetime') && f.validationVersion !== FORM_VALIDATION_VERSION);
+        return { ...policy, pageCount: sourceCount, textRepairNeeded, formRepairNeeded, formPages: sourceFormPages, externalFormNames };
       });
       if (!result.readOnly && sourceFormPages.some(p => p.length)) source = await rewriteFormDocument(source);
     } else if (type === 'rebuild' && source) result = await rebuild(payload);
     else if (['text-context', 'text-change'].includes(type) && source) result = textRequest(type, payload);
     else if (type === 'form-context' && source) result = withPage(payload.buffer, payload.pageIndex, (page, document) => ({
       ...textTools.geometry(page), fields: formTools.list(document, page), image: textTools.render(page, 1800, 2, document) }));
+    else if (type === 'form-layout' && source) result = withPage(payload.buffer, payload.pageIndex, (page, document) => ({
+      ...textTools.geometry(page), fields: formTools.list(document, page) }));
     else if (type === 'form-prepare' && source) {
       const policy = pagePolicy(payload.pageId);
       if (!policy.canFormDesign) throw new Error('La progettazione dei moduli non è consentita.');

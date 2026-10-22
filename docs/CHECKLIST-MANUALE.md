@@ -375,3 +375,47 @@ Sottolineato, barrato, apice/pedice, evidenziazione dei caratteri, maiuscole/min
 - Importare un PNG con trasparenza e semitrasparenza, sopra testo o sfondo colorato. Lo sfondo del PDF deve restare visibile attraverso il timbro, anche dopo salvataggio/riapertura ed estrazione.
 - Riavviare PDF MB e selezionare il PNG dalla raccolta Personali; importare non deve sporcare il documento. Provare un file non PNG, un’immagine troppo grande e un campo larghezza temporaneamente vuoto: errore gestito e programma utilizzabile.
 - Selezionare un timbro applicato dall’elenco, eliminarlo e usare Annulla/Ripeti; salvare e riaprire. Le annotazioni esterne devono rimanere intatte.
+
+## Moduli e password 0.10.0
+
+- Creare un testo con regex `[A-Z]{2}[0-9]{6}` e messaggio personalizzato; provare regex sintatticamente errata, valore errato e valore corretto. L’errore deve conservare la bozza; riaprire e verificare regola e messaggio.
+- Creare Data e ora e provare tutti i formati, selettore nativo, febbraio bisestile, 31 aprile, ore 24 e minuti 60. Salvare, riaprire, cambiare pagina e usare Annulla/Ripeti.
+- Caricare PNG trasparente e JPEG nel campo immagine. Provare file non immagine, file oltre 8 MB e immagine oltre 16 milioni di pixel. Verificare proporzioni, sostituzione, rimozione, Annulla/Ripeti, salvataggio, stampa, estrazione e riapertura.
+- Creare un pulsante email con e senza destinatario. Verificare che un obbligatorio vuoto blocchi la composizione e che un valore digitato ma non ancora salvato sia nell’allegato. Con client predefinito configurato, controllare manualmente destinatario, allegato e valori senza inviare il messaggio. Ripetere con fallback .eml e un’app associata.
+- Proteggere con password, verificare conferma diversa, Salva e Salva con nome, rifiuto di password assente/errata e riapertura corretta. Compilare e salvare nuovamente: il file deve restare protetto. Controllare password anche per allegati email ed estratti. Rimuoverla con il lucchetto aperto / Rimuovi password e salvare.
+- Nei lettori esterni verificare aspetto dei nuovi campi e supporto effettivo a regex, importazione immagini e invio PDF via email; i lettori possono disabilitare le azioni PDF. I documenti firmati devono conservare le restrizioni esistenti.
+
+## Correzioni moduli 0.10.1
+
+- Impostare `NOW()` come valore predefinito, applicare e provare data, ora e data/ora cambiando il formato: il valore deve essere locale e concreto; l’espressione deve restare nelle proprietà dopo riapertura. Una successiva modifica manuale o cancellazione del valore non deve essere sovrascritta da Salva o da modifiche alla geometria.
+- In progettazione verificare Carica immagine nel campo selezionato e Carica / sostituisci immagine nelle proprietà, anche prima di Applica. Controllare miniatura, sostituzione, rimozione, salvataggio e riapertura.
+- Verificare il lucchetto nella barra principale accanto a Salva, visibile anche alla larghezza minima; aprire il dialogo senza entrare nella progettazione modulo.
+
+## Destinazione email 0.10.2
+
+- Aprire un modulo 0.10.0/0.10.1 con pulsante Invia PDF e salvare senza modificare i campi: l’app deve proporre Salva come modifica pendente e il file deve conservare valori e immagini. Alla successiva riapertura il file deve risultare pulito.
+- In un lettore esterno verificare che il pulsante punti a `mailto:` e non a un percorso `file:///`. La destinazione deve essere un dizionario `/Filespec` con `/FS /URL` e stringa ASCII senza BOM UTF-16; provare anche destinatario vuoto, indirizzo con + e caratteri accentati codificati nell’URL.
+- Verificare manualmente l’apertura del client email e l’allegato PDF compilato, rispettando le conferme di sicurezza del lettore; non inviare il messaggio durante la prova.
+
+## Validazione e immagini statiche 0.10.3
+
+- In un testo con regex `^[A-Z]{2}[0-9]{6}$`, digitare AB123 e uscire con Tab o clic: deve comparire l’avviso, senza salvare il valore errato. Correggere in AB123456 e verificare assenza di errori. Ripetere nel PDF salvato con un lettore che supporta JavaScript, controllando che sia abilitato. I vecchi moduli vanno riaperti e salvati con PDF MB per aggiornare gli script.
+- Strumenti → Immagine: clic singolo e caricamento, oppure trascinamento del riquadro e clic per l’upload. Provare PNG trasparente, JPEG, sostituzione, file errato e annullamento del selettore. Un riquadro vuoto deve richiedere caricamento o annullamento prima del salvataggio.
+- Salvare l’immagine senza premere Applica; alla riapertura deve essere un oggetto immagine statico, privo di widget e azioni. Controllare proporzioni, trasparenza, colori, rotazioni, stampa, estrazione e testi/campi preesistenti. Annulla deve rimuoverla e Ripeti ripristinarla.
+
+## Compilazione nella vista normale 0.10.4
+
+- Aprire un modulo con testo, data/ora NOW(), pulsante email, immagine, checkbox e dropdown: tutti devono essere visibili e utilizzabili senza entrare in Progetta modulo. I campi in sola lettura devono mantenere la restrizione.
+- Modificare data/ora da tastiera e selettore, inizializzato sul valore corrente. Salvare mentre il testo è ancora a fuoco, riaprire e verificare il valore; NOW() non deve sovrascriverlo.
+- Premere il pulsante email nella vista normale: la bozza deve includere il PDF con i valori correnti. Controllare invalidi regex/data, Tab, Annulla/Ripeti, zoom, scorrimento su più pagine e rotazione della vista.
+- Entrare in progettazione, compilazione dedicata e negli altri Strumenti: i controlli della vista normale non devono sovrapporsi agli editor. All’uscita devono tornare nella posizione corretta.
+
+## Miniature con campi modulo 0.10.5
+
+- Aprire una pagina priva di testo statico con campo testo, data/ora e pulsante email: la miniatura laterale deve mostrare tutti e tre, compresa l’etichetta del pulsante. Ripetere in Gestisci pagine.
+- Modificare i valori, uscire dal campo, salvare e riaprire: pagina e miniature devono mostrare i valori aggiornati; controllare anche Annulla/Ripeti e pagine ruotate.
+
+## Lucchetto e rimozione password 0.10.6
+
+- Su PDF non protetto controllare lucchetto chiuso e Proteggi con password. Impostare la password: barra principale, menu Strumenti e barra modulo devono mostrare lucchetto aperto e Rimuovi password, anche dopo Salva e riapertura.
+- Cliccare Rimuovi password: nessuna richiesta di una nuova password, modifica pendente, lucchetto chiuso ripristinato. Salvare e riaprire senza password; verificare campi e valori conservati. Chiudere o aprire un altro documento non protetto deve ripristinare il comando Proteggi con password.

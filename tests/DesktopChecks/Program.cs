@@ -10,6 +10,19 @@ internal static class Program
         // Check the real native layout without showing/starting the application.
         var desktop = System.Reflection.Assembly.Load("PdfMB.Desktop");
         var mainType = desktop.GetType("PdfMB.Desktop.MainForm")!;
+        var emailType = desktop.GetType("PdfMB.Desktop.Services.FormEmail")!;
+        var draftMethod = emailType.GetMethod("DraftContent", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        byte[] attachment = System.Text.Encoding.ASCII.GetBytes("%PDF-1.7\ncompilato-test");
+        var draft = (string)draftMethod.Invoke(null, [attachment, "test@example.com"])!;
+        Check(draft.Contains("X-Unsent: 1\r\nTo: test@example.com") && draft.Contains("Content-Disposition: attachment; filename=modulo.pdf") && draft.Contains(Convert.ToBase64String(attachment)), "Email draft loses its recipient or exact PDF attachment");
+        var passwordType = desktop.GetType("PdfMB.Desktop.PasswordDialog")!;
+        using (var passwordDialog = (Form)Activator.CreateInstance(passwordType, [true, null])!)
+        {
+            Check(passwordDialog.Controls[0].Controls.OfType<TextBox>().Count(box => box.UseSystemPasswordChar) == 2, "Password confirmation is missing or unmasked");
+            Check(passwordDialog.AcceptButton is not null && passwordDialog.CancelButton is not null, "Password dialog keyboard actions missing");
+            passwordDialog.PerformLayout();
+        }
+        Console.WriteLine("Password dialog and MIME email draft: masked confirmation, recipient and exact PDF attachment OK (no mail client opened)");
         using (var window = (Form)Activator.CreateInstance(mainType, [Array.Empty<string>()])!)
         {
             Check(window.Icon is not null, "Application window icon missing");
@@ -31,7 +44,30 @@ internal static class Program
             var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
             var toolbar = (ToolStrip)mainType.GetField("_mainToolbar", flags)!.GetValue(window)!;
             var modules = (ToolStripButton)mainType.GetField("_forms", flags)!.GetValue(window)!;
+            var protect = (ToolStripButton)mainType.GetField("_protect", flags)!.GetValue(window)!;
             toolbar.PerformLayout();
+            Check(protect.Placement == ToolStripItemPlacement.Main && protect.Image is not null && protect.ToolTipText?.Contains("password") == true, "Password command is not visible in the main toolbar");
+            var save = (ToolStripButton)mainType.GetField("_save", flags)!.GetValue(window)!;
+            Check(toolbar.Items.IndexOf(protect) == toolbar.Items.IndexOf(save) + 1, "Main toolbar password command is not next to Save");
+            var protectionMenu = (ToolStripMenuItem)mainType.GetField("_protectMenu", flags)!.GetValue(window)!;
+            var readState = mainType.GetMethod("ReadEditorState", flags)!;
+            var closedLock = protect.Image;
+            foreach (bool passwordProtected in new[] { true, false })
+            {
+                var state = System.Text.Json.JsonSerializer.SerializeToElement(new
+                {
+                    token = "password-toggle-test", dirty = true, readOnly = false, canEdit = true, canText = true,
+                    passwordProtected, textEditing = false, textMode = false, highlightMode = false,
+                    canUndo = false, canRedo = false, busy = false, editorOpen = false, blockedReason = ""
+                });
+                readState.Invoke(window, [state, true]);
+                string action = passwordProtected ? "Rimuovi password" : "Proteggi con password";
+                Check(protect.AccessibleName == action && protect.ToolTipText == action && protectionMenu.AccessibleName == action,
+                    "Password action does not follow the document security state");
+                Check((protect.Image != closedLock) == passwordProtected && protectionMenu.Image == protect.Image,
+                    "Toolbar and menu do not switch between closed and open padlocks");
+            }
+            Console.WriteLine("Password command: document state switches open/closed padlock, removal action, tooltip and Tools menu OK");
             Check(modules.Placement == ToolStripItemPlacement.Main && modules.Bounds.Right <= toolbar.Width,
                 "Module command overflows at minimum window width");
             Check(modules.Text == "Progetta modulo" && modules.DisplayStyle == ToolStripItemDisplayStyle.Image && modules.Image is not null && modules.ToolTipText?.Contains("Progetta modulo") == true,
@@ -39,6 +75,8 @@ internal static class Program
             Check(toolbar.Items.Cast<ToolStripItem>().Where(item => item is ToolStripButton or ToolStripDropDownButton).All(item => item.Image is not null && item.DisplayStyle == ToolStripItemDisplayStyle.Image && !string.IsNullOrEmpty(item.AccessibleName)), "A native command has no accessible icon");
             Check(toolbar.ShowItemToolTips && toolbar.Items.Cast<ToolStripItem>().Where(item => item is ToolStripButton or ToolStripDropDownButton).All(item => !string.IsNullOrWhiteSpace(item.ToolTipText)), "An icon command has no explicit tooltip");
             var manage = (ToolStripButton)mainType.GetField("_manage", flags)!.GetValue(window)!;
+            var tools = (ToolStripDropDownButton)mainType.GetField("_tools", flags)!.GetValue(window)!;
+            Check(tools.DropDownItems.OfType<ToolStripMenuItem>().Any(item => Equals(item.Tag, "image") && item.Image is not null), "Static image command missing from Tools");
             Check(manage.ToolTipText?.Contains("Gestisci pagine") == true, "Page management tooltip is missing");
             var text = (ToolStripButton)mainType.GetField("_text", flags)!.GetValue(window)!;
             var highlight = (ToolStripButton)mainType.GetField("_highlight", flags)!.GetValue(window)!;
