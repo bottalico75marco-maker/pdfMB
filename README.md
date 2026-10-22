@@ -6,7 +6,7 @@
 
 | Riferimento | Stato |
 | --- | --- |
-| **0.10.6** | Lucchetto aperto e comando Rimuovi password quando il PDF è protetto; clic per rimuovere la protezione, da confermare con Salva. Barra principale, Strumenti e modulo sincronizzati. Build locale in `artifacts/app-0.10.6`. |
+| **0.10.6** | Lucchetto aperto e comando Rimuovi password quando il PDF è protetto; clic per rimuovere la protezione, da confermare con Salva. Barra principale, Strumenti e modulo sincronizzati. Build completa nella [Release 0.10.6](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.10.6) e in `artifacts/app-0.10.6`. |
 | **0.10.5** | Miniature del viewer e di Gestisci pagine complete di testo, data/ora e pulsanti del modulo, anche su pagine senza contenuti statici. Build locale in `artifacts/app-0.10.5`. |
 | **0.10.4** | Moduli compilabili anche nella vista normale: pulsante email visibile, data/ora modificabili da tastiera e selettore, salvataggio e cronologia condivisi con la progettazione. Build locale in `artifacts/app-0.10.4`. |
 | **0.10.3** | Avviso regex all’uscita dal campo, script PDF compatibili ECMAScript 5, riparazione delle validazioni precedenti e nuovo Strumenti → Immagine con upload e incorporamento statico al salvataggio. Build locale in `artifacts/app-0.10.3`. |
@@ -31,12 +31,14 @@ Questo README presenta le funzioni aggiornate alla **0.10.6**. Tutti i branch so
 
 ## Installazione su Windows
 
-1. Aprire il risultato della workflow **Verifica e build Windows** relativo al commit desiderato e scaricare l’artefatto **PDF-MB-0.10.6-win-x64**, quando la compilazione è terminata con successo.
+1. Scaricare [PDF-MB-0.10.6-win-x64.zip](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.10.6/PDF-MB-0.10.6-win-x64.zip) dalla [Release 0.10.6](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.10.6). La pagina include anche il checksum SHA-256.
 2. Estrarre **l’intera cartella** dello ZIP.
 3. Verificare la presenza di **.NET Desktop Runtime 10** e **Microsoft Edge WebView2 Runtime** su Windows a 64 bit.
 4. Avviare **PdfMB.Desktop.exe**.
 
 Tenere insieme EXE, DLL, cartelle `Web` e `ThirdParty` e `GUIDA-WINDOWS.html`. Per usare una build già compilata non servono Visual Studio, Node.js o l’SDK .NET.
+
+Le build dei singoli commit restano disponibili tra gli artefatti della workflow **Verifica e build Windows** in GitHub Actions, dopo la riuscita dei controlli.
 
 La guida si apre offline con **Aiuto → Guida Windows** o **F1**, nel browser predefinito. Include istruzioni per tutti gli strumenti e per la risoluzione dei problemi più comuni. La scritta fissa “Gestione pagine” in alto a destra è stata rimossa; il pulsante **Gestisci pagine** resta disponibile.
 
