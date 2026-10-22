@@ -4,6 +4,5 @@
 .cache/
 node_modules/
 src/PdfMB.Desktop/Web/vendor/
-artifacts/
 *.user
 *.suo
