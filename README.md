@@ -22,12 +22,12 @@
 | **0.8.4** | Build locale in `artifacts/app-0.8.4`: rettangoli ed ellissi senza campo note; Salva include anche le forme ancora da applicare; colore, spessore e aspetto conservati dopo riapertura. |
 | **0.8.3** | Build locale in `artifacts/app-0.8.3`: preview live di testo/font/dimensione, tavolozza con 14 timbri statici e data, PNG personali trasparenti in raccolta locale. |
 | **0.8.2** | Build locale in `artifacts/app-0.8.2`: selezione degli oggetti dal menu o dal PDF, apertura con trascinamento, registrazione come lettore PDF per Windows. |
-| **0.8.0** | Versione di sviluppo più recente, con tutte le funzioni descritte qui e guida Windows. Disponibile nel [ramo di sviluppo](https://github.com/bottalico75marco-maker/pdfMB/tree/codex/evidenziatore-0.7.0) e nella [PR #1](https://github.com/bottalico75marco-maker/pdfMB/pull/1), ancora in bozza per le prove Windows. |
-| **0.6.5** | Versione dei sorgenti su `main` al momento della pubblicazione di questo README e ultima cartella binaria storica inclusa nel repository. |
+| **0.8.0** | Versione storica con strumenti di annotazione, modifica oggetti, stampa, oscuramento e guida Windows, confluita in `main`. |
+| **0.6.5** | Versione storica con correzioni del salvataggio delle caselle di testo; cartella binaria conservata nel repository. |
 
-Questo README presenta le funzioni aggiornate alla **0.10.6** locale. Aggiornare la documentazione nella pagina principale non unisce automaticamente la PR: per usare le nuove funzioni scegliere la build corrispondente.
+Questo README presenta le funzioni aggiornate alla **0.10.6**. Tutti i branch sono stati consolidati in `main`, unico ramo di sviluppo del progetto, conservando la cronologia completa. Per usare le nuove funzioni scegliere la build corrispondente.
 
-**Collegamenti:** [Guida Windows](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/GUIDA-WINDOWS.html) · [Checklist unica delle prove](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/CHECKLIST-MANUALE.md) · [Build Windows su GitHub Actions](https://github.com/bottalico75marco-maker/pdfMB/actions) · [Architettura](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/ARCHITETTURA.md)
+**Collegamenti:** [Guida Windows](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/GUIDA-WINDOWS.html) · [Checklist unica delle prove](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/CHECKLIST-MANUALE.md) · [Build Windows su GitHub Actions](https://github.com/bottalico75marco-maker/pdfMB/actions) · [Architettura](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/ARCHITETTURA.md)
 
 ## Installazione su Windows
 
@@ -224,7 +224,7 @@ Annulla può ripristinare la sorgente nella sessione: condividere soltanto il PD
 
 ## Changelog di tutte le versioni disponibili
 
-La cronologia seguente è ricostruita dai sorgenti, dalla documentazione e dalle cartelle versionate presenti nel repository. Non vengono inventate date di rilascio o modifiche non documentate. Le versioni 0.7.0 e 0.8.0 appartengono al ramo di sviluppo della PR #1; le cartelle storiche su `main` arrivano alla 0.6.5.
+La cronologia seguente è ricostruita dai sorgenti, dalla documentazione e dalle cartelle versionate presenti nel repository. Non vengono inventate date di rilascio o modifiche non documentate. Le versioni sviluppate nei branch precedenti e le relative cartelle applicative sono ora consolidate in `main`.
 
 | Versione | Funzionalità e modifiche |
 | --- | --- |
@@ -246,14 +246,14 @@ Non sono presenti cartelle applicative o note di rilascio verificabili per 0.1.x
 
 ## Compilazione dai sorgenti e verifiche
 
-Tecnologie: **C# / WinForms, .NET 10, WebView2 ed EmbedPDF/PDFium 2.15.1**. Per lavorare sulla versione più recente scegliere il ramo `codex/evidenziatore-0.7.0` della PR #1.
+Tecnologie: **C# / WinForms, .NET 10, WebView2 ed EmbedPDF/PDFium 2.15.1**. I sorgenti aggiornati sono nel ramo `main`.
 
 Su Windows, con SDK .NET 10, Node.js 24 e WebView2 Runtime:
 
 ```powershell
 git clone https://github.com/bottalico75marco-maker/pdfMB.git
 cd pdfMB
-git switch codex/evidenziatore-0.7.0
+git switch main
 npm ci
 npm run assets
 npm test
@@ -274,7 +274,7 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-Sono state eseguite verifiche automatiche su cronologia, errori, permessi, pixel, annotazioni e oggetti con PDFium WASM reale, salvataggio/riapertura e flusso Chromium con trasporto WebView2 simulato, oltre alla compilazione/pubblicazione per Windows. La [checklist unica](https://github.com/bottalico75marco-maker/pdfMB/blob/codex/evidenziatore-0.7.0/docs/CHECKLIST-MANUALE.md) raccoglie le prove della finestra Windows, della stampante e dei documenti reali da completare prima di considerare consolidata la nuova versione.
+Sono state eseguite verifiche automatiche su cronologia, errori, permessi, pixel, annotazioni e oggetti con PDFium WASM reale, salvataggio/riapertura e flusso Chromium con trasporto WebView2 simulato, oltre alla compilazione/pubblicazione per Windows. La [checklist unica](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/CHECKLIST-MANUALE.md) raccoglie le prove della finestra Windows, della stampante e dei documenti reali da completare prima di considerare consolidata la nuova versione.
 
 Le licenze e gli avvisi delle dipendenze sono inclusi nella distribuzione, in `ThirdParty` e `Web/vendor/THIRD-PARTY-NOTICES.txt`.
 
