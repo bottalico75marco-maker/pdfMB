@@ -7,6 +7,7 @@ internal sealed class InsertPagesDialog : Form
     private readonly int _sourcePageCount;
     private readonly TextBox _range = new() { Text = "Tutte", MaxLength = 4096 };
     private readonly NumericUpDown _position = new() { Minimum = 1, DecimalPlaces = 0 };
+    private readonly ToolTip _tips = new();
     private readonly Label _error = new() { ForeColor = Color.Firebrick, AutoEllipsis = true };
 
     public int[] PageIndexes { get; private set; } = [];
@@ -24,11 +25,14 @@ internal sealed class InsertPagesDialog : Form
         ShowInTaskbar = false;
         Font = new Font("Segoe UI", 10);
         ClientSize = new Size(560, 342);
+        // Long names are shortened in the middle so the page count below always stays visible.
         var source = new Label
         {
-            Text = $"{sourceName}\nPagine disponibili: {sourcePageCount}", UseMnemonic = false,
-            AutoEllipsis = true, Location = new Point(20, 16), Size = new Size(520, 45)
+            Text = $"{DialogText.FitFileName(sourceName, Font, 515)}\nPagine disponibili: {sourcePageCount}", UseMnemonic = false,
+            Location = new Point(20, 16), Size = new Size(520, 45)
         };
+        _tips.SetToolTip(source, sourceName);
+        Disposed += (_, _) => _tips.Dispose();
         var rangeLabel = new Label { Text = "Pagine da inserire", Location = new Point(20, 71), AutoSize = true };
         _range.SetBounds(20, 96, 520, 28);
         var rangeHint = new Label
