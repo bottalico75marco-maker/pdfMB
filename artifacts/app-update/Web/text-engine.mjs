@@ -196,8 +196,8 @@ export function createTextTools(api) {
     }
     checked(api.FPDFPage_GenerateContent(page));
   }
-  function render(page) {
-    const { width, height } = geometry(page), scale = Math.min(2, 1400 / Math.max(width, height));
+  function render(page, maximumSide = 1400, maximumScale = 2, document = 0) {
+    const { width, height } = geometry(page), scale = Math.min(maximumScale, maximumSide / Math.max(width, height));
     const w = Math.max(1, Math.round(width * scale)), h = Math.max(1, Math.round(height * scale));
     const ptr = alloc(w * h * 4);
     let bitmap = 0;
@@ -205,11 +205,22 @@ export function createTextTools(api) {
       bitmap = api.FPDFBitmap_CreateEx(w, h, 4, ptr, w * 4);
       checked(bitmap);
       api.FPDFBitmap_FillRect(bitmap, 0, 0, w, h, 0xffffffff);
-      api.FPDF_RenderPageBitmap(bitmap, page, 0, 0, w, h, 0, 17);
+      api.FPDF_RenderPageBitmap(bitmap, page, 0, 0, w, h, 0, 1); // BGRA; converted once below
+      if (document && api.FPDF_GetFormType(document)) {
+        const info = api.PDFiumExt_OpenFormFillInfo(); checked(info);
+        let form = 0;
+        try {
+          form = api.PDFiumExt_InitFormFillEnvironment(document, info); checked(form, 'Impossibile renderizzare i moduli della pagina.');
+          api.FORM_OnAfterLoadPage(page, form);
+          try { api.FPDF_FFLDraw(form, bitmap, page, 0, 0, w, h, 0, 1); }
+          finally { api.FORM_OnBeforeClosePage(page, form); }
+        } finally { if (form) api.PDFiumExt_ExitFormFillEnvironment(form); api.PDFiumExt_CloseFormFillInfo(info); }
+      }
       const pixels = api.pdfium.HEAPU8.slice(ptr, ptr + w * h * 4);
       for (let i = 0; i < pixels.length; i += 4) { const b = pixels[i]; pixels[i] = pixels[i + 2]; pixels[i + 2] = b; }
       return { pixels: pixels.buffer, width: w, height: h };
     } finally { if (bitmap) api.FPDFBitmap_Destroy(bitmap); free(ptr); }
   }
-  return { notes, geometry, prepare, apply, repairAppearances, needsRepair, render };
+  return { notes, geometry, point, screenRect, prepare, apply, repairAppearances, needsRepair, render };
 }
+

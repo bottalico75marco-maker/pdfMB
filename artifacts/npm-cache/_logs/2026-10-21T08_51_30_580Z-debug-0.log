@@ -1,0 +1,374 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.12.1
+2 info using node@v24.15.0
+3 silly config load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config load:file:C:\progetti\pdfMB\.npmrc
+5 silly config load:file:C:\Users\MarcoBottalico\.npmrc
+6 silly config load:file:C:\Users\MarcoBottalico\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm ci
+8 verbose argv "ci" "--cache" ".npm-cache" "--no-audit" "--no-fund"
+9 verbose logfile logs-max:10 dir:C:\progetti\pdfMB\.npm-cache\_logs\2026-10-21T08_51_30_580Z-
+10 verbose logfile C:\progetti\pdfMB\.npm-cache\_logs\2026-10-21T08_51_30_580Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+14 silly idealTree buildDeps
+15 silly reify moves {}
+16 http cache vue@https://registry.npmjs.org/vue/-/vue-3.5.44.tgz 2ms (cache hit)
+17 http cache zimmerframe@https://registry.npmjs.org/zimmerframe/-/zimmerframe-1.1.5.tgz 0ms (cache hit)
+18 http cache tailwind-merge@https://registry.npmjs.org/tailwind-merge/-/tailwind-merge-3.7.0.tgz 0ms (cache hit)
+19 http cache svelte@https://registry.npmjs.org/svelte/-/svelte-5.57.2.tgz 0ms (cache hit)
+20 http cache source-map-js@https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.2.tgz 0ms (cache hit)
+21 http cache scheduler@https://registry.npmjs.org/scheduler/-/scheduler-0.28.0.tgz 0ms (cache hit)
+22 http cache react-dom@https://registry.npmjs.org/react-dom/-/react-dom-19.3.1.tgz 0ms (cache hit)
+23 http cache preact@https://registry.npmjs.org/preact/-/preact-10.29.8.tgz 0ms (cache hit)
+24 http cache react@https://registry.npmjs.org/react/-/react-19.3.1.tgz 0ms (cache hit)
+25 http cache playwright@https://registry.npmjs.org/playwright/-/playwright-1.64.1.tgz 0ms (cache hit)
+26 http cache postcss@https://registry.npmjs.org/postcss/-/postcss-8.5.31.tgz 0ms (cache hit)
+27 http cache playwright-core@https://registry.npmjs.org/playwright-core/-/playwright-core-1.64.1.tgz 0ms (cache hit)
+28 http cache picocolors@https://registry.npmjs.org/picocolors/-/picocolors-1.1.1.tgz 0ms (cache hit)
+29 http cache nanoid@https://registry.npmjs.org/nanoid/-/nanoid-3.3.20.tgz 0ms (cache hit)
+30 http cache locate-character@https://registry.npmjs.org/locate-character/-/locate-character-3.0.0.tgz 0ms (cache hit)
+31 http cache estree-walker@https://registry.npmjs.org/estree-walker/-/estree-walker-2.0.2.tgz 0ms (cache hit)
+32 http cache esrap@https://registry.npmjs.org/esrap/-/esrap-2.4.0.tgz 0ms (cache hit)
+33 http cache csstype@https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz 0ms (cache hit)
+34 http cache magic-string@https://registry.npmjs.org/magic-string/-/magic-string-0.30.21.tgz 0ms (cache hit)
+35 http cache is-reference@https://registry.npmjs.org/is-reference/-/is-reference-3.0.3.tgz 0ms (cache hit)
+36 http cache entities@https://registry.npmjs.org/entities/-/entities-7.0.1.tgz 0ms (cache hit)
+37 http cache @vue/shared@https://registry.npmjs.org/@vue/shared/-/shared-3.5.44.tgz 0ms (cache hit)
+38 http cache esm-env@https://registry.npmjs.org/esm-env/-/esm-env-1.2.2.tgz 0ms (cache hit)
+39 http cache axobject-query@https://registry.npmjs.org/axobject-query/-/axobject-query-4.1.0.tgz 0ms (cache hit)
+40 http cache devalue@https://registry.npmjs.org/devalue/-/devalue-5.9.4.tgz 0ms (cache hit)
+41 http cache clsx@https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz 0ms (cache hit)
+42 http cache aria-query@https://registry.npmjs.org/aria-query/-/aria-query-5.3.1.tgz 0ms (cache hit)
+43 http cache acorn@https://registry.npmjs.org/acorn/-/acorn-8.19.0.tgz 0ms (cache hit)
+44 http cache @vue/runtime-core@https://registry.npmjs.org/@vue/runtime-core/-/runtime-core-3.5.44.tgz 0ms (cache hit)
+45 http cache @vue/server-renderer@https://registry.npmjs.org/@vue/server-renderer/-/server-renderer-3.5.44.tgz 0ms (cache hit)
+46 http cache @vue/reactivity@https://registry.npmjs.org/@vue/reactivity/-/reactivity-3.5.44.tgz 0ms (cache hit)
+47 http cache @vue/runtime-dom@https://registry.npmjs.org/@vue/runtime-dom/-/runtime-dom-3.5.44.tgz 0ms (cache hit)
+48 http cache @vue/compiler-ssr@https://registry.npmjs.org/@vue/compiler-ssr/-/compiler-ssr-3.5.44.tgz 0ms (cache hit)
+49 http cache @sveltejs/acorn-typescript@https://registry.npmjs.org/@sveltejs/acorn-typescript/-/acorn-typescript-1.0.13.tgz 0ms (cache hit)
+50 http cache @vue/compiler-core@https://registry.npmjs.org/@vue/compiler-core/-/compiler-core-3.5.44.tgz 0ms (cache hit)
+51 http cache @vue/compiler-dom@https://registry.npmjs.org/@vue/compiler-dom/-/compiler-dom-3.5.44.tgz 0ms (cache hit)
+52 http cache @vue/compiler-sfc@https://registry.npmjs.org/@vue/compiler-sfc/-/compiler-sfc-3.5.44.tgz 0ms (cache hit)
+53 http cache @embedpdf/utils@https://registry.npmjs.org/@embedpdf/utils/-/utils-2.15.1.tgz 0ms (cache hit)
+54 http cache @jridgewell/sourcemap-codec@https://registry.npmjs.org/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.6.0.tgz 0ms (cache hit)
+55 http cache @jridgewell/trace-mapping@https://registry.npmjs.org/@jridgewell/trace-mapping/-/trace-mapping-0.3.31.tgz 0ms (cache hit)
+56 http cache @jridgewell/resolve-uri@https://registry.npmjs.org/@jridgewell/resolve-uri/-/resolve-uri-3.1.2.tgz 0ms (cache hit)
+57 http cache @types/estree@https://registry.npmjs.org/@types/estree/-/estree-1.0.9.tgz 0ms (cache hit)
+58 http cache @jridgewell/remapping@https://registry.npmjs.org/@jridgewell/remapping/-/remapping-2.3.5.tgz 0ms (cache hit)
+59 http cache @embedpdf/plugin-zoom@https://registry.npmjs.org/@embedpdf/plugin-zoom/-/plugin-zoom-2.15.1.tgz 0ms (cache hit)
+60 http cache @jridgewell/gen-mapping@https://registry.npmjs.org/@jridgewell/gen-mapping/-/gen-mapping-0.3.13.tgz 0ms (cache hit)
+61 http cache @embedpdf/plugin-tiling@https://registry.npmjs.org/@embedpdf/plugin-tiling/-/plugin-tiling-2.15.1.tgz 1ms (cache hit)
+62 http cache @embedpdf/snippet@https://registry.npmjs.org/@embedpdf/snippet/-/snippet-2.15.1.tgz 0ms (cache hit)
+63 http cache @embedpdf/plugin-viewport@https://registry.npmjs.org/@embedpdf/plugin-viewport/-/plugin-viewport-2.15.1.tgz 0ms (cache hit)
+64 http cache @embedpdf/plugin-stamp@https://registry.npmjs.org/@embedpdf/plugin-stamp/-/plugin-stamp-2.15.1.tgz 0ms (cache hit)
+65 http cache @embedpdf/plugin-thumbnail@https://registry.npmjs.org/@embedpdf/plugin-thumbnail/-/plugin-thumbnail-2.15.1.tgz 0ms (cache hit)
+66 http cache @embedpdf/plugin-selection@https://registry.npmjs.org/@embedpdf/plugin-selection/-/plugin-selection-2.15.1.tgz 0ms (cache hit)
+67 http cache @embedpdf/plugin-ui@https://registry.npmjs.org/@embedpdf/plugin-ui/-/plugin-ui-2.15.1.tgz 1ms (cache hit)
+68 http cache @embedpdf/plugin-spread@https://registry.npmjs.org/@embedpdf/plugin-spread/-/plugin-spread-2.15.1.tgz 0ms (cache hit)
+69 http cache @embedpdf/plugin-signature@https://registry.npmjs.org/@embedpdf/plugin-signature/-/plugin-signature-2.15.1.tgz 0ms (cache hit)
+70 http cache @embedpdf/plugin-search@https://registry.npmjs.org/@embedpdf/plugin-search/-/plugin-search-2.15.1.tgz 0ms (cache hit)
+71 http cache @embedpdf/plugin-rotate@https://registry.npmjs.org/@embedpdf/plugin-rotate/-/plugin-rotate-2.15.1.tgz 0ms (cache hit)
+72 http cache @embedpdf/plugin-pan@https://registry.npmjs.org/@embedpdf/plugin-pan/-/plugin-pan-2.15.1.tgz 0ms (cache hit)
+73 http cache @embedpdf/plugin-redaction@https://registry.npmjs.org/@embedpdf/plugin-redaction/-/plugin-redaction-2.15.1.tgz 0ms (cache hit)
+74 http cache @embedpdf/plugin-scroll@https://registry.npmjs.org/@embedpdf/plugin-scroll/-/plugin-scroll-2.15.1.tgz 0ms (cache hit)
+75 http cache @embedpdf/plugin-print@https://registry.npmjs.org/@embedpdf/plugin-print/-/plugin-print-2.15.1.tgz 0ms (cache hit)
+76 http cache @embedpdf/plugin-interaction-manager@https://registry.npmjs.org/@embedpdf/plugin-interaction-manager/-/plugin-interaction-manager-2.15.1.tgz 0ms (cache hit)
+77 http cache @embedpdf/plugin-render@https://registry.npmjs.org/@embedpdf/plugin-render/-/plugin-render-2.15.1.tgz 0ms (cache hit)
+78 http cache @embedpdf/plugin-history@https://registry.npmjs.org/@embedpdf/plugin-history/-/plugin-history-2.15.1.tgz 0ms (cache hit)
+79 http cache @embedpdf/plugin-form@https://registry.npmjs.org/@embedpdf/plugin-form/-/plugin-form-2.15.1.tgz 0ms (cache hit)
+80 http cache @embedpdf/plugin-fullscreen@https://registry.npmjs.org/@embedpdf/plugin-fullscreen/-/plugin-fullscreen-2.15.1.tgz 0ms (cache hit)
+81 http cache @embedpdf/plugin-commands@https://registry.npmjs.org/@embedpdf/plugin-commands/-/plugin-commands-2.15.1.tgz 1ms (cache hit)
+82 http cache @embedpdf/plugin-i18n@https://registry.npmjs.org/@embedpdf/plugin-i18n/-/plugin-i18n-2.15.1.tgz 0ms (cache hit)
+83 http cache @embedpdf/plugin-export@https://registry.npmjs.org/@embedpdf/plugin-export/-/plugin-export-2.15.1.tgz 0ms (cache hit)
+84 http cache @embedpdf/plugin-annotation@https://registry.npmjs.org/@embedpdf/plugin-annotation/-/plugin-annotation-2.15.1.tgz 0ms (cache hit)
+85 http cache @embedpdf/plugin-capture@https://registry.npmjs.org/@embedpdf/plugin-capture/-/plugin-capture-2.15.1.tgz 0ms (cache hit)
+86 http cache @embedpdf/plugin-document-manager@https://registry.npmjs.org/@embedpdf/plugin-document-manager/-/plugin-document-manager-2.15.1.tgz 0ms (cache hit)
+87 http cache @embedpdf/plugin-bookmark@https://registry.npmjs.org/@embedpdf/plugin-bookmark/-/plugin-bookmark-2.15.1.tgz 1ms (cache hit)
+88 http cache @embedpdf/plugin-attachment@https://registry.npmjs.org/@embedpdf/plugin-attachment/-/plugin-attachment-2.15.1.tgz 0ms (cache hit)
+89 http cache @embedpdf/pdfium@https://registry.npmjs.org/@embedpdf/pdfium/-/pdfium-2.15.1.tgz 0ms (cache hit)
+90 http cache @embedpdf/fonts-kr@https://registry.npmjs.org/@embedpdf/fonts-kr/-/fonts-kr-1.0.0.tgz 0ms (cache hit)
+91 http cache @embedpdf/models@https://registry.npmjs.org/@embedpdf/models/-/models-2.15.1.tgz 0ms (cache hit)
+92 http cache @embedpdf/fonts-latin@https://registry.npmjs.org/@embedpdf/fonts-latin/-/fonts-latin-1.0.0.tgz 0ms (cache hit)
+93 http cache @embedpdf/fonts-tc@https://registry.npmjs.org/@embedpdf/fonts-tc/-/fonts-tc-1.0.0.tgz 0ms (cache hit)
+94 http cache @embedpdf/fonts-sc@https://registry.npmjs.org/@embedpdf/fonts-sc/-/fonts-sc-1.0.0.tgz 0ms (cache hit)
+95 http cache @embedpdf/fonts-hebrew@https://registry.npmjs.org/@embedpdf/fonts-hebrew/-/fonts-hebrew-1.0.0.tgz 0ms (cache hit)
+96 http cache @babel/parser@https://registry.npmjs.org/@babel/parser/-/parser-7.29.9.tgz 0ms (cache hit)
+97 http cache @embedpdf/fonts-jp@https://registry.npmjs.org/@embedpdf/fonts-jp/-/fonts-jp-1.0.0.tgz 0ms (cache hit)
+98 http cache @embedpdf/engines@https://registry.npmjs.org/@embedpdf/engines/-/engines-2.15.1.tgz 0ms (cache hit)
+99 http cache @embedpdf/fonts-arabic@https://registry.npmjs.org/@embedpdf/fonts-arabic/-/fonts-arabic-1.0.0.tgz 0ms (cache hit)
+100 http cache @embedpdf/core@https://registry.npmjs.org/@embedpdf/core/-/core-2.15.1.tgz 0ms (cache hit)
+101 silly tarball no local data for vue@https://registry.npmjs.org/vue/-/vue-3.5.44.tgz. Extracting by manifest.
+102 http cache @babel/helper-string-parser@https://registry.npmjs.org/@babel/helper-string-parser/-/helper-string-parser-7.29.7.tgz 0ms (cache hit)
+103 silly tarball no local data for zimmerframe@https://registry.npmjs.org/zimmerframe/-/zimmerframe-1.1.5.tgz. Extracting by manifest.
+104 silly tarball no local data for tailwind-merge@https://registry.npmjs.org/tailwind-merge/-/tailwind-merge-3.7.0.tgz. Extracting by manifest.
+105 silly tarball no local data for svelte@https://registry.npmjs.org/svelte/-/svelte-5.57.2.tgz. Extracting by manifest.
+106 silly tarball no local data for source-map-js@https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.2.tgz. Extracting by manifest.
+107 http cache @babel/types@https://registry.npmjs.org/@babel/types/-/types-7.29.8.tgz 0ms (cache hit)
+108 silly tarball no local data for scheduler@https://registry.npmjs.org/scheduler/-/scheduler-0.28.0.tgz. Extracting by manifest.
+109 silly tarball no local data for react-dom@https://registry.npmjs.org/react-dom/-/react-dom-19.3.1.tgz. Extracting by manifest.
+110 silly tarball no local data for preact@https://registry.npmjs.org/preact/-/preact-10.29.8.tgz. Extracting by manifest.
+111 silly tarball no local data for react@https://registry.npmjs.org/react/-/react-19.3.1.tgz. Extracting by manifest.
+112 silly tarball no local data for playwright@https://registry.npmjs.org/playwright/-/playwright-1.64.1.tgz. Extracting by manifest.
+113 silly tarball no local data for postcss@https://registry.npmjs.org/postcss/-/postcss-8.5.31.tgz. Extracting by manifest.
+114 silly tarball no local data for playwright-core@https://registry.npmjs.org/playwright-core/-/playwright-core-1.64.1.tgz. Extracting by manifest.
+115 silly tarball no local data for picocolors@https://registry.npmjs.org/picocolors/-/picocolors-1.1.1.tgz. Extracting by manifest.
+116 http cache @babel/helper-validator-identifier@https://registry.npmjs.org/@babel/helper-validator-identifier/-/helper-validator-identifier-7.29.7.tgz 0ms (cache hit)
+117 silly tarball no local data for nanoid@https://registry.npmjs.org/nanoid/-/nanoid-3.3.20.tgz. Extracting by manifest.
+118 silly tarball no local data for locate-character@https://registry.npmjs.org/locate-character/-/locate-character-3.0.0.tgz. Extracting by manifest.
+119 silly tarball no local data for estree-walker@https://registry.npmjs.org/estree-walker/-/estree-walker-2.0.2.tgz. Extracting by manifest.
+120 silly tarball no local data for esrap@https://registry.npmjs.org/esrap/-/esrap-2.4.0.tgz. Extracting by manifest.
+121 silly tarball no local data for csstype@https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz. Extracting by manifest.
+122 silly tarball no local data for magic-string@https://registry.npmjs.org/magic-string/-/magic-string-0.30.21.tgz. Extracting by manifest.
+123 silly tarball no local data for is-reference@https://registry.npmjs.org/is-reference/-/is-reference-3.0.3.tgz. Extracting by manifest.
+124 silly tarball no local data for entities@https://registry.npmjs.org/entities/-/entities-7.0.1.tgz. Extracting by manifest.
+125 silly tarball no local data for @vue/shared@https://registry.npmjs.org/@vue/shared/-/shared-3.5.44.tgz. Extracting by manifest.
+126 silly tarball no local data for esm-env@https://registry.npmjs.org/esm-env/-/esm-env-1.2.2.tgz. Extracting by manifest.
+127 silly tarball no local data for axobject-query@https://registry.npmjs.org/axobject-query/-/axobject-query-4.1.0.tgz. Extracting by manifest.
+128 silly tarball no local data for devalue@https://registry.npmjs.org/devalue/-/devalue-5.9.4.tgz. Extracting by manifest.
+129 silly tarball no local data for clsx@https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz. Extracting by manifest.
+130 silly tarball no local data for aria-query@https://registry.npmjs.org/aria-query/-/aria-query-5.3.1.tgz. Extracting by manifest.
+131 silly tarball no local data for acorn@https://registry.npmjs.org/acorn/-/acorn-8.19.0.tgz. Extracting by manifest.
+132 silly tarball no local data for @vue/runtime-core@https://registry.npmjs.org/@vue/runtime-core/-/runtime-core-3.5.44.tgz. Extracting by manifest.
+133 silly tarball no local data for @vue/server-renderer@https://registry.npmjs.org/@vue/server-renderer/-/server-renderer-3.5.44.tgz. Extracting by manifest.
+134 silly tarball no local data for @vue/reactivity@https://registry.npmjs.org/@vue/reactivity/-/reactivity-3.5.44.tgz. Extracting by manifest.
+135 silly tarball no local data for @vue/runtime-dom@https://registry.npmjs.org/@vue/runtime-dom/-/runtime-dom-3.5.44.tgz. Extracting by manifest.
+136 silly tarball no local data for @vue/compiler-ssr@https://registry.npmjs.org/@vue/compiler-ssr/-/compiler-ssr-3.5.44.tgz. Extracting by manifest.
+137 silly tarball no local data for @sveltejs/acorn-typescript@https://registry.npmjs.org/@sveltejs/acorn-typescript/-/acorn-typescript-1.0.13.tgz. Extracting by manifest.
+138 silly tarball no local data for @vue/compiler-core@https://registry.npmjs.org/@vue/compiler-core/-/compiler-core-3.5.44.tgz. Extracting by manifest.
+139 silly tarball no local data for @vue/compiler-dom@https://registry.npmjs.org/@vue/compiler-dom/-/compiler-dom-3.5.44.tgz. Extracting by manifest.
+140 silly tarball no local data for @vue/compiler-sfc@https://registry.npmjs.org/@vue/compiler-sfc/-/compiler-sfc-3.5.44.tgz. Extracting by manifest.
+141 silly tarball no local data for @embedpdf/utils@https://registry.npmjs.org/@embedpdf/utils/-/utils-2.15.1.tgz. Extracting by manifest.
+142 silly tarball no local data for @jridgewell/sourcemap-codec@https://registry.npmjs.org/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.6.0.tgz. Extracting by manifest.
+143 silly tarball no local data for @jridgewell/trace-mapping@https://registry.npmjs.org/@jridgewell/trace-mapping/-/trace-mapping-0.3.31.tgz. Extracting by manifest.
+144 silly tarball no local data for @jridgewell/resolve-uri@https://registry.npmjs.org/@jridgewell/resolve-uri/-/resolve-uri-3.1.2.tgz. Extracting by manifest.
+145 silly tarball no local data for @types/estree@https://registry.npmjs.org/@types/estree/-/estree-1.0.9.tgz. Extracting by manifest.
+146 silly tarball no local data for @jridgewell/remapping@https://registry.npmjs.org/@jridgewell/remapping/-/remapping-2.3.5.tgz. Extracting by manifest.
+147 silly tarball no local data for @embedpdf/plugin-zoom@https://registry.npmjs.org/@embedpdf/plugin-zoom/-/plugin-zoom-2.15.1.tgz. Extracting by manifest.
+148 silly tarball no local data for @jridgewell/gen-mapping@https://registry.npmjs.org/@jridgewell/gen-mapping/-/gen-mapping-0.3.13.tgz. Extracting by manifest.
+149 silly tarball no local data for @embedpdf/plugin-tiling@https://registry.npmjs.org/@embedpdf/plugin-tiling/-/plugin-tiling-2.15.1.tgz. Extracting by manifest.
+150 silly tarball no local data for @embedpdf/snippet@https://registry.npmjs.org/@embedpdf/snippet/-/snippet-2.15.1.tgz. Extracting by manifest.
+151 silly tarball no local data for @embedpdf/plugin-viewport@https://registry.npmjs.org/@embedpdf/plugin-viewport/-/plugin-viewport-2.15.1.tgz. Extracting by manifest.
+152 silly tarball no local data for @embedpdf/plugin-stamp@https://registry.npmjs.org/@embedpdf/plugin-stamp/-/plugin-stamp-2.15.1.tgz. Extracting by manifest.
+153 silly tarball no local data for @embedpdf/plugin-thumbnail@https://registry.npmjs.org/@embedpdf/plugin-thumbnail/-/plugin-thumbnail-2.15.1.tgz. Extracting by manifest.
+154 silly tarball no local data for @embedpdf/plugin-selection@https://registry.npmjs.org/@embedpdf/plugin-selection/-/plugin-selection-2.15.1.tgz. Extracting by manifest.
+155 silly tarball no local data for @embedpdf/plugin-ui@https://registry.npmjs.org/@embedpdf/plugin-ui/-/plugin-ui-2.15.1.tgz. Extracting by manifest.
+156 silly tarball no local data for @embedpdf/plugin-spread@https://registry.npmjs.org/@embedpdf/plugin-spread/-/plugin-spread-2.15.1.tgz. Extracting by manifest.
+157 silly tarball no local data for @embedpdf/plugin-signature@https://registry.npmjs.org/@embedpdf/plugin-signature/-/plugin-signature-2.15.1.tgz. Extracting by manifest.
+158 silly tarball no local data for @embedpdf/plugin-search@https://registry.npmjs.org/@embedpdf/plugin-search/-/plugin-search-2.15.1.tgz. Extracting by manifest.
+159 silly tarball no local data for @embedpdf/plugin-rotate@https://registry.npmjs.org/@embedpdf/plugin-rotate/-/plugin-rotate-2.15.1.tgz. Extracting by manifest.
+160 silly tarball no local data for @embedpdf/plugin-pan@https://registry.npmjs.org/@embedpdf/plugin-pan/-/plugin-pan-2.15.1.tgz. Extracting by manifest.
+161 silly tarball no local data for @embedpdf/plugin-redaction@https://registry.npmjs.org/@embedpdf/plugin-redaction/-/plugin-redaction-2.15.1.tgz. Extracting by manifest.
+162 silly tarball no local data for @embedpdf/plugin-scroll@https://registry.npmjs.org/@embedpdf/plugin-scroll/-/plugin-scroll-2.15.1.tgz. Extracting by manifest.
+163 silly tarball no local data for @embedpdf/plugin-print@https://registry.npmjs.org/@embedpdf/plugin-print/-/plugin-print-2.15.1.tgz. Extracting by manifest.
+164 silly tarball no local data for @embedpdf/plugin-interaction-manager@https://registry.npmjs.org/@embedpdf/plugin-interaction-manager/-/plugin-interaction-manager-2.15.1.tgz. Extracting by manifest.
+165 silly tarball no local data for @embedpdf/plugin-render@https://registry.npmjs.org/@embedpdf/plugin-render/-/plugin-render-2.15.1.tgz. Extracting by manifest.
+166 silly tarball no local data for @embedpdf/plugin-history@https://registry.npmjs.org/@embedpdf/plugin-history/-/plugin-history-2.15.1.tgz. Extracting by manifest.
+167 silly tarball no local data for @embedpdf/plugin-form@https://registry.npmjs.org/@embedpdf/plugin-form/-/plugin-form-2.15.1.tgz. Extracting by manifest.
+168 silly tarball no local data for @embedpdf/plugin-fullscreen@https://registry.npmjs.org/@embedpdf/plugin-fullscreen/-/plugin-fullscreen-2.15.1.tgz. Extracting by manifest.
+169 silly tarball no local data for @embedpdf/plugin-commands@https://registry.npmjs.org/@embedpdf/plugin-commands/-/plugin-commands-2.15.1.tgz. Extracting by manifest.
+170 silly tarball no local data for @embedpdf/plugin-i18n@https://registry.npmjs.org/@embedpdf/plugin-i18n/-/plugin-i18n-2.15.1.tgz. Extracting by manifest.
+171 silly tarball no local data for @embedpdf/plugin-export@https://registry.npmjs.org/@embedpdf/plugin-export/-/plugin-export-2.15.1.tgz. Extracting by manifest.
+172 silly tarball no local data for @embedpdf/plugin-annotation@https://registry.npmjs.org/@embedpdf/plugin-annotation/-/plugin-annotation-2.15.1.tgz. Extracting by manifest.
+173 silly tarball no local data for @embedpdf/plugin-capture@https://registry.npmjs.org/@embedpdf/plugin-capture/-/plugin-capture-2.15.1.tgz. Extracting by manifest.
+174 silly tarball no local data for @embedpdf/plugin-document-manager@https://registry.npmjs.org/@embedpdf/plugin-document-manager/-/plugin-document-manager-2.15.1.tgz. Extracting by manifest.
+175 silly tarball no local data for @embedpdf/plugin-bookmark@https://registry.npmjs.org/@embedpdf/plugin-bookmark/-/plugin-bookmark-2.15.1.tgz. Extracting by manifest.
+176 silly tarball no local data for @embedpdf/plugin-attachment@https://registry.npmjs.org/@embedpdf/plugin-attachment/-/plugin-attachment-2.15.1.tgz. Extracting by manifest.
+177 silly tarball no local data for @embedpdf/pdfium@https://registry.npmjs.org/@embedpdf/pdfium/-/pdfium-2.15.1.tgz. Extracting by manifest.
+178 silly tarball no local data for @embedpdf/fonts-kr@https://registry.npmjs.org/@embedpdf/fonts-kr/-/fonts-kr-1.0.0.tgz. Extracting by manifest.
+179 silly tarball no local data for @embedpdf/models@https://registry.npmjs.org/@embedpdf/models/-/models-2.15.1.tgz. Extracting by manifest.
+180 silly tarball no local data for @embedpdf/fonts-latin@https://registry.npmjs.org/@embedpdf/fonts-latin/-/fonts-latin-1.0.0.tgz. Extracting by manifest.
+181 silly tarball no local data for @embedpdf/fonts-tc@https://registry.npmjs.org/@embedpdf/fonts-tc/-/fonts-tc-1.0.0.tgz. Extracting by manifest.
+182 silly tarball no local data for @embedpdf/fonts-sc@https://registry.npmjs.org/@embedpdf/fonts-sc/-/fonts-sc-1.0.0.tgz. Extracting by manifest.
+183 silly tarball no local data for @embedpdf/fonts-hebrew@https://registry.npmjs.org/@embedpdf/fonts-hebrew/-/fonts-hebrew-1.0.0.tgz. Extracting by manifest.
+184 silly tarball no local data for @babel/parser@https://registry.npmjs.org/@babel/parser/-/parser-7.29.9.tgz. Extracting by manifest.
+185 silly tarball no local data for @embedpdf/fonts-jp@https://registry.npmjs.org/@embedpdf/fonts-jp/-/fonts-jp-1.0.0.tgz. Extracting by manifest.
+186 silly tarball no local data for @embedpdf/engines@https://registry.npmjs.org/@embedpdf/engines/-/engines-2.15.1.tgz. Extracting by manifest.
+187 silly tarball no local data for @embedpdf/fonts-arabic@https://registry.npmjs.org/@embedpdf/fonts-arabic/-/fonts-arabic-1.0.0.tgz. Extracting by manifest.
+188 silly tarball no local data for @embedpdf/core@https://registry.npmjs.org/@embedpdf/core/-/core-2.15.1.tgz. Extracting by manifest.
+189 silly tarball no local data for @babel/helper-string-parser@https://registry.npmjs.org/@babel/helper-string-parser/-/helper-string-parser-7.29.7.tgz. Extracting by manifest.
+190 silly tarball no local data for @babel/types@https://registry.npmjs.org/@babel/types/-/types-7.29.8.tgz. Extracting by manifest.
+191 silly tarball no local data for @babel/helper-validator-identifier@https://registry.npmjs.org/@babel/helper-validator-identifier/-/helper-validator-identifier-7.29.7.tgz. Extracting by manifest.
+192 http fetch GET 200 https://registry.npmjs.org/picocolors/-/picocolors-1.1.1.tgz 1341ms (cache miss)
+193 http fetch GET 200 https://registry.npmjs.org/locate-character/-/locate-character-3.0.0.tgz 1343ms (cache miss)
+194 http fetch GET 200 https://registry.npmjs.org/is-reference/-/is-reference-3.0.3.tgz 1530ms (cache miss)
+195 http fetch GET 200 https://registry.npmjs.org/zimmerframe/-/zimmerframe-1.1.5.tgz 1589ms (cache miss)
+196 http fetch GET 200 https://registry.npmjs.org/scheduler/-/scheduler-0.28.0.tgz 2377ms (cache miss)
+197 http fetch GET 200 https://registry.npmjs.org/@vue/shared/-/shared-3.5.44.tgz 2515ms (cache miss)
+198 http fetch GET 200 https://registry.npmjs.org/esm-env/-/esm-env-1.2.2.tgz 2536ms (cache miss)
+199 http fetch GET 200 https://registry.npmjs.org/estree-walker/-/estree-walker-2.0.2.tgz 2985ms (cache miss)
+200 http fetch GET 200 https://registry.npmjs.org/magic-string/-/magic-string-0.30.21.tgz 3094ms (cache miss)
+201 http fetch GET 200 https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.2.tgz 3183ms (cache miss)
+202 http fetch GET 200 https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz 3153ms (cache miss)
+203 http fetch GET 200 https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz 3197ms (cache miss)
+204 http fetch GET 200 https://registry.npmjs.org/nanoid/-/nanoid-3.3.20.tgz 3501ms (cache miss)
+205 http fetch GET 200 https://registry.npmjs.org/devalue/-/devalue-5.9.4.tgz 3778ms (cache miss)
+206 http fetch GET 200 https://registry.npmjs.org/react/-/react-19.3.1.tgz 4081ms (cache miss)
+207 http fetch GET 200 https://registry.npmjs.org/@vue/compiler-ssr/-/compiler-ssr-3.5.44.tgz 4064ms (cache miss)
+208 http fetch GET 200 https://registry.npmjs.org/@sveltejs/acorn-typescript/-/acorn-typescript-1.0.13.tgz 4187ms (cache miss)
+209 http fetch GET 200 https://registry.npmjs.org/acorn/-/acorn-8.19.0.tgz 4741ms (cache miss)
+210 http fetch GET 200 https://registry.npmjs.org/@vue/runtime-core/-/runtime-core-3.5.44.tgz 4742ms (cache miss)
+211 http fetch GET 200 https://registry.npmjs.org/@vue/reactivity/-/reactivity-3.5.44.tgz 4871ms (cache miss)
+212 http fetch GET 200 https://registry.npmjs.org/@vue/compiler-core/-/compiler-core-3.5.44.tgz 5131ms (cache miss)
+213 http fetch GET 200 https://registry.npmjs.org/@types/estree/-/estree-1.0.9.tgz 5132ms (cache miss)
+214 http fetch GET 200 https://registry.npmjs.org/esrap/-/esrap-2.4.0.tgz 5271ms (cache miss)
+215 http fetch GET 200 https://registry.npmjs.org/@vue/compiler-dom/-/compiler-dom-3.5.44.tgz 5321ms (cache miss)
+216 http fetch GET 200 https://registry.npmjs.org/@jridgewell/resolve-uri/-/resolve-uri-3.1.2.tgz 5456ms (cache miss)
+217 http fetch GET 200 https://registry.npmjs.org/@vue/runtime-dom/-/runtime-dom-3.5.44.tgz 5777ms (cache miss)
+218 http fetch GET 200 https://registry.npmjs.org/tailwind-merge/-/tailwind-merge-3.7.0.tgz 6716ms (cache miss)
+219 http fetch GET 200 https://registry.npmjs.org/postcss/-/postcss-8.5.31.tgz 7045ms (cache miss)
+220 http fetch GET 200 https://registry.npmjs.org/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.6.0.tgz 7334ms (cache miss)
+221 http fetch GET 200 https://registry.npmjs.org/@vue/server-renderer/-/server-renderer-3.5.44.tgz 7410ms (cache miss)
+222 http fetch GET 200 https://registry.npmjs.org/vue/-/vue-3.5.44.tgz 7646ms (cache miss)
+223 http fetch GET 200 https://registry.npmjs.org/@jridgewell/gen-mapping/-/gen-mapping-0.3.13.tgz 8108ms (cache miss)
+224 http fetch GET 200 https://registry.npmjs.org/@jridgewell/remapping/-/remapping-2.3.5.tgz 8316ms (cache miss)
+225 http fetch GET 200 https://registry.npmjs.org/@jridgewell/trace-mapping/-/trace-mapping-0.3.31.tgz 9115ms (cache miss)
+226 http fetch GET 200 https://registry.npmjs.org/@vue/compiler-sfc/-/compiler-sfc-3.5.44.tgz 9585ms (cache miss)
+227 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-bookmark/-/plugin-bookmark-2.15.1.tgz 9839ms (cache miss)
+228 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-attachment/-/plugin-attachment-2.15.1.tgz 9908ms (cache miss)
+229 http fetch GET 200 https://registry.npmjs.org/@embedpdf/fonts-hebrew/-/fonts-hebrew-1.0.0.tgz 11524ms (cache miss)
+230 http fetch GET 200 https://registry.npmjs.org/react-dom/-/react-dom-19.3.1.tgz 12911ms (cache miss)
+231 http fetch GET 200 https://registry.npmjs.org/@embedpdf/fonts-arabic/-/fonts-arabic-1.0.0.tgz 12990ms (cache miss)
+232 http fetch GET 200 https://registry.npmjs.org/playwright/-/playwright-1.64.1.tgz 13176ms (cache miss)
+233 http fetch GET 200 https://registry.npmjs.org/@babel/helper-string-parser/-/helper-string-parser-7.29.7.tgz 13128ms (cache miss)
+234 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-tiling/-/plugin-tiling-2.15.1.tgz 14583ms (cache miss)
+235 http fetch GET 200 https://registry.npmjs.org/@babel/helper-validator-identifier/-/helper-validator-identifier-7.29.7.tgz 14792ms (cache miss)
+236 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-stamp/-/plugin-stamp-2.15.1.tgz 15092ms (cache miss)
+237 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-history/-/plugin-history-2.15.1.tgz 15130ms (cache miss)
+238 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-thumbnail/-/plugin-thumbnail-2.15.1.tgz 15379ms (cache miss)
+239 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-search/-/plugin-search-2.15.1.tgz 15491ms (cache miss)
+240 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-print/-/plugin-print-2.15.1.tgz 15616ms (cache miss)
+241 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-viewport/-/plugin-viewport-2.15.1.tgz 15757ms (cache miss)
+242 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-pan/-/plugin-pan-2.15.1.tgz 15833ms (cache miss)
+243 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-rotate/-/plugin-rotate-2.15.1.tgz 16109ms (cache miss)
+244 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-spread/-/plugin-spread-2.15.1.tgz 16299ms (cache miss)
+245 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-render/-/plugin-render-2.15.1.tgz 16384ms (cache miss)
+246 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-scroll/-/plugin-scroll-2.15.1.tgz 17299ms (cache miss)
+247 http fetch GET 200 https://registry.npmjs.org/entities/-/entities-7.0.1.tgz 17407ms (cache miss)
+248 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-export/-/plugin-export-2.15.1.tgz 17431ms (cache miss)
+249 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-zoom/-/plugin-zoom-2.15.1.tgz 17786ms (cache miss)
+250 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-i18n/-/plugin-i18n-2.15.1.tgz 17856ms (cache miss)
+251 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-interaction-manager/-/plugin-interaction-manager-2.15.1.tgz 17868ms (cache miss)
+252 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-fullscreen/-/plugin-fullscreen-2.15.1.tgz 18068ms (cache miss)
+253 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-signature/-/plugin-signature-2.15.1.tgz 18122ms (cache miss)
+254 http fetch GET 200 https://registry.npmjs.org/preact/-/preact-10.29.8.tgz 18241ms (cache miss)
+255 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-commands/-/plugin-commands-2.15.1.tgz 18145ms (cache miss)
+256 http fetch GET 200 https://registry.npmjs.org/@embedpdf/models/-/models-2.15.1.tgz 18296ms (cache miss)
+257 http fetch GET 200 https://registry.npmjs.org/@embedpdf/utils/-/utils-2.15.1.tgz 18422ms (cache miss)
+258 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-selection/-/plugin-selection-2.15.1.tgz 18459ms (cache miss)
+259 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-document-manager/-/plugin-document-manager-2.15.1.tgz 18425ms (cache miss)
+260 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-capture/-/plugin-capture-2.15.1.tgz 18502ms (cache miss)
+261 http fetch GET 200 https://registry.npmjs.org/axobject-query/-/axobject-query-4.1.0.tgz 19735ms (cache miss)
+262 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-ui/-/plugin-ui-2.15.1.tgz 20154ms (cache miss)
+263 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-redaction/-/plugin-redaction-2.15.1.tgz 20217ms (cache miss)
+264 http fetch GET 200 https://registry.npmjs.org/@embedpdf/core/-/core-2.15.1.tgz 21021ms (cache miss)
+265 http fetch GET 200 https://registry.npmjs.org/aria-query/-/aria-query-5.3.1.tgz 21471ms (cache miss)
+266 http fetch GET 200 https://registry.npmjs.org/playwright-core/-/playwright-core-1.64.1.tgz 21550ms (cache miss)
+267 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-form/-/plugin-form-2.15.1.tgz 22194ms (cache miss)
+268 http fetch GET 200 https://registry.npmjs.org/@babel/types/-/types-7.29.8.tgz 22696ms (cache miss)
+269 http fetch GET 200 https://registry.npmjs.org/@embedpdf/plugin-annotation/-/plugin-annotation-2.15.1.tgz 26239ms (cache miss)
+270 http fetch GET 200 https://registry.npmjs.org/svelte/-/svelte-5.57.2.tgz 27147ms (cache miss)
+271 http fetch GET 200 https://registry.npmjs.org/@embedpdf/pdfium/-/pdfium-2.15.1.tgz 28363ms (cache miss)
+272 http fetch GET 200 https://registry.npmjs.org/@babel/parser/-/parser-7.29.9.tgz 29239ms (cache miss)
+273 http fetch GET 200 https://registry.npmjs.org/@embedpdf/engines/-/engines-2.15.1.tgz 31114ms (cache miss)
+274 http fetch GET 200 https://registry.npmjs.org/@embedpdf/snippet/-/snippet-2.15.1.tgz 32835ms (cache miss)
+275 http fetch GET 200 https://registry.npmjs.org/@embedpdf/fonts-latin/-/fonts-latin-1.0.0.tgz 45621ms (cache miss)
+276 http fetch GET 200 https://registry.npmjs.org/@embedpdf/fonts-jp/-/fonts-jp-1.0.0.tgz 65260ms (cache miss)
+277 http fetch GET 200 https://registry.npmjs.org/@embedpdf/fonts-kr/-/fonts-kr-1.0.0.tgz 70187ms (cache miss)
+278 http fetch GET 200 https://registry.npmjs.org/@embedpdf/fonts-tc/-/fonts-tc-1.0.0.tgz 102607ms (cache miss)
+279 http fetch GET 200 https://registry.npmjs.org/@embedpdf/fonts-sc/-/fonts-sc-1.0.0.tgz 104723ms (cache miss)
+280 silly ADD node_modules/zimmerframe
+281 silly ADD node_modules/vue
+282 silly ADD node_modules/tailwind-merge
+283 silly ADD node_modules/svelte
+284 silly ADD node_modules/source-map-js
+285 silly ADD node_modules/scheduler
+286 silly ADD node_modules/react-dom
+287 silly ADD node_modules/react
+288 silly ADD node_modules/preact
+289 silly ADD node_modules/postcss
+290 silly ADD node_modules/playwright-core
+291 silly ADD node_modules/playwright
+292 silly ADD node_modules/picocolors
+293 silly ADD node_modules/nanoid
+294 silly ADD node_modules/magic-string
+295 silly ADD node_modules/locate-character
+296 silly ADD node_modules/is-reference
+297 silly ADD node_modules/estree-walker
+298 silly ADD node_modules/esrap
+299 silly ADD node_modules/esm-env
+300 silly ADD node_modules/entities
+301 silly ADD node_modules/devalue
+302 silly ADD node_modules/csstype
+303 silly ADD node_modules/clsx
+304 silly ADD node_modules/axobject-query
+305 silly ADD node_modules/aria-query
+306 silly ADD node_modules/acorn
+307 silly ADD node_modules/@vue/shared
+308 silly ADD node_modules/@vue/server-renderer
+309 silly ADD node_modules/@vue/runtime-dom
+310 silly ADD node_modules/@vue/runtime-core
+311 silly ADD node_modules/@vue/reactivity
+312 silly ADD node_modules/@vue/compiler-ssr
+313 silly ADD node_modules/@vue/compiler-sfc
+314 silly ADD node_modules/@vue/compiler-dom
+315 silly ADD node_modules/@vue/compiler-core
+316 silly ADD node_modules/@types/estree
+317 silly ADD node_modules/@sveltejs/acorn-typescript
+318 silly ADD node_modules/@jridgewell/trace-mapping
+319 silly ADD node_modules/@jridgewell/sourcemap-codec
+320 silly ADD node_modules/@jridgewell/resolve-uri
+321 silly ADD node_modules/@jridgewell/remapping
+322 silly ADD node_modules/@jridgewell/gen-mapping
+323 silly ADD node_modules/@embedpdf/utils
+324 silly ADD node_modules/@embedpdf/snippet
+325 silly ADD node_modules/@embedpdf/plugin-zoom
+326 silly ADD node_modules/@embedpdf/plugin-viewport
+327 silly ADD node_modules/@embedpdf/plugin-ui
+328 silly ADD node_modules/@embedpdf/plugin-tiling
+329 silly ADD node_modules/@embedpdf/plugin-thumbnail
+330 silly ADD node_modules/@embedpdf/plugin-stamp
+331 silly ADD node_modules/@embedpdf/plugin-spread
+332 silly ADD node_modules/@embedpdf/plugin-signature
+333 silly ADD node_modules/@embedpdf/plugin-selection
+334 silly ADD node_modules/@embedpdf/plugin-search
+335 silly ADD node_modules/@embedpdf/plugin-scroll
+336 silly ADD node_modules/@embedpdf/plugin-rotate
+337 silly ADD node_modules/@embedpdf/plugin-render
+338 silly ADD node_modules/@embedpdf/plugin-redaction
+339 silly ADD node_modules/@embedpdf/plugin-print
+340 silly ADD node_modules/@embedpdf/plugin-pan
+341 silly ADD node_modules/@embedpdf/plugin-interaction-manager
+342 silly ADD node_modules/@embedpdf/plugin-i18n
+343 silly ADD node_modules/@embedpdf/plugin-history
+344 silly ADD node_modules/@embedpdf/plugin-fullscreen
+345 silly ADD node_modules/@embedpdf/plugin-form
+346 silly ADD node_modules/@embedpdf/plugin-export
+347 silly ADD node_modules/@embedpdf/plugin-document-manager
+348 silly ADD node_modules/@embedpdf/plugin-commands
+349 silly ADD node_modules/@embedpdf/plugin-capture
+350 silly ADD node_modules/@embedpdf/plugin-bookmark
+351 silly ADD node_modules/@embedpdf/plugin-attachment
+352 silly ADD node_modules/@embedpdf/plugin-annotation
+353 silly ADD node_modules/@embedpdf/pdfium
+354 silly ADD node_modules/@embedpdf/models
+355 silly ADD node_modules/@embedpdf/fonts-tc
+356 silly ADD node_modules/@embedpdf/fonts-sc
+357 silly ADD node_modules/@embedpdf/fonts-latin
+358 silly ADD node_modules/@embedpdf/fonts-kr
+359 silly ADD node_modules/@embedpdf/fonts-jp
+360 silly ADD node_modules/@embedpdf/fonts-hebrew
+361 silly ADD node_modules/@embedpdf/fonts-arabic
+362 silly ADD node_modules/@embedpdf/engines
+363 silly ADD node_modules/@embedpdf/core
+364 silly ADD node_modules/@babel/types
+365 silly ADD node_modules/@babel/parser
+366 silly ADD node_modules/@babel/helper-validator-identifier
+367 silly ADD node_modules/@babel/helper-string-parser
+368 verbose cwd C:\progetti\pdfMB
+369 verbose os Windows_NT 10.0.26200
+370 verbose node v24.15.0
+371 verbose npm  v11.12.1
+372 verbose exit 0
+373 info ok

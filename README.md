@@ -6,6 +6,7 @@
 
 | Riferimento | Stato |
 | --- | --- |
+| **0.10.7** | Lucchetto aperto e comando Rimuovi password quando il PDF è protetto; clic per rimuovere la protezione, da confermare con Salva. Barra principale, Strumenti e modulo sincronizzati. Build completa nella [Release 0.10.7](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.10.6) e in `artifacts/app-0.10.7`. |
 | **0.10.6** | Lucchetto aperto e comando Rimuovi password quando il PDF è protetto; clic per rimuovere la protezione, da confermare con Salva. Barra principale, Strumenti e modulo sincronizzati. Build completa nella [Release 0.10.6](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.10.6) e in `artifacts/app-0.10.6`. |
 | **0.10.5** | Miniature del viewer e di Gestisci pagine complete di testo, data/ora e pulsanti del modulo, anche su pagine senza contenuti statici. Build locale in `artifacts/app-0.10.5`. |
 | **0.10.4** | Moduli compilabili anche nella vista normale: pulsante email visibile, data/ora modificabili da tastiera e selettore, salvataggio e cronologia condivisi con la progettazione. Build locale in `artifacts/app-0.10.4`. |

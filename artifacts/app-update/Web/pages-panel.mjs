@@ -1,6 +1,6 @@
 export class PagesPanel {
-  constructor({ plugin, session, editor, unavailable, select, change, insert, extract, toggle }) {
-    Object.assign(this, { plugin, session, editor, unavailable, select, change, insert, extract, toggle });
+  constructor({ plugin, session, editor, unavailable, select, change, insert, insertBlank, extract, toggle }) {
+    Object.assign(this, { plugin, session, editor, unavailable, select, change, insert, insertBlank, extract, toggle });
     this.element = document.querySelector('#pages-panel');
     this.list = document.querySelector('#page-list');
     this.menu = document.querySelector('#page-menu');
@@ -23,6 +23,7 @@ export class PagesPanel {
       if (operation === 'move') this.showMove();
       else if (operation === 'delete') this.showDelete();
       else if (operation === 'insert') insert();
+      else if (operation === 'insert-blank') insertBlank();
       else if (operation === 'extract') extract();
       else change({ operation });
     };

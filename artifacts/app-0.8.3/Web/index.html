@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' blob:; font-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>PDF MB</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <section id="text-toolbar" aria-label="Strumenti testo e carattere" hidden>
+    <div class="text-tools-row">
+      <button id="text-new" type="button" aria-pressed="false">Nuova casella</button>
+      <label class="text-box-picker">Caselle<select id="text-existing" aria-label="Caselle della pagina corrente"><option value="">Nessuna selezione</option></select></label>
+      <label>Font<select id="text-font"><option>Helvetica</option><option>Times</option><option>Courier</option></select></label>
+      <label>pt<input id="text-size" type="number" min="6" max="144" step="0.5" value="12" required aria-label="Dimensione carattere in punti"></label>
+      <button type="button" id="text-smaller" aria-label="Riduci dimensione" title="Riduci dimensione">A−</button>
+      <button type="button" id="text-larger" aria-label="Aumenta dimensione" title="Aumenta dimensione">A+</button>
+      <button type="button" id="text-bold" aria-pressed="false" aria-label="Grassetto" title="Grassetto"><b>G</b></button>
+      <button type="button" id="text-italic" aria-pressed="false" aria-label="Corsivo" title="Corsivo"><i>C</i></button>
+      <label>Colore<input id="text-color" type="color" value="#202020" aria-label="Colore del testo"></label>
+      <button type="button" id="text-delete" class="text-delete">Elimina</button>
+      <button type="button" id="text-cancel">Annulla modifica</button>
+      <label>Zoom<select id="text-zoom"><option value="fit">Adatta larghezza</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
+    </div>
+    <p id="text-status" role="status" aria-live="polite">Modifica testo: crea, sposta e ridimensiona le caselle direttamente sulla pagina.</p>
+  </section>
+  <section id="tools-toolbar" aria-labelledby="tools-title" hidden>
+    <header class="tools-row"><h2 id="tools-title">Strumenti pagina</h2><button id="tools-previous">Pagina precedente</button><button id="tools-next">Pagina successiva</button><button data-tools-close class="secondary">Chiudi</button></header>
+    <div class="tools-row">
+      <label>Strumento<select id="tools-mode"><option value="note">Nota adesiva</option><option value="square">Rettangolo</option><option value="circle">Ellisse</option><option value="line">Linea</option><option value="ink">Penna</option><option value="stamp">Timbri</option><option value="objects">Testo e oggetti esistenti</option><option value="redact">Oscuramento effettivo</option></select></label>
+      <label>Elementi<select id="tools-items"><option value="">Nuova selezione</option></select></label>
+      <div id="tools-annotation-controls" class="tools-row"><label>Colore<input id="tools-color" type="color" value="#ffcc00"></label><label>Spessore pt<input id="tools-stroke" type="number" min="0.5" max="20" step="0.5" value="2"></label></div>
+    </div>
+    <div id="tools-object-controls" class="tools-row" hidden>
+      <label>Azione<select id="tools-action"><option value="object-text">Sostituisci il testo dell’oggetto</option><option value="object-transform">Sposta / scala / ruota l’oggetto</option></select></label>
+      <label>Font<select id="tools-font"><option>Helvetica</option><option value="Times-Roman">Times</option><option>Courier</option></select></label><label>pt<input id="tools-size" type="number" min="6" max="144" value="12"></label>
+      <label>Sposta X pt<input id="tools-dx" type="number" min="-2000" max="2000" value="0"></label><label>Sposta Y pt<input id="tools-dy" type="number" min="-2000" max="2000" value="0"></label><label>Scala<input id="tools-scale" type="number" min="0.1" max="10" step="0.1" value="1"></label><label>Ruota °<input id="tools-angle" type="number" min="-360" max="360" value="0"></label>
+      <button id="tools-reset-preview" class="secondary">Annulla anteprima</button>
+    </div>
+    <div id="tools-stamp-controls" class="tools-row" hidden>
+      <label>Timbro<select id="tools-stamp"></select></label>
+      <button type="button" popovertarget="stamp-palette" class="secondary">Tavolozza timbri</button>
+      <label class="stamp-upload">Carica PNG personale<input id="tools-stamp-upload" type="file" accept="image/png,.png"></label>
+      <label>Larghezza mm<input id="tools-stamp-width" type="number" min="5" max="500" step="0.1" value="64"></label>
+      <span id="tools-stamp-dimensions"></span>
+      <div id="tools-stamp-date-controls" class="tools-row" hidden><label>Data<input id="tools-stamp-date" type="date"></label><label>Formato<select id="tools-stamp-format"><option value="slash">gg/mm/aaaa</option><option value="dash">gg-mm-aaaa</option><option value="long">giorno mese anno</option></select></label></div>
+    </div>
+    <div class="tools-row"><label class="tools-text">Contenuto nota / nuovo testo dell’oggetto<textarea id="tools-contents" rows="2" maxlength="10000"></textarea></label><button id="tools-apply">Applica</button><button id="tools-delete" class="danger">Elimina selezionato</button></div>
+    <p id="tools-warning" hidden>Oscuramento: la pagina diventa un’immagine, senza testo selezionabile né elementi modificabili. Il file salvato conserva solo il risultato bonificato delle pagine oscurate; allegati, metadati e segnalibri del documento vengono esclusi. Salva prima di condividere.</p>
+    <p id="tools-status" role="status"></p>
+  </section>
+  <div id="stamp-palette" popover="auto" aria-label="Tavolozza timbri">
+    <h2>Timbri statici</h2><div id="stamp-presets" class="stamp-grid"></div>
+    <h2>Personali · PNG trasparenti</h2><div id="stamp-personal" class="stamp-grid"></div>
+    <p>Carica un PNG dai controlli Timbri. Le proporzioni e la trasparenza vengono conservate.</p>
+  </div>
+  <div id="workspace">
+    <aside id="pages-panel" aria-label="Gestione pagine" hidden>
+      <div class="panel-heading"><h2>Gestisci pagine</h2><button id="panel-close" class="secondary" aria-label="Chiudi pannello pagine">×</button></div>
+      <p id="edit-reason" class="notice" role="status" hidden></p>
+      <p id="selection-count" role="status">0 pagine selezionate</p>
+      <small class="selection-help">Tasto destro: comandi · Ctrl/Maiusc+clic: selezione</small>
+      <div id="page-list" role="listbox" aria-label="Pagine del documento" aria-multiselectable="true"></div>
+    </aside>
+    <main id="viewer-shell" aria-label="Documento PDF">
+      <div id="viewer" aria-label="Visualizzatore PDF"></div>
+      <div id="tools-preview" hidden><canvas id="tools-canvas" hidden aria-hidden="true"></canvas></div>
+      <div id="text-surface" aria-label="Modifica caselle di testo sulla pagina" tabindex="0" hidden></div>
+    </main>
+  </div>
+  <div id="page-menu" popover="auto" role="menu" aria-labelledby="page-menu-title" tabindex="-1">
+    <div id="page-menu-title" class="page-menu-title"></div>
+    <button type="button" role="menuitem" data-operation="rotate-left">Ruota a sinistra</button>
+    <button type="button" role="menuitem" data-operation="rotate-right">Ruota a destra</button>
+    <button type="button" role="menuitem" data-operation="delete" class="delete-page">Elimina</button>
+    <button type="button" role="menuitem" data-operation="move">Sposta…</button>
+    <hr role="separator">
+    <button type="button" role="menuitem" data-operation="insert">Inserisci…</button>
+    <button type="button" role="menuitem" data-operation="extract">Estrai pagine…</button>
+  </div>
+  <div id="text-context-menu" popover="auto" role="menu" aria-labelledby="text-context-title" tabindex="-1">
+    <div id="text-context-title" class="page-menu-title">Casella di testo</div>
+    <button type="button" role="menuitem" id="text-context-copy">Copia</button>
+    <button type="button" role="menuitem" id="text-context-paste">Incolla</button>
+  </div>
+  <section id="welcome" aria-labelledby="welcome-title">
+    <div class="file-icon" aria-hidden="true">PDF</div>
+    <p class="eyebrow">PDF MB · DOCUMENTI</p>
+    <h1 id="welcome-title">Il tuo documento, qui.</h1>
+    <p>Apri un PDF per consultare pagine, miniature e testo.</p>
+    <button id="open" disabled>Apri documento</button>
+    <small id="hint" role="status">Avvio del motore PDF…</small>
+  </section>
+  <div id="fatal" role="alert" hidden><span id="error-text"></span><button id="dismiss-error" class="secondary" aria-label="Chiudi messaggio">×</button></div>
+  <dialog id="move-dialog" aria-labelledby="move-title" aria-describedby="move-description">
+    <h2 id="move-title">Sposta pagine</h2>
+    <p id="move-description"></p>
+    <label for="move-position">Posizione finale</label>
+    <input id="move-position" type="number" min="1" step="1" required>
+    <div class="dialog-actions"><button data-cancel-dialog class="secondary">Annulla</button><button id="move-confirm">Sposta</button></div>
+  </dialog>
+  <dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-description">
+    <h2 id="delete-title">Elimina pagine</h2>
+    <p id="delete-description"></p>
+    <div class="dialog-actions"><button id="delete-cancel" data-cancel-dialog class="secondary">Annulla</button><button id="delete-confirm" class="danger">Elimina</button></div>
+  </dialog>
+  <div id="highlight-delete-menu" popover="auto" role="menu" aria-label="Evidenziazione selezionata">
+    <button data-highlight-remove role="menuitem">Elimina evidenziazione</button>
+    <button data-highlight-dismiss>Chiudi</button>
+  </div>
+  <script type="module" src="app.mjs"></script>
+</body>
+</html>
+
