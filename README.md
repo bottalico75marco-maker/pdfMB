@@ -2,6 +2,17 @@
 
 **Il tuo editor PDF per Windows:** organizza pagine, modifica testi, aggiungi annotazioni, stampa e oscura contenuti. Tutto in locale.
 
+**Versione pubblicata: [PDF MB 0.12.2](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.12.2)** · [Scarica ZIP Windows x64](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.12.2/PDF-MB-0.12.2-win-x64.zip) · [Checksum SHA-256](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.12.2/PDF-MB-0.12.2-win-x64.zip.sha256)
+
+### Novità della 0.12.2
+
+- **Editing più stabile:** le modifiche pendenti vengono applicate all’uscita dal campo e il clic sul blocco successivo viene gestito anche durante l’aggiornamento della pagina.
+- **Selezione conservata:** il blocco modificato viene ritrovato dopo l’applicazione; i comandi successivi, compreso Elimina, vengono gestiti in sequenza.
+- **Raggruppamento migliorato:** i frammenti della stessa riga vengono ordinati da sinistra a destra anche con caratteri di altezze diverse. Le parole restano complete e gli spazi tra parole vengono ricostruiti senza aggiungerne al loro interno.
+- **Caselle adattate al contenuto:** una riga originale può crescere fino al bordo pagina; le caselle disegnate o ridimensionate conservano la larghezza scelta per il ritorno a capo.
+
+La release ha superato 65 test automatici Node/PDFium, i controlli desktop Windows e la prova browser Chromium. [Note complete](docs/releases/0.12.2.md) · [Verifiche e pubblicazione su GitHub Actions](https://github.com/bottalico75marco-maker/pdfMB/actions/runs/40954513366).
+
 ## Stato del progetto e versione attuale
 
 | Riferimento | Stato |
@@ -36,12 +47,14 @@ La versione **0.12.2** migliora la stabilità dell’editor e il raggruppamento 
 
 ## Installazione su Windows
 
-1. Scaricare il pacchetto Windows x64 ZIP dall’[ultima release pubblica](https://github.com/bottalico75marco-maker/pdfMB/releases/latest). La pagina include anche il checksum SHA-256.
+1. Scaricare [PDF-MB-0.12.2-win-x64.zip](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.12.2/PDF-MB-0.12.2-win-x64.zip) oppure consultare l’[ultima release pubblica](https://github.com/bottalico75marco-maker/pdfMB/releases/latest). Il [checksum SHA-256 della 0.12.2](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.12.2/PDF-MB-0.12.2-win-x64.zip.sha256) permette di verificare l’integrità del download.
 2. Estrarre **l’intera cartella** dello ZIP.
 3. Verificare la presenza di **.NET Desktop Runtime 10** e **Microsoft Edge WebView2 Runtime** su Windows a 64 bit.
 4. Avviare **PdfMB.Desktop.exe**.
 
 Tenere insieme EXE, DLL, cartelle `Web` e `ThirdParty` e `GUIDA-WINDOWS.html`. Per usare una build già compilata non servono Visual Studio, Node.js o l’SDK .NET.
+
+Per aggiornare un’installazione precedente, salvare i documenti e chiudere PDF MB prima di sostituire la cartella con il contenuto completo del nuovo ZIP. Il comando **Aiuto → Verifica aggiornamenti** mostra le nuove release disponibili.
 
 Le build dei singoli commit restano disponibili tra gli artefatti della workflow **Verifica e build Windows** in GitHub Actions, dopo la riuscita dei controlli.
 
@@ -111,13 +124,14 @@ Il trascinamento delle miniature non è previsto. La sorgente di un inserimento 
 
 - Il pulsante **Testo** attiva la modifica sulle pagine; la barra contestuale compare solo in questa modalità.
 - Clic sul testo originale o su una casella per modificarlo; clic o trascinamento nello spazio vuoto per inserire testo. **Nuova casella** permette di inserire anche sopra un testo esistente.
-- Frammenti vicini e allineati, con font, dimensione e colore compatibili, selezionabili come un solo blocco. Colonne distanti e stili diversi restano separati; il raggruppamento da solo non modifica il documento.
-- Caselle ridotte al contenuto con un piccolo margine; larghezza di inserimento o ridimensionamento usata come limite di ritorno a capo. Spostamento dal bordo e ridimensionamento con otto maniglie.
+- Frammenti vicini e allineati, con font, dimensione e colore compatibili, selezionabili come un solo blocco. L’ordinamento per riga e posizione ricompone anche parole divise tra oggetti con caratteri di altezze diverse, preservando gli spazi tra parole. Colonne distanti e stili diversi restano separati; il raggruppamento da solo non modifica il documento.
+- Caselle ridotte al contenuto con un piccolo margine. Le righe originali singole possono allungarsi fino al bordo pagina; paragrafi già su più righe e caselle disegnate o ridimensionate mantengono la larghezza prevista per il ritorno a capo. Spostamento dal bordo e ridimensionamento con otto maniglie.
 - Font **Helvetica, Times e Courier**, dimensioni **6–144 pt**, grassetto, corsivo e colore.
 - Selezione dei caratteri e copia/incolla del testo all’interno della casella.
 - Copia/incolla dell’intera casella dal menu contestuale o da tastiera, con nuovo identificativo e conservazione dello stile.
 - Selezione e modifica delle caselle create da PDF MB anche dopo salvataggio e riapertura.
 - Applicazione automatica all’uscita dal campo, al rilascio dopo spostamento/ridimensionamento o con `Ctrl+Invio`.
+- Dopo l’applicazione la selezione viene recuperata sulla pagina aggiornata; il clic sul blocco successivo e i comandi durante l’applicazione vengono gestiti in sequenza. La casella è temporaneamente in sola lettura durante la scrittura per conservare la bozza applicata.
 - **Annulla modifica** per scartare la bozza dopo conferma; errori di validazione mantengono la bozza recuperabile.
 - Il testo originale modificato resta testo nativo del PDF: i frammenti precedenti sono rimossi. Le caselle aggiunte restano annotazioni **FreeText**. Le modifiche a un blocco sono una sola operazione annullabile.
 - Rilevamento e riparazione al salvataggio delle caselle delle vecchie versioni con aspetto trasparente o non valido.
@@ -250,6 +264,10 @@ La cronologia seguente è ricostruita dai sorgenti, dalla documentazione e dalle
 
 | Versione | Funzionalità e modifiche |
 | --- | --- |
+| **0.12.2** | Stabilità dell’editing, recupero della selezione e gestione dei comandi durante l’applicazione; raggruppamento dei frammenti per riga e posizione, ricostruzione corretta degli spazi e crescita delle righe originali verso il bordo pagina. [Note di rilascio](docs/releases/0.12.2.md). |
+| **0.12.1** | Controllo aggiornamenti all’avvio e dal menu Aiuto, preferenza persistente e limite giornaliero; release automatiche da tag con test Windows/Chromium, ZIP, checksum e note. [Note di rilascio](docs/releases/0.12.1.md). |
+| **0.12.0** | Testo unificato: inserimento e modifica del testo originale dallo stesso pulsante, raggruppamento dei frammenti compatibili, caselle compatte e cronologia comune. |
+| **0.11.0** | Conversione PDF in Markdown con confronto affiancato e anteprima live; OCR e descrizione delle immagini tramite un modello visivo Ollama locale, con elaborazione di un’immagine alla volta. |
 | **0.8.0** | Note adesive modificabili; rettangoli, ellissi, linee e penna; stampa con anteprima; modifica del testo originale per oggetto, trasformazione/eliminazione di oggetti; oscuramento effettivo mediante ricostruzione raster; sorgenti immutabili nella cronologia; controlli separati dei permessi; correzione dei canali colore e rendering degli aspetti dei moduli; test con PDFium reale, prova browser e workflow di build Windows. Aggiornamento successivo della stessa versione: guida Windows offline, menu Aiuto/F1 e rimozione dell’etichetta fissa “Gestione pagine” in alto a destra. |
 | **0.7.0** | Evidenziatore direttamente sul testo selezionabile del viewer, pulsante di attivazione, cursore a pennarello e select del colore adiacente; applicazione al rilascio, eliminazione delle evidenziazioni PDF MB, salvataggio e cronologia comune; un’unica azione per selezioni su più pagine. |
 | **0.6.5** | Correzione delle caselle non visibili nel PDF salvato: opacità nativa e aspetto generato sulla FreeText di destinazione. Rilevamento/riparazione al salvataggio dei file creati dalle versioni precedenti. |
