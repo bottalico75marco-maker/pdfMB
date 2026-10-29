@@ -44,7 +44,16 @@ Le build dei singoli commit restano disponibili tra gli artefatti della workflow
 
 La guida si apre offline con **Aiuto → Guida Windows** o **F1**, nel browser predefinito. Include istruzioni per tutti gli strumenti e per la risoluzione dei problemi più comuni. La scritta fissa “Gestione pagine” in alto a destra è stata rimossa; il pulsante **Gestisci pagine** resta disponibile.
 
-## Tutte le funzionalità disponibili nella 0.10.6
+## Tutte le funzionalità disponibili nella 0.11.0
+
+### Markdown e OCR locale
+
+- **Confronta Markdown** apre il PDF a sinistra e il Markdown modificabile con anteprima live a destra; i marcatori di pagina mantengono il confronto durante le correzioni.
+- **Converti testo in MD** estrae il testo selezionabile e salva `nomefile.pdf.md`. Un file già esistente viene caricato; riconvertire richiede conferma.
+- **OCR e descrivi foto** estrae e invia una sola immagine alla volta a Ollama locale, trascrivendo scansioni e descrivendo immagini. Il campo Modello propone i nomi installati; senza servizio e modello visivo locale il comando resta disabilitato.
+- **Interrompi** conserva il risultato parziale. Salvataggio UTF-8, limite 8 MB, controllo delle modifiche esterne e conferma delle modifiche pendenti prima di cambiare documento o uscire.
+
+Istruzioni complete in [Markdown e Ollama](docs/MARKDOWN.md). La build locale completa è in `artifacts/app-0.11.0`; il pacchetto è `artifacts/PDF-MB-0.11.0-win-x64.zip`, accompagnato dal checksum SHA-256. L’ultima release pubblicata collegata sopra resta la 0.10.6.
 
 ### Nuovo documento e pagine vuote
 
@@ -218,7 +227,7 @@ Annulla può ripristinare la sorgente nella sessione: condividere soltanto il PD
 ## Limiti attuali
 
 - **64 MB** per PDF aperto, importato o risultante; **128 MB** complessivi per sorgenti e cronologia. Salvare e riaprire libera la cronologia.
-- OCR non ancora gestito; progettazione e compilazione dedicate ai campi creati da PDF MB. L’apertura di PDF cifrati e firmati insieme non è supportata. Per l’inserimento di pagine da un PDF protetto aprirlo prima con la password e salvarne una copia senza protezione.
+- L’OCR opzionale produce testo nel Markdown senza aggiungere un livello ricercabile al PDF; colonne, tabelle, trascrizioni e descrizioni richiedono confronto con l’originale. Progettazione e compilazione sono dedicate ai campi creati da PDF MB. L’apertura di PDF cifrati e firmati insieme non è supportata. Per l’inserimento di pagine da un PDF protetto aprirlo prima con la password e salvarne una copia senza protezione.
 - Font remoti di fallback disabilitati: un PDF con font mancanti può richiedere una verifica sull’originale.
 - Fino a 1.000 modifiche a caselle o evidenziazioni per pagina; fino a 1.000 rettangoli per tratto di evidenziatore e pagina.
 - La superficie Strumenti ispeziona pagine con un massimo di 2.000 oggetti/annotazioni.
@@ -268,7 +277,7 @@ dotnet run --project src/PdfMB.Desktop
 Pubblicazione della cartella Windows a 64 bit:
 
 ```powershell
-dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.10.6
+dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.11.0
 ```
 
 Prova browser facoltativa:

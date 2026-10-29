@@ -37,11 +37,12 @@ internal sealed partial class MainForm
         _ocrAvailable = false; UpdateControls();
         try
         {
+            await _bridge.RequestAsync("markdown.availability", new { available = false, message = "OCR disattivato: verifica del modello in corso…" });
             var result = await _ocr.CheckAsync(model);
             if (IsDisposed || model != _markdownModel) return;
             _ocrAvailable = result.Available;
             _ocrButton.ToolTipText = result.Message;
-            await _bridge.RequestAsync("markdown.availability", new { available = result.Available, message = result.Message });
+            await _bridge.RequestAsync("markdown.availability", new { available = result.Available, message = result.Message, models = result.Models });
         }
         catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or TaskCanceledException)
         { _ocrAvailable = false; }
@@ -81,7 +82,8 @@ internal sealed partial class MainForm
             {
                 var available = await _ocr.CheckAsync(_markdownModel);
                 _ocrAvailable = available.Available;
-                await _bridge.RequestAsync("markdown.availability", new { available = available.Available, message = available.Message });
+                _ocrButton.ToolTipText = available.Message;
+                await _bridge.RequestAsync("markdown.availability", new { available = available.Available, message = available.Message, models = available.Models });
                 if (!available.Available) { _status.Text = available.Message; return; }
             }
             var state = await _bridge.RequestAsync("editor.lock");

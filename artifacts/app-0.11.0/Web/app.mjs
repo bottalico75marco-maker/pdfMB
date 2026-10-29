@@ -326,7 +326,7 @@ try {
       if (!session?.currentId || page < 1 || page > editor.pages.length) return;
       plugin('scroll').forDocument(session.currentId).scrollToPage({ pageNumber: page, behavior: 'instant' });
     } });
-  installPdfDrop({ target: document, unavailable: () => locked || working || !session || !!formSurface?.active,
+  installPdfDrop({ target: document, unavailable: () => locked || working || !!markdown?.generating || !session || !!formSurface?.active,
     open: file => transport.postMessageWithAdditionalObjects({ version: 1, kind: 'event', type: 'host.drop', payload: {} }, [file]),
     showError });
   const { default: EmbedPDF } = await import('./vendor/embedpdf.js');
@@ -430,7 +430,7 @@ try {
     const target = event.composedPath()[0];
     if (['z', 'y'].includes(key) && (document.querySelector('dialog[open]') || target?.matches?.('input,textarea'))) return;
     event.preventDefault(); event.stopImmediatePropagation();
-    if (locked || working) return;
+    if (locked || working || markdown.generating) return;
     if (formSurface.active && ['n', 'o', 'p'].includes(key)) return;
     if (key === 'n') bridge.emit('host.new');
     if (key === 'o') bridge.emit('host.open');

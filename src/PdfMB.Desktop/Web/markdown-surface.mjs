@@ -81,7 +81,10 @@ export class MarkdownSurface {
     this.input.value = value;
   }
   finish({ message }) { this.generating = false; this.status.textContent = message; this.refresh(); this.notify(); }
-  availability({ available, message }) {
+  availability({ available, message, models }) {
+    if (models) document.querySelector('#markdown-models').replaceChildren(...models.map(model => {
+      const option = document.createElement('option'); option.value = model; option.label = 'Installato'; return option;
+    }));
     this.available = available; document.querySelector('#markdown-availability').textContent = message; this.refresh();
   }
   export() { return { token: this.token, text: this.input.value, revision: this.revision, dirty: this.dirty }; }

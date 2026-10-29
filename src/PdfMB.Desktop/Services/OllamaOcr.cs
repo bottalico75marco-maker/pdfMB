@@ -13,32 +13,34 @@ internal sealed class OllamaOcr : IDisposable
         { BaseAddress = new Uri("http://127.0.0.1:11434/"), Timeout = Timeout.InfiniteTimeSpan };
     }
 
-    public async Task<(bool Available, string Message)> CheckAsync(string model, CancellationToken cancellation = default)
+    public async Task<(bool Available, string Message, string[] Models)> CheckAsync(string model, CancellationToken cancellation = default)
     {
         if (string.IsNullOrWhiteSpace(model) || model.Length > 200)
-            return (false, "OCR disattivato: scegliere un modello visivo locale.");
+            return (false, "OCR disattivato: scegliere un modello visivo locale.", []);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(TimeSpan.FromSeconds(4));
         try
         {
             using var tags = await _client.GetFromJsonAsync<JsonDocument>("api/tags", timeout.Token);
+            string[] models = tags?.RootElement.GetProperty("models").EnumerateArray()
+                .Select(item => item.GetProperty("name").GetString()).OfType<string>().ToArray() ?? [];
             string normalized = model.Contains(':') ? model : model + ":latest";
-            if (tags is null || !tags.RootElement.GetProperty("models").EnumerateArray().Any(item =>
-                item.GetProperty("name").GetString() is string name && (name == model || name == normalized)))
-                return (false, $"OCR disattivato: modello assente. Installarlo con: ollama pull {model}");
+            if (!models.Any(name => name == model || name == normalized))
+                return (false, $"OCR disattivato: modello assente. Scegliere un modello installato oppure installarlo con: ollama pull {model}", models);
             using var response = await _client.PostAsJsonAsync("api/show", new { model }, timeout.Token);
             response.EnsureSuccessStatusCode();
             using var details = await response.Content.ReadFromJsonAsync<JsonDocument>(timeout.Token);
             if (details is null || !details.RootElement.TryGetProperty("capabilities", out var capabilities) ||
                 !capabilities.EnumerateArray().Any(value => value.GetString() == "vision"))
-                return (false, "OCR disattivato: il modello installato non dichiara il supporto immagini. Aggiornare Ollama o scegliere un modello visivo.");
+                return (false, "OCR disattivato: il modello installato non dichiara il supporto immagini. Aggiornare Ollama o scegliere un modello visivo.", models);
             // Remote-only Ollama models must not enable this local OCR command.
-            if (details.RootElement.TryGetProperty("remote_model", out var remote) && !string.IsNullOrEmpty(remote.GetString()))
-                return (false, "OCR disattivato: scegliere un modello installato localmente, senza elaborazione cloud.");
-            return (true, $"OCR disponibile · {model} · immagini elaborate singolarmente sul PC.");
+            if ((details.RootElement.TryGetProperty("remote_model", out var remote) && !string.IsNullOrEmpty(remote.GetString())) ||
+                (details.RootElement.TryGetProperty("remote_host", out var host) && !string.IsNullOrEmpty(host.GetString())))
+                return (false, "OCR disattivato: scegliere un modello installato localmente, senza elaborazione cloud.", models);
+            return (true, $"OCR disponibile · {model} · immagini elaborate singolarmente sul PC.", models);
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidOperationException or KeyNotFoundException or OperationCanceledException)
-        { return (false, "OCR disattivato: Ollama locale non disponibile. Installare o avviare Ollama e verificare il modello."); }
+        { return (false, "OCR disattivato: Ollama locale non disponibile. Installare o avviare Ollama e verificare il modello.", []); }
     }
 
     public async Task<string> DescribeAsync(string model, string base64, bool hasPageText, CancellationToken cancellation)
@@ -57,7 +59,9 @@ internal sealed class OllamaOcr : IDisposable
         }, timeout.Token);
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Ollama ha restituito un errore ({(int)response.StatusCode}). Verificare modello e memoria disponibile.");
         using var result = await response.Content.ReadFromJsonAsync<JsonDocument>(timeout.Token);
-        string text = result?.RootElement.GetProperty("response").GetString()?.Trim() ?? "";
+        if (result is null || !result.RootElement.TryGetProperty("response", out var output) || output.ValueKind != JsonValueKind.String)
+            throw new InvalidDataException("Risposta OCR non valida. Verificare il modello e la versione di Ollama.");
+        string text = output.GetString()?.Trim() ?? "";
         if (text.Length == 0) throw new InvalidDataException("Il modello non ha restituito una descrizione dell’immagine.");
         if (result!.RootElement.TryGetProperty("done_reason", out var reason) && reason.GetString() == "length")
             text += "\n\n> OCR interrotto al limite di lunghezza: verificare e completare la trascrizione.";

@@ -6,6 +6,8 @@
 - [ ] Provare una scansione e un’immagine dentro un gruppo PDF; confrontare trascrizione e descrizione con l’originale. Nessuna schermata di pagina deve essere usata al posto dell’immagine estratta.
 - [ ] Modificare titoli, paragrafi e descrizioni: anteprima immediata, Annulla locale, Ctrl+S salva MD. Navigazione Pagina e clic/cursore nel Markdown seguono i marcatori di pagina.
 - [ ] Interrompere OCR, verificare il risultato parziale e salvarlo. Riaprire il PDF e il pannello per ritrovare il `.pdf.md`.
+- [ ] Durante l’OCR provare Ctrl+Z, Ctrl+Y, Ctrl+O, Ctrl+S, Ctrl+P e trascinare un altro PDF: nessuna modifica al PDF e nessun cambio documento. Interrompi deve restare disponibile.
+- [ ] Verifica modello deve proporre i nomi effettivamente installati. Scegliere un modello solo testo e poi uno visivo; verificare che l’abilitazione OCR segua il modello scelto, anche cambiandolo rapidamente.
 - [ ] Cambiare documento/uscire con MD modificato: Salva, Non salvare e Annulla; ripetere con PDF e MD entrambi modificati. Nascondere il pannello non perde il testo.
 - [ ] Modificare il `.md` da un altro editor: Salva MD deve rifiutare il conflitto. Salva MD con nome conserva entrambe le versioni. Provare PDF senza permesso di copia.
 
