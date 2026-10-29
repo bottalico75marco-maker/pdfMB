@@ -6,6 +6,7 @@
 
 | Riferimento | Stato |
 | --- | --- |
+| **0.11.0** | Conversione in `nomefile.pdf.md`, confronto PDF/Markdown affiancato, modifica e anteprima live. OCR e descrizione delle immagini con Ollama locale: immagini estratte singolarmente e inviate in sequenza; comando con icona disabilitato senza servizio e modello visivo installato. Build locale in `artifacts/app-0.11.0`. |
 | **0.10.7** | Lucchetto aperto e comando Rimuovi password quando il PDF è protetto; clic per rimuovere la protezione, da confermare con Salva. Barra principale, Strumenti e modulo sincronizzati. Build completa nella [Release 0.10.7](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.10.6) e in `artifacts/app-0.10.7`. |
 | **0.10.6** | Lucchetto aperto e comando Rimuovi password quando il PDF è protetto; clic per rimuovere la protezione, da confermare con Salva. Barra principale, Strumenti e modulo sincronizzati. Build completa nella [Release 0.10.6](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.10.6) e in `artifacts/app-0.10.6`. |
 | **0.10.5** | Miniature del viewer e di Gestisci pagine complete di testo, data/ora e pulsanti del modulo, anche su pagine senza contenuti statici. Build locale in `artifacts/app-0.10.5`. |
@@ -26,7 +27,7 @@
 | **0.8.0** | Versione storica con strumenti di annotazione, modifica oggetti, stampa, oscuramento e guida Windows, confluita in `main`. |
 | **0.6.5** | Versione storica con correzioni del salvataggio delle caselle di testo; cartella binaria conservata nel repository. |
 
-Questo README presenta le funzioni aggiornate alla **0.10.6**. Tutti i branch sono stati consolidati in `main`, unico ramo di sviluppo del progetto, conservando la cronologia completa. Per usare le nuove funzioni scegliere la build corrispondente.
+La build locale **0.11.0** aggiunge il confronto Markdown e l’OCR opzionale: istruzioni in [Markdown e Ollama](docs/MARKDOWN.md). Le funzioni precedenti sono descritte di seguito. Tutti i branch sono stati consolidati in `main`, unico ramo di sviluppo del progetto, conservando la cronologia completa. Per usare le nuove funzioni scegliere la build corrispondente.
 
 **Collegamenti:** [Guida Windows](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/GUIDA-WINDOWS.html) · [Checklist unica delle prove](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/CHECKLIST-MANUALE.md) · [Build Windows su GitHub Actions](https://github.com/bottalico75marco-maker/pdfMB/actions) · [Architettura](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/ARCHITETTURA.md)
 

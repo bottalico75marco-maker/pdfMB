@@ -6,6 +6,26 @@ body { display: flex; flex-direction: column; }
 #viewer-shell { position: relative; flex: 1; min-width: 0; height: 100%; overflow: hidden; }
 #viewer { flex: 1; height: 100%; min-width: 0; overflow: hidden; }
 embedpdf-container { display: block; height: 100%; }
+#markdown-panel { flex: 0 0 48%; min-width: 340px; max-width: 70%; display: flex; flex-direction: column; gap: 7px; padding: 12px; background: #fff; border-left: 2px solid #bacbdf; overflow: auto; }
+#markdown-panel header { display: flex; align-items: center; gap: 10px; }
+#markdown-panel header button { margin-left: auto; }
+#markdown-panel button { margin: 0; padding: 6px 10px; font-size: 12px; }
+#markdown-panel label, #markdown-panel select, #markdown-panel input { font: 12px "Segoe UI", sans-serif; }
+#markdown-panel input:not([type="checkbox"]) { padding: 5px; border: 1px solid #aebdd0; border-radius: 4px; width: 190px; }
+.markdown-actions, .markdown-options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#markdown-name { overflow-wrap: anywhere; }
+#markdown-modified { font-size: 11px; color: #9a5200; }
+#markdown-status { font-size: 12px; margin: 0; }
+.markdown-editor-label { color: #63738a; }
+#markdown-source { flex: 1 0 32%; min-height: 130px; width: 100%; resize: vertical; padding: 10px; border: 1px solid #aebdd0; border-radius: 4px; font: 13px/20px Consolas, monospace; tab-size: 2; }
+#markdown-preview { flex: 1 0 25%; min-height: 100px; overflow: auto; border-top: 1px solid #d7e0eb; padding: 10px 5px; overflow-wrap: anywhere; }
+#markdown-preview p { color: inherit; line-height: 1.55; }
+#markdown-preview h1, #markdown-preview h2, #markdown-preview h3 { margin: 14px 0 8px; }
+#markdown-preview pre { white-space: pre-wrap; background: #eef1f5; padding: 10px; }
+#markdown-preview table { border-collapse: collapse; font-size: 13px; }
+#markdown-preview td, #markdown-preview th { border: 1px solid #cbd5e1; padding: 5px; }
+#markdown-preview blockquote { border-left: 3px solid #80ade0; padding-left: 10px; margin-left: 0; color: #63738a; }
+#markdown-preview [data-page] { cursor: pointer; border-top: 1px solid #d7e0eb; margin-top: 12px; }
 [hidden] { display: none !important; }
 #welcome { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f6f8fb; }
 .welcome-logo { display: block; width: 88px; height: 88px; object-fit: contain; flex: none; margin-bottom: 24px; }

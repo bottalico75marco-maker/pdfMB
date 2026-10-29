@@ -97,6 +97,19 @@
       <div id="tools-preview" hidden><canvas id="tools-canvas" hidden aria-hidden="true"></canvas></div>
       <div id="text-surface" aria-label="Modifica caselle di testo sulla pagina" tabindex="0" hidden></div>
     </main>
+    <aside id="markdown-panel" aria-label="Confronto PDF e Markdown" hidden>
+      <header><h2>Markdown</h2><span id="markdown-modified" role="status"></span><button id="markdown-close" class="secondary" title="Nascondi Markdown; le modifiche restano in memoria">Chiudi</button></header>
+      <small id="markdown-name"></small>
+      <div class="markdown-actions"><button id="markdown-generate">Converti testo in MD</button><button id="markdown-ocr" disabled>OCR e descrivi foto</button><button id="markdown-cancel" class="secondary" hidden>Interrompi</button><button id="markdown-save">Salva MD</button><button id="markdown-saveAs" class="secondary">Salva MD con nome</button></div>
+      <div class="markdown-options"><label>Modello Ollama<input id="markdown-model" value="qwen3-vl:2b-instruct" list="markdown-models" spellcheck="false"></label><button id="markdown-check" class="secondary">Verifica modello</button><datalist id="markdown-models"><option value="qwen3-vl:2b-instruct"><option value="qwen3-vl:4b-instruct"><option value="minicpm-v"></datalist></div>
+      <small id="markdown-availability" role="status">OCR disattivato: verifica di Ollama e del modello locale in corso.</small>
+      <small>Ogni immagine viene estratta e inviata singolarmente al modello locale. Le modifiche al Markdown si salvano con Salva MD.</small>
+      <div class="markdown-actions"><label for="markdown-page">Confronta</label><select id="markdown-page" aria-label="Pagina da confrontare"></select><label><input id="markdown-show-preview" type="checkbox" checked>Anteprima live</label></div>
+      <p id="markdown-status" role="status" aria-live="polite"></p>
+      <label class="markdown-editor-label" for="markdown-source">Testo Markdown · Ctrl+S salva MD · le modifiche riguardano il file MD</label>
+      <textarea id="markdown-source" spellcheck="false" aria-label="Modifica Markdown"></textarea>
+      <section id="markdown-preview" aria-label="Anteprima Markdown"></section>
+    </aside>
   </div>
   <div id="page-menu" popover="auto" role="menu" aria-labelledby="page-menu-title" tabindex="-1">
     <div id="page-menu-title" class="page-menu-title"></div>

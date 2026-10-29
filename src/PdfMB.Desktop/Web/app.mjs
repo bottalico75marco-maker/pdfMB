@@ -1,4 +1,5 @@
 import { FormSurface } from './form-surface.mjs';
+import { MarkdownSurface } from './markdown-surface.mjs';
 import { FormReader } from './form-reader.mjs';
 import { installCommandIcons } from './command-icons.mjs';
 import { WorkbenchSurface } from './workbench-surface.mjs';
@@ -16,7 +17,7 @@ import { italian } from './italian.mjs';
 const welcome = document.querySelector('#welcome');
 const openButton = document.querySelector('#open');
 const transport = window.chrome?.webview;
-let bridge, registry, session, editor, panel, textSurface, highlightSurface, workbench, formSurface, formReader;
+let bridge, registry, session, editor, panel, textSurface, highlightSurface, workbench, formSurface, formReader, markdown;
 let locked = false, working = false, panelOpen = false, nextView = null, strategy = 'vertical';
 let deferredFormView = null;
 let tail = Promise.resolve();
@@ -33,7 +34,8 @@ function editorState() {
   return { ...(editor?.state() ?? { token: null, revision: 0, dirty: false, readOnly: true,
     canEdit: false, canText: false, canUndo: false, canRedo: false, blockedReason: '' }),
     dirty: !!editor?.state().dirty || !!textSurface?.changed() || !!workbench?.pendingShape || !!formSurface?.pending || !!formSurface?.pendingValue || !!formReader?.changed,
-    busy: locked || working || !!textSurface?.busy || !!workbench?.busy || workbench?.drag != null || !!formSurface?.drag || !!formSurface?.busy, formMode: !!formSurface?.active, textEditing: !!textSurface?.textEditing || !!formSurface?.textEditing || !!formReader?.textEditing,
+    busy: locked || working || !!markdown?.generating || !!textSurface?.busy || !!workbench?.busy || workbench?.drag != null || !!formSurface?.drag || !!formSurface?.busy, formMode: !!formSurface?.active, textEditing: !!markdown?.textEditing || !!textSurface?.textEditing || !!formSurface?.textEditing || !!formReader?.textEditing,
+    markdownDirty: !!markdown?.dirty, markdownEditing: !!markdown?.textEditing,
     textMode: !!textSurface?.active, highlightMode: !!highlightSurface?.active,
     editorOpen: panelOpen && !!editor };
 }
@@ -66,6 +68,7 @@ function notify() {
   panel?.refresh(panelOpen && !!editor);
   textSurface?.sync();
   formReader?.sync();
+  markdown?.sync(editor);
   bridge.emit('editor.state', state);
   bridge.emit('viewer.state', viewerState());
   return state;
@@ -82,7 +85,7 @@ async function withWorking(action) {
   finally { working = false; notify(); }
 }
 function uiAction(action) {
-  if (locked || working) return;
+  if (locked || working || markdown?.generating) return;
   enqueue(() => withWorking(action)).catch(showError);
 }
 
@@ -148,6 +151,7 @@ async function openDocument(source, name, unsaved = false, password = '') {
     candidate.unsavedDocument = unsaved;
     candidate.password = candidate.savedPassword = opened.protected ? password : '';
     editor?.dispose(); editor = candidate;
+    markdown?.reset();
     welcome.hidden = true;
     return notify();
   } catch (error) { candidate.dispose(); throw error; }
@@ -157,6 +161,28 @@ try {
   installCommandIcons();
   if (!transport) throw new Error('Aprire PDF MB tramite l’applicazione Windows.');
   const handlers = {
+    'markdown.open': async payload => {
+      if (!editor || payload.token !== editor.token) throw new Error('Documento cambiato.');
+      if (formSurface.active) await formSurface.close();
+      if (textSurface.active) textSurface.toggle(false, true);
+      highlightSurface.toggle(false); workbench.close(); panelOpen = false;
+      plugin('ui').forDocument(session.currentId).closeSidebarSlot('left', 'main');
+      markdown.open({ ...payload, name: editor.name, pageCount: editor.pages.length, pdfRevision: editor.revision });
+      return notify();
+    },
+    'markdown.begin': payload => { markdown.begin(payload); return { token: editor.token, pageCount: editor.pages.length }; },
+    'markdown.page': async payload => {
+      if (!editor || payload.token !== editor.token || payload.revision !== editor.revision) throw new Error('Il PDF è cambiato durante la conversione.');
+      const data = await editor.markdownPage(payload.pageIndex, payload.imageIndex);
+      return payload.imageIndex === undefined ? data : { base64: printImageBase64(data) };
+    },
+    'markdown.append': payload => { markdown.append(payload); return {}; },
+    'markdown.image': payload => { markdown.appendImage(payload); return {}; },
+    'markdown.progress': payload => { markdown.status.textContent = payload.message; return {}; },
+    'markdown.finish': payload => { markdown.finish(payload); return notify(); },
+    'markdown.export': () => markdown.export(),
+    'markdown.saved': payload => { markdown.markSaved(payload); return notify(); },
+    'markdown.availability': payload => { markdown.availability(payload); return {}; },
     'stamps.set': payload => workbench.setCustomStamps(payload),
     'stamps.error': payload => workbench.stampError(payload.message),
     'editor.lock': async () => {
@@ -263,6 +289,7 @@ try {
       if (!locked) throw new Error('Operazione documento non sincronizzata con l’applicazione.');
       await session.close();
       editor?.dispose(); editor = null;
+      markdown.reset();
       panelOpen = false;
       panel.clear();
       welcome.hidden = false;
@@ -293,6 +320,12 @@ try {
   };
   bridge = createBridge(transport, Object.fromEntries(Object.entries(handlers)
     .map(([name, handler]) => [name, payload => enqueue(() => handler(payload))])));
+  markdown = new MarkdownSurface({ emit: (type, payload) => bridge.emit(type, payload), notify,
+    unavailable: () => locked || working,
+    navigate: page => {
+      if (!session?.currentId || page < 1 || page > editor.pages.length) return;
+      plugin('scroll').forDocument(session.currentId).scrollToPage({ pageNumber: page, behavior: 'instant' });
+    } });
   installPdfDrop({ target: document, unavailable: () => locked || working || !session || !!formSurface?.active,
     open: file => transport.postMessageWithAdditionalObjects({ version: 1, kind: 'event', type: 'host.drop', payload: {} }, [file]),
     showError });
@@ -362,12 +395,12 @@ try {
     unavailable: () => locked || working || !!textSurface?.active || !!workbench?.active || !!formSurface?.active, showError });
   formReader = new FormReader({ editor: () => editor, plugin, session, notify, showError,
     unavailable: () => locked || working,
-    suspended: () => !!formSurface?.active || !!textSurface?.active || !!workbench?.active || !!highlightSurface?.active,
+    suspended: () => !!markdown?.active || !!formSurface?.active || !!textSurface?.active || !!workbench?.active || !!highlightSurface?.active,
     read: action => enqueue(action), run: action => enqueue(() => withWorking(action)), emit: (type, payload) => bridge.emit(type, payload) });
   plugin('scroll').onLayoutReady(event => layouts.add(event.documentId));
   plugin('document-manager').onDocumentClosed(id => layouts.delete(id));
   plugin('scroll').onStateChange(state => { strategy = state.strategy; });
-  plugin('scroll').onPageChange(() => bridge.emit('viewer.state', viewerState()));
+  plugin('scroll').onPageChange(() => { const view = viewerState(); markdown.showPage(view.page); bridge.emit('viewer.state', view); });
   plugin('zoom').onZoomChange(() => bridge.emit('viewer.state', viewerState()));
   plugin('rotate').onRotateChange(() => { textSurface.layout(); bridge.emit('viewer.state', viewerState()); });
   document.querySelector('#new-document').disabled = false;
@@ -402,13 +435,14 @@ try {
     if (key === 'n') bridge.emit('host.new');
     if (key === 'o') bridge.emit('host.open');
     if (key === 'p') bridge.emit('host.print');
-    if (key === 's') bridge.emit(event.shiftKey ? 'host.saveAs' : 'host.save');
+    if (key === 's') bridge.emit(markdown.textEditing ? (event.shiftKey ? 'host.markdownSaveAs' : 'host.markdownSave') : (event.shiftKey ? 'host.saveAs' : 'host.save'));
     if (key === 'z' || key === 'y') enqueue(async () => {
       await formSurface.flush();
       if (await textSurface.flush()) await withWorking(async () => { await (key === 'z' ? editor?.undo() : editor?.redo()); await formSurface.refresh(); });
     }).catch(showError);
   }, true);
   bridge.emit('viewer.ready');
+  markdown.checkModel();
   notify();
 } catch (error) {
   showError(error);

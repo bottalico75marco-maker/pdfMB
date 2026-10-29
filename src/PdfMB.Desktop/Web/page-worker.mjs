@@ -1,4 +1,5 @@
 import { createFormTools } from './form-engine.mjs';
+import { extractMarkdownPage, extractMarkdownImage } from './markdown-engine.mjs';
 import { transformPdfSecurity } from './pdf-security.mjs';
 import { paperSize } from './paper-sizes.mjs';
 import { rewriteFormDocument, FORM_EMAIL_ACTION_VERSION, FORM_VALIDATION_VERSION } from './form-document.mjs';
@@ -463,6 +464,13 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
         const scale = Number.isFinite(payload.scale) ? Math.max(1, Math.min(4, payload.scale)) : 2;
         return { image: textTools.render(page, 2800, scale, document),
           position: workbenchTools.objects(page, false).find(item => item.index === payload.input.index)?.position };
+      });
+    }
+    else if (['markdown-page', 'markdown-image'].includes(type) && source) {
+      result = withPage(payload.buffer, payload.pageIndex, (page, document) => {
+        const permissions = api.FPDF_GetDocPermissions(document) >>> 0;
+        if (!(permissions & 16)) throw new Error('Il PDF non consente la copia e l’estrazione del contenuto.');
+        return type === 'markdown-page' ? extractMarkdownPage(api, page) : extractMarkdownImage(api, document, page, payload.imageIndex);
       });
     }
     else if (type === 'output-page' && source) {

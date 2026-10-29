@@ -6,7 +6,7 @@ using PdfMB.Desktop.Services;
 
 namespace PdfMB.Desktop;
 
-internal sealed class MainForm : Form
+internal sealed partial class MainForm : Form
 {
     private static readonly string AppTitle = $"PDF MB {Application.ProductVersion.Split('+')[0]}";
     private readonly WebView2 _webView = new() { Dock = DockStyle.Fill };
@@ -34,7 +34,7 @@ internal sealed class MainForm : Form
     private ToolStrip _mainToolbar = null!;
     private bool _formMode, _canFormDesign;
     private bool _untitled;
-    private bool _canContent, _canPrint;
+    private bool _canContent, _canPrint, _canCopy;
     private readonly ToolStripButton _undo = new("Annulla") { ToolTipText = "Annulla (Ctrl+Z)" };
     private readonly ToolStripButton _redo = new("Ripeti") { ToolTipText = "Ripeti (Ctrl+Y)" };
     private readonly ToolStripButton _close = new("Chiudi documento");
@@ -53,7 +53,7 @@ internal sealed class MainForm : Form
     private string? _openedPath, _token;
     private bool _hostBusy = true, _editorBusy, _viewerFaulted, _initialized, _closeApproved;
     private bool _dirty, _readOnly, _canEdit, _canText, _textEditing, _canUndo, _canRedo;
-    private bool IsBusy => _hostBusy || _editorBusy || _viewerFaulted;
+    private bool IsBusy => _hostBusy || _editorBusy || _viewerFaulted || _markdownConverting;
 
     public MainForm(string[] args)
     {
@@ -77,7 +77,7 @@ internal sealed class MainForm : Form
         _mainToolbar = toolbar;
         toolbar.Items.AddRange([new ToolStripLabel(AppTitle) { Font = new Font("Segoe UI", 12, FontStyle.Bold) },
             new ToolStripSeparator(), _new, _open, _recent, _save, _protect, _saveAs, new ToolStripSeparator(),
-            _manage, _text, _forms, _highlight, _highlightColor, _tools, _print, _undo, _redo, new ToolStripSeparator(), _close, _help]);
+            _manage, _text, _forms, _highlight, _highlightColor, _tools, _markdownButton, _ocrButton, _print, _undo, _redo, new ToolStripSeparator(), _close, _help]);
         var statusBar = new StatusStrip { BackColor = Color.White, SizingGrip = false };
         statusBar.Items.AddRange([_status, _pages]);
         Controls.Add(_webView);
@@ -116,6 +116,7 @@ internal sealed class MainForm : Form
         _undo.Click += async (_, _) => await EditorCommandAsync("editor.undo");
         _redo.Click += async (_, _) => await EditorCommandAsync("editor.redo");
         _close.Click += async (_, _) => await RunHostAsync(CloseDocumentCoreAsync);
+        InitializeMarkdown();
         _recent.DropDownOpening += (_, _) => PopulateRecentFiles();
         var guide = new ToolStripMenuItem("Guida Windows") { ShortcutKeyDisplayString = "F1" };
         guide.Click += (_, _) => OpenWindowsGuide();
@@ -198,6 +199,11 @@ internal sealed class MainForm : Form
                 case "host.insertBlank": await RunHostAsync(InsertBlankPageCoreAsync); break;
                 case "host.save": await RunHostAsync(async () => { await SaveCoreAsync(false); }); break;
                 case "host.saveAs": await RunHostAsync(async () => { await SaveCoreAsync(true); }); break;
+                case "host.markdownCheck": await CheckOcrAsync(payload.GetProperty("model").GetString() ?? ""); break;
+                case "host.markdownGenerate": await ConvertMarkdownAsync(payload.GetProperty("vision").GetBoolean()); break;
+                case "host.markdownSave": await RunHostAsync(async () => { await SaveMarkdownCoreAsync(false); }); break;
+                case "host.markdownSaveAs": await RunHostAsync(async () => { await SaveMarkdownCoreAsync(true); }); break;
+                case "host.markdownCancel": _markdownCancellation?.Cancel(); break;
                 case "host.protect": await RunHostAsync(ProtectCoreAsync); break;
                 case "host.formEmail": await RunHostAsync(() => FormEmailCoreAsync(payload)); break;
                 case "host.insert": await RunHostAsync(InsertPagesCoreAsync); break;
@@ -232,12 +238,15 @@ internal sealed class MainForm : Form
         if (!acceptNew && token != _token) return;
         _token = token;
         _dirty = state.GetProperty("dirty").GetBoolean();
+        _markdownDirty = state.TryGetProperty("markdownDirty", out var mdDirty) && mdDirty.GetBoolean();
+        _markdownEditing = state.TryGetProperty("markdownEditing", out var mdEditing) && mdEditing.GetBoolean();
         _readOnly = state.GetProperty("readOnly").GetBoolean();
         _canEdit = state.GetProperty("canEdit").GetBoolean();
         _passwordProtected = state.TryGetProperty("passwordProtected", out var passwordProtected) && passwordProtected.GetBoolean();
         _canText = state.GetProperty("canText").GetBoolean();
         _canContent = state.TryGetProperty("canContent", out var content) && content.GetBoolean();
         _canPrint = state.TryGetProperty("canPrint", out var print) && print.GetBoolean();
+        _canCopy = state.TryGetProperty("canCopy", out var copy) && copy.GetBoolean();
         _formMode = state.TryGetProperty("formMode", out var formMode) && formMode.GetBoolean();
         _canFormDesign = state.TryGetProperty("canFormDesign", out var canForm) && canForm.GetBoolean();
         _textEditing = state.GetProperty("textEditing").GetBoolean();
@@ -267,6 +276,8 @@ internal sealed class MainForm : Form
         _protectMenu.ToolTipText = _protectMenu.AccessibleName = protectionAction;
         _protectMenu.Image = _protect.Image;
         _saveAs.Enabled = _manage.Enabled = _close.Enabled = hasDocument;
+        _markdownButton.Enabled = hasDocument && !_formMode && _canCopy;
+        _ocrButton.Enabled = hasDocument && !_formMode && _canCopy && _ocrAvailable;
         _saveAs.Text = _readOnly ? "Salva copia…" : "Salva con nome…";
         _saveAs.ToolTipText = _saveAs.AccessibleName = _saveAs.Text;
         _undo.Enabled = hasDocument && _canUndo;
@@ -280,7 +291,7 @@ internal sealed class MainForm : Form
         _highlight.Enabled = _highlightColor.Enabled = hasDocument && _canText;
         _text.ToolTipText = _canText ? "Modifica le caselle di testo direttamente sulla pagina" : "Testo non disponibile: controllare i permessi del documento";
         _redo.Enabled = hasDocument && _canRedo;
-        Text = _document is null ? AppTitle : $"{(_dirty ? "* " : "")}{_document.Name} — {AppTitle}";
+        Text = _document is null ? AppTitle : $"{(_dirty || _markdownDirty ? "* " : "")}{_document.Name} — {AppTitle}";
         ApplyCaptionColor();
         UseWaitCursor = _hostBusy || _editorBusy;
     }
@@ -294,9 +305,9 @@ internal sealed class MainForm : Form
 
     private void ApplyCaptionColor()
     {
-        if (!IsHandleCreated || _captionModified == _dirty) return;
-        WindowCaption.SetModifiedColor(Handle, _dirty);
-        _captionModified = _dirty;
+        if (!IsHandleCreated || _captionModified == (_dirty || _markdownDirty)) return;
+        WindowCaption.SetModifiedColor(Handle, _dirty || _markdownDirty);
+        _captionModified = _dirty || _markdownDirty;
     }
 
     private async Task RunHostAsync(Func<Task> action)
@@ -351,6 +362,8 @@ internal sealed class MainForm : Form
     {
         if (_formMode && (keyData == (Keys.Control | Keys.O) || keyData == (Keys.Control | Keys.P) || keyData == (Keys.Control | Keys.N))) return true;
         if (keyData == Keys.F1) { OpenWindowsGuide(); return true; }
+        if (_markdownEditing && (keyData == (Keys.Control | Keys.S) || keyData == (Keys.Control | Keys.Shift | Keys.S)))
+        { _ = RunHostAsync(async () => { await SaveMarkdownCoreAsync(keyData.HasFlag(Keys.Shift)); }); return true; }
         if (keyData == (Keys.Control | Keys.P)) { _ = RunHostAsync(PrintCoreAsync); return true; }
         // The text field keeps its own clipboard and local undo/redo shortcuts.
         if (_textEditing) return base.ProcessCmdKey(ref msg, keyData);
@@ -621,6 +634,7 @@ internal sealed class MainForm : Form
 
     private async Task<bool> ConfirmUnsavedAsync()
     {
+        if (_markdownDirty && !await ConfirmMarkdownUnsavedAsync()) return false;
         if (!_dirty || _document is null) return true;
         return UnsavedChangesDialog.Show(this, _document.Name) switch
         {
@@ -639,6 +653,7 @@ internal sealed class MainForm : Form
         _openedPath = _token = null;
         _dirty = _readOnly = _canEdit = _canText = _textEditing = _canUndo = _canRedo = _passwordProtected = false;
         _canContent = _canPrint = false;
+        _canCopy = _markdownDirty = _markdownEditing = false;
         _manage.Checked = false;
         _text.Checked = _highlight.Checked = false;
         _status.Text = "Pronto · Apri un documento PDF";
@@ -651,7 +666,7 @@ internal sealed class MainForm : Form
         e.Cancel = true;
         if (_viewerFaulted)
         {
-            if (_dirty && MessageBox.Show(this, "Il visualizzatore non risponde. Chiudere perdendo le modifiche non salvate?",
+            if ((_dirty || _markdownDirty) && MessageBox.Show(this, "Il visualizzatore non risponde. Chiudere perdendo le modifiche non salvate?",
                 "Chiudi PDF MB", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             _closeApproved = true;
             Close();

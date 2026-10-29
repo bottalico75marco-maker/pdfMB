@@ -46,6 +46,11 @@ internal sealed record PdfFile(string Path, byte[] Bytes)
     public static async Task WriteAtomicAsync(string destination, byte[] bytes, FileStamp expected)
     {
         Validate(bytes);
+        await WriteDataAtomicAsync(destination, bytes, expected);
+    }
+
+    internal static async Task WriteDataAtomicAsync(string destination, byte[] bytes, FileStamp expected)
+    {
         string path = System.IO.Path.GetFullPath(destination);
         string temporaryPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!,
             $".pdfmb-{Guid.NewGuid():N}.tmp");

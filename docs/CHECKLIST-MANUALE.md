@@ -1,3 +1,14 @@
+# Markdown e OCR locale 0.11.0
+
+- [ ] Aprire un PDF con testo e due foto: Confronta Markdown mostra PDF a sinistra e editor/anteprima a destra. Converti testo produce `nomefile.pdf.md` in UTF-8, con sezioni delle immagini.
+- [ ] Senza Ollama, con servizio fermo, modello assente o modello solo testo: OCR con icona di scansione disattivato sia nella barra principale sia nel pannello. La conversione del testo funziona.
+- [ ] Installare e avviare un modello visivo locale: Verifica modello abilita OCR. Le due immagini vengono estratte e inviate una alla volta, con descrizioni distinte nella pagina corretta.
+- [ ] Provare una scansione e un’immagine dentro un gruppo PDF; confrontare trascrizione e descrizione con l’originale. Nessuna schermata di pagina deve essere usata al posto dell’immagine estratta.
+- [ ] Modificare titoli, paragrafi e descrizioni: anteprima immediata, Annulla locale, Ctrl+S salva MD. Navigazione Pagina e clic/cursore nel Markdown seguono i marcatori di pagina.
+- [ ] Interrompere OCR, verificare il risultato parziale e salvarlo. Riaprire il PDF e il pannello per ritrovare il `.pdf.md`.
+- [ ] Cambiare documento/uscire con MD modificato: Salva, Non salvare e Annulla; ripetere con PDF e MD entrambi modificati. Nascondere il pannello non perde il testo.
+- [ ] Modificare il `.md` da un altro editor: Salva MD deve rifiutare il conflitto. Salva MD con nome conserva entrambe le versioni. Provare PDF senza permesso di copia.
+
 # Logo schermata iniziale 0.9.5
 
 - [ ] Avviare `artifacts/app-0.9.5/PdfMB.Desktop.exe` senza documenti: al posto del vecchio riquadro PDF compare il biscione nero/azzurro, centrato sopra PDF MB · DOCUMENTI.

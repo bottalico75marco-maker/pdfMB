@@ -7,6 +7,7 @@ internal static class Program
     private static void Main()
     {
         static void Check(bool success, string message) { if (!success) throw new Exception(message); }
+        MarkdownChecks.RunAsync().GetAwaiter().GetResult();
         // Check the real native layout without showing/starting the application.
         var desktop = System.Reflection.Assembly.Load("PdfMB.Desktop");
         var mainType = desktop.GetType("PdfMB.Desktop.MainForm")!;

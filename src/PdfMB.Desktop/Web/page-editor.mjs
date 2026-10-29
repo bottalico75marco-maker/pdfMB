@@ -106,6 +106,7 @@ export class PageEditor {
       canFormDesign: this.canFormDesign, canFormFill: this.canEdit && !!this.policy.canFormFill,
       canEdit: this.canEdit, canText: this.canText, canContent: this.canEdit && !!this.policy.canContent,
       canPrint: !!this.policy.canPrint, blockedReason: this.blockedReason,
+      canCopy: !!this.worker?.alive && !!(this.policy.permissions & 16),
       canUndo: this.canEdit && this.past.length > 0, canRedo: this.canEdit && this.future.length > 0 };
   }
   snapshot() {
@@ -344,6 +345,12 @@ export class PageEditor {
       throw new Error('Esportazione non consentita.');
     const buffer = this.bytes.slice(0);
     return this.worker.request('output-page', { buffer, pageIndex, pageId: this.pages[pageIndex].id, kind }, [buffer]);
+  }
+  async markdownPage(pageIndex, imageIndex) {
+    if (!this.pages[pageIndex] || !this.worker?.alive) throw new Error('Pagina non disponibile per la conversione.');
+    if (!(this.policy.permissions & 16)) throw new Error('Il PDF non consente la copia e l’estrazione del contenuto.');
+    const buffer = this.bytes.slice(0);
+    return this.worker.request(imageIndex === undefined ? 'markdown-page' : 'markdown-image', { buffer, pageIndex, imageIndex }, [buffer]);
   }
   async changeWorkbench({ pageIndex, token, revision, input }) {
     if (token !== this.token || revision !== this.revision || !this.pages[pageIndex]) throw new Error('Il documento è cambiato. Riaprire gli strumenti.');

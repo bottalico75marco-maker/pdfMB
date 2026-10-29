@@ -30,6 +30,8 @@ internal static class CommandIcons
                 break;
             case "pages": Rect(7, 3, 14, 16); Poly(new(3, 7), new(3, 22), new(17, 22)); break;
             case "text": Rect(2, 4, 20, 16); Line(8, 8, 16, 8); Line(12, 8, 12, 16); Line(9, 16, 15, 16); break;
+            case "markdown": Rect(2, 4, 20, 16); Poly(new(5, 16), new(5, 8), new(8, 12), new(11, 8), new(11, 16)); Line(17, 8, 17, 16); Poly(new(14, 13), new(17, 16), new(20, 13)); break;
+            case "ocr": Poly(new(8, 3), new(3, 3), new(3, 8)); Poly(new(16, 3), new(21, 3), new(21, 8)); Poly(new(3, 16), new(3, 21), new(8, 21)); Poly(new(16, 21), new(21, 21), new(21, 16)); Line(7, 8, 17, 8); Line(12, 8, 12, 17); Line(9, 17, 15, 17); break;
             case "forms": Sheet(); Rect(8, 8, 8, 3); Rect(8, 15, 4, 4); Poly(new(8, 17), new(10, 19), new(13, 14)); Line(15, 16, 17, 16); break;
             case "highlight": Poly(new(3, 16), new(14, 4), new(20, 10), new(9, 22), new(3, 22), new(3, 16)); Line(10, 9, 16, 15); break;
             case "tools": g.DrawArc(pen, 4, 2, 12, 12, 15, 280); Poly(new(7, 12), new(2, 20), new(5, 23), new(13, 15)); Line(16, 3, 12, 7); break;
@@ -63,7 +65,7 @@ internal static class CommandIcons
         "Nuovo" or "Nuovo documento" or "Crea" => "new", "Apri PDF" or "Apri" => "open", "Recenti" => "recent", "Applica" => "apply",
         "Salva" => "save", "Salva con nome" or "Salva copia" => "saveAs", "Non salvare" => "saveOff",
         "Gestisci pagine" or "Pagine" => "pages", "Testo" => "text", "Evidenziatore" => "highlight",
-        "Strumenti" => "tools", "Progetta modulo" or "Moduli" => "forms", "Stampa" => "print",
+        "Strumenti" => "tools", "Progetta modulo" or "Moduli" => "forms", "Stampa" => "print", "Confronta Markdown" => "markdown", "OCR e descrivi foto" => "ocr",
         "Annulla" => "cancel", "Ripeti" => "redo", "Chiudi documento" => "exit", "Aiuto" => "help",
         "Nota adesiva" => "note", "Rettangolo" => "square", "Ellisse" => "circle", "Linea" => "line", "Penna" => "ink",
         "Timbri" => "stamp", "Immagine" => "image", "Modifica testo e oggetti" => "objects", "Oscuramento effettivo" => "redact",

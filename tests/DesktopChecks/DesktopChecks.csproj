@@ -12,6 +12,9 @@
     <Compile Include="../../src/PdfMB.Desktop/Services/PdfDropFiles.cs" Link="PdfDropFiles.cs" />
     <Compile Include="../../src/PdfMB.Desktop/Services/PngFile.cs" Link="PngFile.cs" />
     <Compile Include="../../src/PdfMB.Desktop/Services/StampLibrary.cs" Link="StampLibrary.cs" />
+    <Compile Include="../../src/PdfMB.Desktop/Services/PdfFile.cs" Link="PdfFile.cs" />
+    <Compile Include="../../src/PdfMB.Desktop/Services/MarkdownFile.cs" Link="MarkdownFile.cs" />
+    <Compile Include="../../src/PdfMB.Desktop/Services/OllamaOcr.cs" Link="OllamaOcr.cs" />
   </ItemGroup>
   <Target Name="RemoveUnusedWpfReference" BeforeTargets="ResolveAssemblyReferences">
     <ItemGroup>

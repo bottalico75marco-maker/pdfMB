@@ -8,6 +8,8 @@ export function installCommandIcons() {
     'tools-reset-preview': 'undo', 'tools-apply': 'apply', 'tools-delete': 'delete',
     'text-context-copy': 'copy', 'text-context-paste': 'paste', 'move-confirm': 'move', 'delete-confirm': 'delete'
   };
+  Object.assign(commands, { 'markdown-generate': 'markdown', 'markdown-ocr': 'ocr', 'markdown-save': 'save',
+    'markdown-saveAs': 'saveAs', 'markdown-cancel': 'cancel', 'markdown-close': 'exit', 'markdown-check': 'preview' });
   for (const [id, kind] of Object.entries(commands)) {
     const button = document.getElementById(id);
     commandIcon(button, kind, button.getAttribute('aria-label') || button.textContent.trim(), button.getAttribute('role') === 'menuitem');
