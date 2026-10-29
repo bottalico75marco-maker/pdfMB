@@ -168,10 +168,16 @@ try {
   await assert.rejects(() => request('markdown.saved', { revision: correctedMarkdown.revision - 1, path: 'smoke.pdf.md' }), /cambiato/);
   await request('markdown.saved', { revision: correctedMarkdown.revision, path: 'smoke.pdf.md' });
   assert.equal((await request('markdown.export')).dirty, false);
+  // Scrolling the viewer reports its page more than once as the layout settles,
+  // so wait for the comparison to reach the chosen page rather than for one
+  // particular message to be the latest.
+  const comparedPage = expected => page.waitForFunction(wanted =>
+    __messages.filter(m => m.type === 'viewer.state').some(m => m.payload.page === wanted), expected);
   await page.locator('#markdown-page').selectOption('2');
-  await page.waitForFunction(() => __messages.filter(m => m.type === 'viewer.state').at(-1)?.payload.page === 2);
+  await comparedPage(2);
+  await page.evaluate(() => { window.__messages = __messages.filter(m => m.type !== 'viewer.state'); });
   await page.locator('#markdown-page').selectOption('1');
-  await page.waitForFunction(() => __messages.filter(m => m.type === 'viewer.state').at(-1)?.payload.page === 1);
+  await comparedPage(1);
   await page.screenshot({ path: fileURLToPath(new URL('../artifacts/test/markdown-comparison.png', import.meta.url)) });
   await page.locator('#markdown-close').click();
   await request('editor.lock'); await request('markdown.open', { token: markdownDoc.token, text: '', path: 'smoke.pdf.md' }); await request('editor.unlock');
@@ -254,18 +260,71 @@ try {
   await page.waitForFunction(() => document.querySelector('#tools-items').value === '0');
   console.log('Selezione degli oggetti dal menu e dal PDF sincronizzata: OK');
   const previewRevision = await page.evaluate(() => __messages.filter(m => m.type === 'editor.state').at(-1).payload.revision);
-  await page.locator('#tools-font').selectOption('Courier'); await page.locator('#tools-size').fill('24');
+  await page.locator('#tools-dx').fill('5');
   await page.waitForFunction(() => document.querySelector('#tools-canvas').dataset.livePreview === 'true');
   assert.equal(await page.evaluate(() => __messages.filter(m => m.type === 'editor.state').at(-1).payload.revision), previewRevision);
   await page.screenshot({ path: fileURLToPath(new URL('../artifacts/test/live-font-preview.png', import.meta.url)) });
   await page.locator('#tools-reset-preview').click();
-  assert.equal(await page.locator('#tools-font').inputValue(), 'Helvetica');
-  assert.equal(await page.locator('#tools-size').inputValue(), '16');
+  assert.equal(await page.locator('#tools-dx').inputValue(), '0');
   assert.equal(await page.locator('#tools-canvas').getAttribute('data-live-preview'), null);
-  console.log('Font e dimensione: anteprima live sul PDF, ripristino e cronologia invariata: OK');
-  await page.locator('#tools-contents').fill('PUBLIC'); await page.locator('#tools-apply').click();
-  await page.waitForFunction(() => [...document.querySelector('#tools-items').options].some(o => o.textContent.includes('PUBLIC')));
-  console.log('Modifica testo esistente: OK');
+  console.log('Trasformazione oggetti: anteprima live, ripristino e cronologia invariata: OK');
+  await request('editor.lock'); await request('editor.text'); await request('editor.unlock');
+  await page.locator('.text-box-hit[data-note="content-0"]').first().waitFor();
+  await page.locator('.text-box-hit[data-note="content-0"]').first().click();
+  await page.waitForFunction(() => document.querySelector('.text-inline-input')?.readOnly === false);
+  await page.locator('.text-inline-input').fill('PUBLIC');
+  assert.equal(await page.evaluate(() => __messages.filter(m => m.type === 'editor.state').at(-1).payload.revision), previewRevision, 'Typing remains a draft until committed');
+  await page.locator('.text-inline-input').press('Control+Enter');
+  await page.waitForFunction(() => document.querySelector('#text-status').textContent.startsWith('Testo applicato'));
+  await request('editor.lock'); const unifiedSaved = await request('document.export'); await request('editor.unlock');
+  const mdAfterText = await request('markdown.page', { token: unifiedSaved.token, revision: unifiedSaved.revision, pageIndex: 0 });
+  assert.match(mdAfterText.markdown, /PUBLIC/); assert.doesNotMatch(mdAfterText.markdown, /SECRET/);
+  const plane = await page.locator('.text-page-plane').first().boundingBox();
+  await page.mouse.click(plane.x + plane.width * .5, plane.y + plane.height * .45);
+  await page.locator('.text-inline-input').fill('Nuovo testo');
+  const fittedBox = await page.locator('.text-box-selected').evaluate(element => ({ width: parseFloat(element.style.width), height: parseFloat(element.style.height) }));
+  assert.ok(fittedBox.width < 150 && fittedBox.height < 30, 'New box shrinks around its text');
+  await page.locator('.text-inline-input').press('Control+Enter');
+  await page.waitForFunction(() => document.querySelector('#text-status').textContent.startsWith('Testo applicato'));
+  // The inline editor must take every edit at the first attempt. Each step
+  // below reproduces a way it used to drop one: the applied block losing the
+  // selection, a click arriving while an edit was being applied, and Delete
+  // handed the promise of the edit already in flight.
+  const blockLabels = () => page.locator('.text-box-hit').evaluateAll(hits => hits.map(hit => hit.getAttribute('aria-label').replace('Casella: ', '')));
+  const blockBox = label => page.locator(`.text-box-hit[aria-label="Casella: ${label}"]`);
+  const chosenBlock = label => page.waitForFunction(expected => document.querySelector('#text-existing').selectedOptions[0]?.textContent === expected, label, { timeout: 30000 });
+  const applyingNow = () => page.waitForFunction(() => __messages.filter(m => m.type === 'editor.state').at(-1).payload.busy === true);
+  const typeInto = async value => {
+    await page.waitForFunction(() => document.querySelector('.text-inline-input')?.readOnly === false);
+    await page.locator('.text-inline-input').fill(value);
+  };
+  await blockBox('VISIBLE').click();
+  await typeInto('VISIBILE');
+  await page.locator('.text-inline-input').press('Control+Enter');
+  await chosenBlock('VISIBILE');
+  assert.ok(!(await blockLabels()).includes('VISIBILE'), 'The applied block is still the selected one, ready for the next edit');
+  await page.locator('.text-box-selected').dblclick();
+  await typeInto('VISIBILE DUE');
+  await page.locator('.text-inline-input').press('Control+Enter');
+  await applyingNow();
+  await blockBox('PUBLIC').click();
+  await chosenBlock('PUBLIC');
+  assert.ok((await blockLabels()).includes('VISIBILE DUE'), 'The edit under way when the click arrived was applied too');
+  await page.locator('.text-box-selected').dblclick();
+  await typeInto('DA ELIMINARE');
+  const beforeDelete = dialogs.length;
+  await page.locator('#text-larger').click();
+  await page.locator('#text-larger').press('Control+Enter');
+  await applyingNow();
+  await page.keyboard.press('Delete');
+  await page.waitForFunction(() => document.querySelector('#text-status').textContent.startsWith('Casella eliminata'), { timeout: 30000 });
+  assert.ok(dialogs.slice(beforeDelete).some(dialog => dialog.type === 'confirm' && /Eliminare la casella/.test(dialog.message)), 'Delete is carried out, not answered by the edit in flight');
+  assert.ok(!(await blockLabels()).includes('DA ELIMINARE'), 'The block the user had selected is the one removed');
+  console.log('Editor testo: modifica applicata al primo tentativo, selezione conservata, clic e Elimina durante l’applicazione: OK');
+  await page.screenshot({ path: fileURLToPath(new URL('../artifacts/test/unified-text.png', import.meta.url)) });
+  await request('editor.lock'); await request('editor.undo'); await request('editor.redo');
+  await request('editor.text'); await request('editor.tools', { mode: 'stamp' }); await request('editor.unlock');
+  console.log('Testo unificato: modifica originale, inserimento con clic, casella compatta, salvataggio nativo e Annulla/Ripeti: OK');
   await page.locator('#tools-mode').selectOption('stamp');
   await page.locator('[popovertarget="stamp-palette"]').click();
   assert.equal(await page.locator('#stamp-presets button').count(), 15);

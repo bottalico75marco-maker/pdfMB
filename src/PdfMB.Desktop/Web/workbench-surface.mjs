@@ -292,7 +292,7 @@ export class WorkbenchSurface {
     this.field('annotation-controls').hidden = objects || redact || ['stamp', 'image'].includes(this.mode.value);
     this.field('stamp-controls').hidden = this.mode.value !== 'stamp';
     this.field('image-controls').hidden = this.mode.value !== 'image';
-    this.contents.closest('label').hidden = !['note', 'objects'].includes(this.mode.value);
+    this.contents.closest('label').hidden = this.mode.value !== 'note';
     this.field('content-label').textContent = objects ? 'Nuovo testo dell’oggetto' : 'Contenuto nota';
     this.items.disabled = redact || this.mode.value === 'image';
     this.contents.value = ''; this.originalContents = '';
@@ -301,7 +301,7 @@ export class WorkbenchSurface {
     this.field('apply').disabled = false;
     this.field('delete').hidden = redact || this.mode.value === 'image';
     this.field('warning').hidden = !redact;
-    this.status.textContent = objects ? 'Seleziona un oggetto sulla pagina o dall’elenco. I gruppi si modificano come oggetto unico.' :
+    this.status.textContent = objects ? 'Seleziona un oggetto per spostarlo, ridimensionarlo o ruotarlo. Per inserire e modificare testo usa il pulsante Testo.' :
       redact ? 'Trascina l’area da eliminare, quindi applica. Prima di condividere salva il PDF risultante.' :
       this.mode.value === 'stamp' ? 'Scegli un timbro: clicca per inserirlo oppure trascina per dimensionarlo. Applica lo aggiunge al PDF.' :
       this.mode.value === 'image' ? 'Clicca per creare il riquadro e caricare un’immagine, oppure trascina per dimensionarlo. Salva incorpora l’immagine statica.' :

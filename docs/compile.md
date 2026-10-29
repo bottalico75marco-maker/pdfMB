@@ -1,4 +1,4 @@
-# Compilare e distribuire PDF MB 0.11.0 su Windows
+# Compilare e distribuire PDF MB 0.12.2 su Windows
 
 Dalla radice del repository, con Node.js 24, SDK .NET 10 e WebView2 Runtime:
 
@@ -9,13 +9,13 @@ npm test
 dotnet build PdfMB.sln -c Release --nologo
 dotnet run --project tests/DesktopChecks -c Release
 
-dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.11.0 --nologo
-
-Compress-Archive artifacts\app-0.11.0\* artifacts\PDF-MB-0.11.0-win-x64.zip -Force
-(Get-FileHash artifacts\PDF-MB-0.11.0-win-x64.zip -Algorithm SHA256).Hash.ToLower() + "  PDF-MB-0.11.0-win-x64.zip" | Out-File -Encoding ascii artifacts\PDF-MB-0.11.0-win-x64.zip.sha256
+dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.12.2 --nologo
+./scripts/prepare-release.ps1
 ```
 
 Chiudere l’app prima di aggiornare una cartella di build esistente. Distribuire l’intero ZIP, comprese le cartelle `Web` e `ThirdParty` e la guida offline.
+
+Lo script ricava la versione dal progetto e include le note di `docs/releases/X.Y.Z.md`. Per la pubblicazione automatica da tag vedere [Aggiornamenti e release](RELEASES.md).
 
 Prova del viewer in Chromium:
 

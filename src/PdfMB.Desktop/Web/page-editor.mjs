@@ -96,6 +96,7 @@ export class PageEditor {
   get dirty() { return (this.password ?? '') !== (this.savedPassword ?? '') || !!this.unsavedDocument || !!this.textRepairPending || !!this.formRepairPending || key(this.pages) !== this.savedKey; }
   get canEdit() { return !this.policy.readOnly && !!this.worker?.alive; }
   get canText() { return this.canEdit && !!this.policy.canAnnotate; }
+  get canTextEdit() { return this.canEdit && !!(this.policy.canAnnotate || this.policy.canContent); }
   get canFormDesign() { return this.canEdit && !!this.policy.canFormDesign; }
   get blockedReason() {
     return this.policy.blockedReason || (!this.worker?.alive ? 'Motore di modifica non disponibile: salvare il lavoro e riaprire il documento.' : '');
@@ -104,7 +105,7 @@ export class PageEditor {
     return { token: this.token, revision: this.revision, dirty: this.dirty, readOnly: this.policy.readOnly,
       passwordProtected: !!this.password,
       canFormDesign: this.canFormDesign, canFormFill: this.canEdit && !!this.policy.canFormFill,
-      canEdit: this.canEdit, canText: this.canText, canContent: this.canEdit && !!this.policy.canContent,
+      canEdit: this.canEdit, canText: this.canText, canTextEdit: this.canTextEdit, canContent: this.canEdit && !!this.policy.canContent,
       canPrint: !!this.policy.canPrint, blockedReason: this.blockedReason,
       canCopy: !!this.worker?.alive && !!(this.policy.permissions & 16),
       canUndo: this.canEdit && this.past.length > 0, canRedo: this.canEdit && this.future.length > 0 };
@@ -260,9 +261,9 @@ export class PageEditor {
     return { token: this.token, revision: this.revision, pageCount: pageIndexes.length, base64: encodePdf(extracted) };
   }
   async textContext(pageIndex, omitId) {
-    if (!this.canText) throw new Error('Il documento non consente l’aggiunta o la modifica di annotazioni.');
+    if (!this.canTextEdit || !this.pages[pageIndex]) throw new Error('Modifica del testo non consentita.');
     const buffer = this.bytes.slice(0);
-    return this.worker.request('text-context', { buffer, pageIndex, omitId }, [buffer]);
+    return this.worker.request('text-context', { buffer, pageIndex, pageId: this.pages[pageIndex].id, omitId }, [buffer]);
   }
   async changeText({ pageIndex, token, revision, input, remove = false }) {
     if (!this.canText) throw new Error('Il documento non consente l’aggiunta o la modifica di annotazioni.');

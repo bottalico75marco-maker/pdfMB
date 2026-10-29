@@ -34,7 +34,7 @@ internal sealed partial class MainForm : Form
     private ToolStrip _mainToolbar = null!;
     private bool _formMode, _canFormDesign;
     private bool _untitled;
-    private bool _canContent, _canPrint, _canCopy;
+    private bool _canContent, _canPrint, _canCopy, _canTextEdit;
     private readonly ToolStripButton _undo = new("Annulla") { ToolTipText = "Annulla (Ctrl+Z)" };
     private readonly ToolStripButton _redo = new("Ripeti") { ToolTipText = "Ripeti (Ctrl+Y)" };
     private readonly ToolStripButton _close = new("Chiudi documento");
@@ -100,7 +100,7 @@ internal sealed partial class MainForm : Form
         });
         _highlight.Click += async (_, _) => await EditorCommandAsync("editor.highlight");
         _text.Click += async (_, _) => await EditorCommandAsync("editor.text");
-        foreach (var tool in new (string Name, string Mode)[] { ("Nota adesiva", "note"), ("Rettangolo", "square"), ("Ellisse", "circle"), ("Linea", "line"), ("Penna", "ink"), ("Timbri", "stamp"), ("Immagine", "image"), ("Modifica testo e oggetti", "objects"), ("Oscuramento effettivo", "redact") })
+        foreach (var tool in new (string Name, string Mode)[] { ("Nota adesiva", "note"), ("Rettangolo", "square"), ("Ellisse", "circle"), ("Linea", "line"), ("Penna", "ink"), ("Timbri", "stamp"), ("Immagine", "image"), ("Modifica oggetti", "objects"), ("Oscuramento effettivo", "redact") })
         {
             var item = new ToolStripMenuItem(tool.Name) { Tag = tool.Mode };
             item.Click += async (_, _) => await RunHostAsync(async () =>
@@ -128,6 +128,7 @@ internal sealed partial class MainForm : Form
             catch (Exception ex) { ShowError(ex); }
         };
         _help.DropDownItems.Add(defaultPdf);
+        InitializeUpdates();
         Shown += async (_, _) => await StartAsync();
         FormClosing += OnFormClosing;
         FormClosed += (_, _) => _bridge?.Dispose();
@@ -174,6 +175,7 @@ internal sealed partial class MainForm : Form
             _status.Text = "Pronto · Apri un documento PDF";
             UpdateControls();
             if (_args.Length == 1) await RunHostAsync(() => OpenPathCoreAsync(_args[0]));
+            _ = CheckForUpdatesAsync(false);
         }
         catch (Exception ex)
         {
@@ -244,6 +246,7 @@ internal sealed partial class MainForm : Form
         _canEdit = state.GetProperty("canEdit").GetBoolean();
         _passwordProtected = state.TryGetProperty("passwordProtected", out var passwordProtected) && passwordProtected.GetBoolean();
         _canText = state.GetProperty("canText").GetBoolean();
+        _canTextEdit = state.TryGetProperty("canTextEdit", out var textEdit) ? textEdit.GetBoolean() : _canText;
         _canContent = state.TryGetProperty("canContent", out var content) && content.GetBoolean();
         _canPrint = state.TryGetProperty("canPrint", out var print) && print.GetBoolean();
         _canCopy = state.TryGetProperty("canCopy", out var copy) && copy.GetBoolean();
@@ -283,13 +286,13 @@ internal sealed partial class MainForm : Form
         _undo.Enabled = hasDocument && _canUndo;
         _forms.Enabled = hasDocument && _canFormDesign;
         _mainToolbar.Visible = !_formMode;
-        _text.Enabled = hasDocument && _canText;
+        _text.Enabled = hasDocument && _canTextEdit;
         _print.Enabled = hasDocument && _canPrint;
         _tools.Enabled = hasDocument && (_canText || _canContent || _canEdit);
         foreach (ToolStripMenuItem item in _tools.DropDownItems)
             item.Enabled = (string)item.Tag! switch { "objects" or "redact" or "image" => _canContent, "protect" => _canEdit, _ => _canText };
         _highlight.Enabled = _highlightColor.Enabled = hasDocument && _canText;
-        _text.ToolTipText = _canText ? "Modifica le caselle di testo direttamente sulla pagina" : "Testo non disponibile: controllare i permessi del documento";
+        _text.ToolTipText = _canTextEdit ? "Inserisci testo e modifica il testo esistente sulla pagina" : "Testo non disponibile: controllare i permessi del documento";
         _redo.Enabled = hasDocument && _canRedo;
         Text = _document is null ? AppTitle : $"{(_dirty || _markdownDirty ? "* " : "")}{_document.Name} — {AppTitle}";
         ApplyCaptionColor();
@@ -652,7 +655,7 @@ internal sealed partial class MainForm : Form
         _untitled = false;
         _openedPath = _token = null;
         _dirty = _readOnly = _canEdit = _canText = _textEditing = _canUndo = _canRedo = _passwordProtected = false;
-        _canContent = _canPrint = false;
+        _canContent = _canPrint = _canTextEdit = false;
         _canCopy = _markdownDirty = _markdownEditing = false;
         _manage.Checked = false;
         _text.Checked = _highlight.Checked = false;

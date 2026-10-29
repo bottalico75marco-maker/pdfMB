@@ -3,14 +3,25 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   windows:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      package-name: ${{ steps.version.outputs.package-name }}
+      notes-name: ${{ steps.version.outputs.notes-name }}
     steps:
       - uses: actions/checkout@v4
+      - name: Verifica versione, tag e note
+        id: version
+        shell: pwsh
+        env:
+          PDFMB_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+        run: ./scripts/prepare-release.ps1 -Tag $env:PDFMB_TAG -MetadataOnly
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -23,11 +34,22 @@ jobs:
       - run: npm test
       - run: dotnet build PdfMB.sln -c Release --nologo
       - run: dotnet run --project tests/DesktopChecks -c Release
-      - run: dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.11.0 --nologo
+      - run: dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o "${{ steps.version.outputs.app-directory }}" --nologo
+      - name: Prepara ZIP, SHA-256 e note
+        shell: pwsh
+        run: ./scripts/prepare-release.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: PDF-MB-0.11.0-win-x64
-          path: artifacts/app-0.11.0/
+          name: PDF-MB-${{ steps.version.outputs.version }}-win-x64
+          path: ${{ steps.version.outputs.app-directory }}/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.version.outputs.version }}
+          path: |
+            artifacts/${{ steps.version.outputs.package-name }}
+            artifacts/${{ steps.version.outputs.package-name }}.sha256
+            artifacts/${{ steps.version.outputs.notes-name }}
           if-no-files-found: error
   browser:
     runs-on: ubuntu-latest
@@ -47,3 +69,41 @@ jobs:
           name: prova-browser
           path: artifacts/test/
           if-no-files-found: ignore
+  release:
+    name: Pubblica release con note e pacchetto
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, browser]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ needs.windows.outputs.version }}
+          path: release
+      - name: Pubblica solo dopo test e caricamento completo
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.windows.outputs.version }}
+          RELEASE_PACKAGE: ${{ needs.windows.outputs.package-name }}
+          RELEASE_NOTES: ${{ needs.windows.outputs.notes-name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd release && sha256sum --check "$RELEASE_PACKAGE.sha256")
+          if gh release view "$RELEASE_TAG" --json isDraft > release/state.json; then
+            if ! jq -e '.isDraft == true' release/state.json > /dev/null; then
+              echo "La release è già pubblicata: non viene modificata."
+              exit 0
+            fi
+            gh release edit "$RELEASE_TAG" --title "PDF MB $RELEASE_VERSION" --notes-file "release/$RELEASE_NOTES"
+            gh release upload "$RELEASE_TAG" "release/$RELEASE_PACKAGE" "release/$RELEASE_PACKAGE.sha256" --clobber
+          else
+            gh release create "$RELEASE_TAG" "release/$RELEASE_PACKAGE" "release/$RELEASE_PACKAGE.sha256" --verify-tag --draft --title "PDF MB $RELEASE_VERSION" --notes-file "release/$RELEASE_NOTES"
+          fi
+          gh release edit "$RELEASE_TAG" --draft=false --latest

@@ -61,7 +61,13 @@ function notify() {
   formSurface?.sync();
   if (!formSurface?.active) highlightSurface?.sync();
   const state = editorState();
-  document.querySelector('#workspace').inert = locked || working;
+  // The text surface drives and guards its own commit. Making it inert for the
+  // duration threw away every click in between, so the selection the user
+  // asked for never happened and the edit appeared to need a second attempt.
+  const blocked = locked || working, textBusy = !locked && !!textSurface?.busy;
+  document.querySelector('#workspace').inert = blocked && !textBusy;
+  for (const id of ['pages-panel', 'viewer', 'tools-preview', 'markdown-panel'])
+    document.querySelector(`#${id}`).inert = blocked && textBusy;
   document.querySelector('#text-toolbar').inert = locked || working;
   document.querySelector('#tools-toolbar').inert = locked || working;
   workbench?.sync();
@@ -76,6 +82,14 @@ function notify() {
 function showError(error) {
   document.querySelector('#error-text').textContent = error?.message ?? String(error);
   document.querySelector('#fatal').hidden = false;
+}
+// Undo and redo from the application apply a pending text draft first, exactly
+// as the keyboard shortcut does: replacing the document under an open draft
+// discarded the edit the user had just typed.
+async function historyStep(step) {
+  if (!editor) return editorState();
+  if (textSurface && !await textSurface.flush()) return editorState();
+  return withWorking(async () => { await step(); await formSurface?.refresh(); return editorState(); });
 }
 async function withWorking(action) {
   working = true;
@@ -204,7 +218,7 @@ try {
       return notify();
     }),
     'editor.text': () => withWorking(async () => {
-      if (!locked || !editor?.canText) throw new Error('Il documento non consente l’inserimento di testo.');
+      if (!locked || !editor?.canTextEdit) throw new Error('Il documento non consente la modifica del testo.');
       highlightSurface.toggle(false);
       textSurface.toggle(undefined, true);
       return notify();
@@ -241,8 +255,8 @@ try {
       return notify();
     },
     'editor.change': payload => withWorking(async () => { if (editor) await editor.change(payload); return editorState(); }),
-    'editor.undo': () => withWorking(async () => { if (editor) await editor.undo(); await formSurface?.refresh(); return editorState(); }),
-    'editor.redo': () => withWorking(async () => { if (editor) await editor.redo(); await formSurface?.refresh(); return editorState(); }),
+    'editor.undo': () => historyStep(() => editor.undo()),
+    'editor.redo': () => historyStep(() => editor.redo()),
     'editor.extract': payload => withWorking(async () => {
       if (!locked || !editor || payload.token !== editor.token)
         throw new Error('Documento non disponibile per l’estrazione.');
@@ -366,7 +380,8 @@ try {
     unavailable: () => locked || working,
     read: (pageIndex, omitId) => enqueue(() => editor.textContext(pageIndex, omitId)),
     run: action => enqueue(action),
-    apply: payload => withWorking(() => editor.changeText(payload)),
+    apply: payload => withWorking(() => payload.input.source ? editor.changeWorkbench({ ...payload,
+      input: { ...payload.input, remove: payload.remove, operation: payload.input.source === 'content' ? 'object-text-group' : 'annotation-text-group' } }) : editor.changeText(payload)),
     onPage: index => {
       if (!session.currentId) return;
       plugin('scroll').forDocument(session.currentId).scrollToPage({ pageNumber: index + 1, behavior: 'instant' });

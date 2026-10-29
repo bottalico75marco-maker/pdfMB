@@ -212,6 +212,24 @@ test('static image Worker operation preserves existing text and produces no form
   await assert.rejects(request('workbench-change', { buffer: bytes, pageIndex: 0, pageId: 0, input: { ...input, image: { ...input.image, pixels: new ArrayBuffer(2) } } }), /Immagine/);
 });
 
+test('unified text Worker hides the entire selected block and commits native replacement as one reversible page override', async () => {
+  const f = fixture(), source = save(f.doc); f.close();
+  await request('load', source);
+  const context = await request('text-context', { buffer: source, pageIndex: 0, pageId: 0 });
+  const selected = context.notes.find(note => note.contents === 'SECRET'); assert.ok(selected);
+  const omitted = await request('text-context', { buffer: source, pageIndex: 0, pageId: 0, omitId: selected.id });
+  assert.notDeepEqual(new Uint8Array(omitted.image.pixels), new Uint8Array(context.image.pixels));
+  const edit = await request('workbench-change', { buffer: source, pageIndex: 0, pageId: 0,
+    input: { ...selected, operation: 'object-text-group', contents: 'PUBLIC' } });
+  const changed = await request('rebuild', [{ id: 0, rotation: 0, override: edit.override }]);
+  reopen(changed, (_, page) => {
+    const native = tools.objects(page, true); assert.ok(native.some(o => o.text.trim() === 'PUBLIC')); assert.ok(!native.some(o => o.text.includes('SECRET')));
+    assert.equal(api.FPDFPage_GetAnnotCount(page), 0);
+  });
+  const restored = await request('rebuild', [{ id: 0, rotation: 0 }]);
+  reopen(restored, (_, page) => assert.equal(tools.objects(page, true)[0].text, 'SECRET'));
+});
+
 test('blank PDF formats have correct physical sizes and insertion leaves source content intact', async () => {
   const expected = { A4: [210, 297], A5: [148, 210], A3: [297, 420] };
   for (const [format, mm] of Object.entries(expected)) for (const landscape of [false, true]) {

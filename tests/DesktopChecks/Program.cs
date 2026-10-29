@@ -8,6 +8,7 @@ internal static class Program
     {
         static void Check(bool success, string message) { if (!success) throw new Exception(message); }
         MarkdownChecks.RunAsync().GetAwaiter().GetResult();
+        UpdateChecks.RunAsync().GetAwaiter().GetResult();
         // Check the real native layout without showing/starting the application.
         var desktop = System.Reflection.Assembly.Load("PdfMB.Desktop");
         var mainType = desktop.GetType("PdfMB.Desktop.MainForm")!;
@@ -90,6 +91,7 @@ internal static class Program
             using var preview = new Bitmap(toolbar.Width, toolbar.Height);
             toolbar.DrawToBitmap(preview, new Rectangle(Point.Empty, preview.Size));
             preview.Save("artifacts/test/native-toolbar.png", System.Drawing.Imaging.ImageFormat.Png);
+            UpdateDialogChecks.Run(desktop, mainType, window);
             Console.WriteLine("Native toolbar at 960px: one top row, Progetta modulo between Text and Highlight, all commands have accessible icons");
         }
         var blankType = desktop.GetType("PdfMB.Desktop.BlankPageDialog")!;

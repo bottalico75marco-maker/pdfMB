@@ -15,6 +15,7 @@
     <Compile Include="../../src/PdfMB.Desktop/Services/PdfFile.cs" Link="PdfFile.cs" />
     <Compile Include="../../src/PdfMB.Desktop/Services/MarkdownFile.cs" Link="MarkdownFile.cs" />
     <Compile Include="../../src/PdfMB.Desktop/Services/OllamaOcr.cs" Link="OllamaOcr.cs" />
+    <Compile Include="../../src/PdfMB.Desktop/Services/UpdateChecker.cs" Link="UpdateChecker.cs" />
   </ItemGroup>
   <Target Name="RemoveUnusedWpfReference" BeforeTargets="ResolveAssemblyReferences">
     <ItemGroup>

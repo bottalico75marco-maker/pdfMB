@@ -68,7 +68,7 @@ export function createWorkbenchTools(api, textTools) {
         const type = api.FPDFPageObj_GetType(object);
         if (!api.FPDFPageObj_GetBounds(object, p, p + 4, p + 8, p + 12)) continue;
         const [left, bottom, right, top] = api.pdfium.HEAPF32.slice(p / 4, p / 4 + 4);
-        let text = '', size = 12, font = 'Helvetica';
+        let text = '', size = 12, font = 'Helvetica', fontKey = '', fontCode = 4, color = '#000000', matrix = null, opacity = 255;
         if (type === 1 && textPage) {
           const length = api.FPDFTextObj_GetText(object, textPage, 0, 0);
           if (length > 2 && length <= 20002) {
@@ -83,11 +83,22 @@ export function createWorkbenchTools(api, textTools) {
             try {
               api.FPDFFont_GetBaseFontName(handle, name, n);
               const family = new TextDecoder().decode(api.pdfium.HEAPU8.slice(name, name + n));
+              fontKey = family.replace(/\0/g, '').replace(/^[A-Z]{6}\+/, '');
               font = /courier/i.test(family) ? 'Courier' : /times/i.test(family) ? 'Times-Roman' : 'Helvetica';
+              fontCode = (font === 'Courier' ? 0 : font === 'Times-Roman' ? 8 : 4) +
+                (/bold|black|heavy/i.test(family) ? (/italic|oblique/i.test(family) ? 2 : 1) : /italic|oblique/i.test(family) ? 3 : 0);
             } finally { free(name); }
           }
+          if (api.FPDFPageObj_GetFillColor(object, p, p + 4, p + 8, p + 12)) {
+            color = '#' + [...api.pdfium.HEAPU32.slice(p / 4, p / 4 + 3)].map(value => value.toString(16).padStart(2, '0')).join('');
+            opacity = api.pdfium.HEAPU32[p / 4 + 3];
+          }
+          if (api.FPDFPageObj_GetMatrix(object, p)) matrix = [...api.pdfium.HEAPF32.slice(p / 4, p / 4 + 6)];
         }
-        result.push({ index, type, text, size, font, position: textTools.screenRect(page, [left, top, right, bottom]) });
+        result.push({ index, type, text, size, font, fontKey, fontCode, color, matrix, opacity,
+          renderMode: type === 1 ? api.FPDFTextObj_GetTextRenderMode(object) : null,
+          rawPosition: { x: left, y: -top, width: right - left, height: top - bottom },
+          position: textTools.screenRect(page, [left, top, right, bottom]) });
       }
       return result;
     } finally { if (textPage) api.FPDFText_ClosePage(textPage); free(p); }

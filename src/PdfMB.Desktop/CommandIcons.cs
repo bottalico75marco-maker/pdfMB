@@ -29,7 +29,7 @@ internal static class CommandIcons
                 if (kind == "saveOff") { using var red = new Pen(Color.Firebrick, 2); g.DrawLine(red, 2, 22, 22, 2); }
                 break;
             case "pages": Rect(7, 3, 14, 16); Poly(new(3, 7), new(3, 22), new(17, 22)); break;
-            case "text": Rect(2, 4, 20, 16); Line(8, 8, 16, 8); Line(12, 8, 12, 16); Line(9, 16, 15, 16); break;
+            case "text": Poly(new(3, 21), new(5, 15), new(16, 4), new(20, 8), new(9, 19), new(3, 21)); Line(5, 15, 9, 19); Line(14, 6, 18, 10); break;
             case "markdown": Rect(2, 4, 20, 16); Poly(new(5, 16), new(5, 8), new(8, 12), new(11, 8), new(11, 16)); Line(17, 8, 17, 16); Poly(new(14, 13), new(17, 16), new(20, 13)); break;
             case "ocr": Poly(new(8, 3), new(3, 3), new(3, 8)); Poly(new(16, 3), new(21, 3), new(21, 8)); Poly(new(3, 16), new(3, 21), new(8, 21)); Poly(new(16, 21), new(21, 21), new(21, 16)); Line(7, 8, 17, 8); Line(12, 8, 12, 17); Line(9, 17, 15, 17); break;
             case "forms": Sheet(); Rect(8, 8, 8, 3); Rect(8, 15, 4, 4); Poly(new(8, 17), new(10, 19), new(13, 14)); Line(15, 16, 17, 16); break;
@@ -68,9 +68,10 @@ internal static class CommandIcons
         "Strumenti" => "tools", "Progetta modulo" or "Moduli" => "forms", "Stampa" => "print", "Confronta Markdown" => "markdown", "OCR e descrivi foto" => "ocr",
         "Annulla" => "cancel", "Ripeti" => "redo", "Chiudi documento" => "exit", "Aiuto" => "help",
         "Nota adesiva" => "note", "Rettangolo" => "square", "Ellisse" => "circle", "Linea" => "line", "Penna" => "ink",
-        "Timbri" => "stamp", "Immagine" => "image", "Modifica testo e oggetti" => "objects", "Oscuramento effettivo" => "redact",
+        "Timbri" => "stamp", "Immagine" => "image", "Modifica oggetti" or "Modifica testo e oggetti" => "objects", "Oscuramento effettivo" => "redact",
         "Proteggi con password" => "protect",
         "Guida Windows" => "guide", "Imposta come lettore PDF predefinito" => "settings",
+        "Verifica aggiornamenti" => "recent", "Controlla aggiornamenti all’avvio" => "settings",
         "Inserisci pagina vuota" => "blank", "Inserisci pagine da PDF" or "Inserisci" => "import", _ => "file"
     };
 

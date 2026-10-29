@@ -1,3 +1,25 @@
+# Stabilità e raggruppamento testo 0.12.2
+
+- [ ] Modificare un blocco e cliccare subito sul successivo: la modifica viene applicata e il nuovo blocco è selezionato al primo tentativo. Ripetere durante l’applicazione, anche con Elimina.
+- [ ] Provare parole suddivise in frammenti con caratteri di altezze diverse: ordine corretto, nessuno spazio aggiunto dentro una parola e spazi conservati tra parole.
+- [ ] Allungare una riga originale e modificare una casella disegnata o ridimensionata: la riga può crescere verso il bordo pagina, la casella conserva la larghezza scelta. Salvare, riaprire e provare Annulla/Ripeti.
+
+# Aggiornamenti 0.12.1
+
+- [ ] Aiuto → Verifica aggiornamenti: messaggio versione attuale se non esiste una release più recente; errore gestito con rete assente o API non disponibile.
+- [ ] Con una release stabile più recente e ZIP/SHA-256 caricati, verificare versione, note, download nel browser e apertura della release. I PDF aperti e le modifiche pendenti devono restare disponibili.
+- [ ] Disabilitare il controllo automatico, chiudere e riaprire: la scelta resta memorizzata. Riabilitarlo e verificare il limite di un controllo riuscito ogni 24 ore; quello manuale resta disponibile.
+- [ ] Pubblicare un nuovo tag X.Y.Z solo dopo aver verificato la versione nel progetto e le note: test Windows/Chromium devono precedere pubblicazione e caricamento ZIP/checksum. Un tag discordante o note mancanti devono fermare la pubblicazione.
+
+# Testo unificato 0.12.0
+
+- [ ] Premere Testo: clic sul testo originale per modificarlo; clic o trascinamento nello spazio vuoto per inserirlo. Nuova casella deve consentire inserimento anche sopra un testo esistente.
+- [ ] Provare parole suddivise tra oggetti PDF, frasi e righe vicine: selezione come blocco quando font, dimensione, colore e allineamento sono compatibili. Colonne distanti e stili diversi devono restare separati.
+- [ ] Digitare, cancellare e cambiare stile: casella aderente al contenuto senza tagli; ritorno a capo entro la larghezza disponibile, anche vicino ai bordi. Ripetere su pagine ruotate e ritagliate.
+- [ ] Salvare e riaprire: testo originale effettivamente sostituito e ancora ricercabile; caselle aggiunte FreeText conservate. Annulla/Ripeti devono ripristinare un intero blocco in una sola operazione.
+- [ ] Provare copia/incolla di testo e caselle, Annulla modifica, uscita dal campo, Ctrl+Invio e Salva mentre si digita. Errori di font, caratteri o spazio devono mantenere la bozza recuperabile.
+- [ ] Strumenti → Modifica oggetti deve gestire spostamento/scala/rotazione/eliminazione; l’editing del testo passa dal pulsante Testo.
+
 # Markdown e OCR locale 0.11.0
 
 - [ ] Aprire un PDF con testo e due foto: Confronta Markdown mostra PDF a sinistra e editor/anteprima a destra. Converti testo produce `nomefile.pdf.md` in UTF-8, con sezioni delle immagini.

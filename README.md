@@ -6,6 +6,9 @@
 
 | Riferimento | Stato |
 | --- | --- |
+| **0.12.2** | Editor testo più stabile: modifiche al primo tentativo, selezione conservata e raggruppamento delle parole frammentate con spazi corretti. [Release 0.12.2](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.12.2), build locale in `artifacts/app-0.12.2`. |
+| **0.12.1** | Controllo aggiornamenti da GitHub all’avvio e dal menu Aiuto; avviso con note e download. Release automatiche dai tag `vX.Y.Z`, con test, ZIP, SHA-256 e note incluse. Build locale in `artifacts/app-0.12.1`. |
+| **0.12.0** | Il pulsante Testo unisce inserimento e modifica del testo originale. Frammenti vicini e con stile compatibile raggruppati; caselle adattate al contenuto, salvataggio e cronologia comune. Build locale in `artifacts/app-0.12.0`. |
 | **0.11.0** | Conversione in `nomefile.pdf.md`, confronto PDF/Markdown affiancato, modifica e anteprima live. OCR e descrizione delle immagini con Ollama locale: immagini estratte singolarmente e inviate in sequenza; comando con icona disabilitato senza servizio e modello visivo installato. Build locale in `artifacts/app-0.11.0`. |
 | **0.10.7** | Lucchetto aperto e comando Rimuovi password quando il PDF è protetto; clic per rimuovere la protezione, da confermare con Salva. Barra principale, Strumenti e modulo sincronizzati. Build completa nella [Release 0.10.7](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.10.6) e in `artifacts/app-0.10.7`. |
 | **0.10.6** | Lucchetto aperto e comando Rimuovi password quando il PDF è protetto; clic per rimuovere la protezione, da confermare con Salva. Barra principale, Strumenti e modulo sincronizzati. Build completa nella [Release 0.10.6](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.10.6) e in `artifacts/app-0.10.6`. |
@@ -27,13 +30,13 @@
 | **0.8.0** | Versione storica con strumenti di annotazione, modifica oggetti, stampa, oscuramento e guida Windows, confluita in `main`. |
 | **0.6.5** | Versione storica con correzioni del salvataggio delle caselle di testo; cartella binaria conservata nel repository. |
 
-La build locale **0.11.0** aggiunge il confronto Markdown e l’OCR opzionale: istruzioni in [Markdown e Ollama](docs/MARKDOWN.md). Le funzioni precedenti sono descritte di seguito. Tutti i branch sono stati consolidati in `main`, unico ramo di sviluppo del progetto, conservando la cronologia completa. Per usare le nuove funzioni scegliere la build corrispondente.
+La versione **0.12.2** migliora la stabilità dell’editor e il raggruppamento dei frammenti di testo. Include il controllo aggiornamenti e le release automatiche della 0.12.1, Testo unificato della 0.12.0 e confronto Markdown/OCR locale della 0.11.0: istruzioni in [Markdown e Ollama](docs/MARKDOWN.md). Tutti i branch sono stati consolidati in `main`, unico ramo di sviluppo del progetto, conservando la cronologia completa. Per usare le nuove funzioni scegliere la build corrispondente.
 
 **Collegamenti:** [Guida Windows](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/GUIDA-WINDOWS.html) · [Checklist unica delle prove](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/CHECKLIST-MANUALE.md) · [Build Windows su GitHub Actions](https://github.com/bottalico75marco-maker/pdfMB/actions) · [Architettura](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/ARCHITETTURA.md)
 
 ## Installazione su Windows
 
-1. Scaricare [PDF-MB-0.10.6-win-x64.zip](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.10.6/PDF-MB-0.10.6-win-x64.zip) dalla [Release 0.10.6](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.10.6). La pagina include anche il checksum SHA-256.
+1. Scaricare il pacchetto Windows x64 ZIP dall’[ultima release pubblica](https://github.com/bottalico75marco-maker/pdfMB/releases/latest). La pagina include anche il checksum SHA-256.
 2. Estrarre **l’intera cartella** dello ZIP.
 3. Verificare la presenza di **.NET Desktop Runtime 10** e **Microsoft Edge WebView2 Runtime** su Windows a 64 bit.
 4. Avviare **PdfMB.Desktop.exe**.
@@ -44,7 +47,13 @@ Le build dei singoli commit restano disponibili tra gli artefatti della workflow
 
 La guida si apre offline con **Aiuto → Guida Windows** o **F1**, nel browser predefinito. Include istruzioni per tutti gli strumenti e per la risoluzione dei problemi più comuni. La scritta fissa “Gestione pagine” in alto a destra è stata rimossa; il pulsante **Gestisci pagine** resta disponibile.
 
-## Tutte le funzionalità disponibili nella 0.11.0
+## Tutte le funzionalità disponibili nella 0.12.2
+
+### Aggiornamenti
+
+L’app controlla le release stabili pubbliche all’avvio, al massimo una volta al giorno. **Aiuto → Verifica aggiornamenti** esegue un controllo manuale; quello automatico si può disabilitare dallo stesso menu. Un aggiornamento disponibile mostra versione, note e download dello ZIP. Il controllo usa l’API pubblica di GitHub senza token e non invia documenti.
+
+Ogni tag `vX.Y.Z` avvia test, build e pubblicazione della release con ZIP, checksum e note. Versione e nomi degli artefatti sono ricavati dal progetto C#. Procedura e dettagli in [Aggiornamenti e release](docs/RELEASES.md).
 
 ### Markdown e OCR locale
 
@@ -53,7 +62,7 @@ La guida si apre offline con **Aiuto → Guida Windows** o **F1**, nel browser p
 - **OCR e descrivi foto** estrae e invia una sola immagine alla volta a Ollama locale, trascrivendo scansioni e descrivendo immagini. Il campo Modello propone i nomi installati; senza servizio e modello visivo locale il comando resta disabilitato.
 - **Interrompi** conserva il risultato parziale. Salvataggio UTF-8, limite 8 MB, controllo delle modifiche esterne e conferma delle modifiche pendenti prima di cambiare documento o uscire.
 
-Istruzioni complete in [Markdown e Ollama](docs/MARKDOWN.md). La build locale completa è in `artifacts/app-0.11.0`; il pacchetto è `artifacts/PDF-MB-0.11.0-win-x64.zip`, accompagnato dal checksum SHA-256. L’ultima release pubblicata collegata sopra resta la 0.10.6.
+Istruzioni complete in [Markdown e Ollama](docs/MARKDOWN.md). La build locale completa è in `artifacts/app-0.12.2`; il pacchetto è `artifacts/PDF-MB-0.12.2-win-x64.zip`, accompagnato dal checksum SHA-256.
 
 ### Nuovo documento e pagine vuote
 
@@ -98,17 +107,19 @@ Il pulsante **Gestisci pagine** attiva il pannello di lavoro. Clic destro sulle 
 
 Il trascinamento delle miniature non è previsto. La sorgente di un inserimento non viene scritta. L’estrazione non cambia nome, cronologia, selezione o stato di salvataggio della sessione e non può sovrascriverne i percorsi originale/corrente.
 
-### Caselle di testo
+### Testo: inserimento e modifica
 
 - Il pulsante **Testo** attiva la modifica sulle pagine; la barra contestuale compare solo in questa modalità.
-- **Nuova casella** mediante trascinamento, scrittura diretta, spostamento dal bordo e ridimensionamento con otto maniglie.
+- Clic sul testo originale o su una casella per modificarlo; clic o trascinamento nello spazio vuoto per inserire testo. **Nuova casella** permette di inserire anche sopra un testo esistente.
+- Frammenti vicini e allineati, con font, dimensione e colore compatibili, selezionabili come un solo blocco. Colonne distanti e stili diversi restano separati; il raggruppamento da solo non modifica il documento.
+- Caselle ridotte al contenuto con un piccolo margine; larghezza di inserimento o ridimensionamento usata come limite di ritorno a capo. Spostamento dal bordo e ridimensionamento con otto maniglie.
 - Font **Helvetica, Times e Courier**, dimensioni **6–144 pt**, grassetto, corsivo e colore.
 - Selezione dei caratteri e copia/incolla del testo all’interno della casella.
 - Copia/incolla dell’intera casella dal menu contestuale o da tastiera, con nuovo identificativo e conservazione dello stile.
 - Selezione e modifica delle caselle create da PDF MB anche dopo salvataggio e riapertura.
 - Applicazione automatica all’uscita dal campo, al rilascio dopo spostamento/ridimensionamento o con `Ctrl+Invio`.
 - **Annulla modifica** per scartare la bozza dopo conferma; errori di validazione mantengono la bozza recuperabile.
-- Conservazione come annotazione PDF **FreeText**, senza trasformare il testo in immagine.
+- Il testo originale modificato resta testo nativo del PDF: i frammenti precedenti sono rimossi. Le caselle aggiunte restano annotazioni **FreeText**. Le modifiche a un blocco sono una sola operazione annullabile.
 - Rilevamento e riparazione al salvataggio delle caselle delle vecchie versioni con aspetto trasparente o non valido.
 
 Ogni casella usa uno stile uniforme e ammette fino a 10.000 caratteri occidentali, accenti ed euro. Non sono ancora disponibili stili misti per intervallo, font arbitrari, sottolineato, barrato e apice/pedice. Il testo non viene ridotto automaticamente per entrare nella casella.
@@ -143,17 +154,15 @@ Dal menu **Strumenti** sono disponibili **Nota adesiva, Rettangolo, Ellisse, Lin
 - Annulla/Ripeti comune, conservazione di testi e campi esistenti, estrazione e riapertura. È richiesto il permesso di modifica del contenuto.
 - Il campo immagine nella progettazione modulo resta invece un controllo di upload interattivo.
 
-### Modifica del testo e degli oggetti originali
+### Modifica degli oggetti originali
 
-**Strumenti → Modifica testo e oggetti** permette di selezionare un oggetto sulla pagina o dall’elenco.
+**Strumenti → Modifica oggetti** permette di selezionare un oggetto sulla pagina o dall’elenco. L’inserimento e la modifica del contenuto testuale passano dal pulsante **Testo**.
 
-- **Sostituire il testo** di un singolo oggetto con un nuovo oggetto testuale nella stessa posizione e ordine: il vecchio contenuto non viene semplicemente coperto.
-- Scegliere **Helvetica, Times o Courier**, con dimensione **6–144 pt**.
-- Vedere **l’anteprima live sulla pagina** mentre si modificano testo, font e dimensione. L’anteprima usa il motore PDF e non aggiunge cronologia; **Applica** conferma e **Annulla anteprima** ripristina l’originale.
+- Vedere **l’anteprima live sulla pagina** mentre si modifica la trasformazione. L’anteprima usa il motore PDF e non aggiunge cronologia; **Applica** conferma e **Annulla anteprima** ripristina l’originale.
 - **Spostare, scalare, ruotare o eliminare** testo, immagini, tracciati e gruppi.
 - Applicare le modifiche alla cronologia comune e conservarle dopo salvataggio/riapertura.
 
-L’editor lavora sui singoli oggetti: non ricompone paragrafi e non modifica gli elementi interni dei gruppi/Form XObject. Il testo sostitutivo è occidentale, su una riga e fino a 10.000 caratteri; il font standard scelto può cambiare la larghezza rispetto all’originale. Verificare il risultato su pagine complesse, con ritagli, link, segnalibri o moduli.
+Il raggruppamento del testo è prudente e riguarda testo normale e caselle con stile uniforme; elementi interni ai Form XObject, testo inclinato, trasparente, solo contorno e livelli OCR invisibili non sono ricomposti. I caratteri modificabili sono occidentali, fino a 10.000 per blocco, con font standard: un font originale diverso può cambiare aspetto e larghezza. Verificare il risultato su pagine complesse, con ritagli, link, segnalibri o moduli.
 
 ### Timbri statici e personali
 
@@ -277,7 +286,7 @@ dotnet run --project src/PdfMB.Desktop
 Pubblicazione della cartella Windows a 64 bit:
 
 ```powershell
-dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.11.0
+dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.12.2
 ```
 
 Prova browser facoltativa:

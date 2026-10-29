@@ -1,5 +1,6 @@
 import { createFormTools } from './form-engine.mjs';
 import { extractMarkdownPage, extractMarkdownImage } from './markdown-engine.mjs';
+import { createUnifiedTextTools } from './unified-text-engine.mjs';
 import { transformPdfSecurity } from './pdf-security.mjs';
 import { paperSize } from './paper-sizes.mjs';
 import { rewriteFormDocument, FORM_EMAIL_ACTION_VERSION, FORM_VALIDATION_VERSION } from './form-document.mjs';
@@ -13,7 +14,7 @@ import { createTextTools } from './text-engine.mjs';
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_SOURCE_BYTES = 128 * 1024 * 1024;
 let sourceFormPages = [];
-let api, formTools, textTools, highlightTools, workbenchTools, stampTools, staticImageTools, source, sourceCount, nextPageId, pendingImport;
+let api, formTools, textTools, unifiedTextTools, highlightTools, workbenchTools, stampTools, staticImageTools, source, sourceCount, nextPageId, pendingImport;
 const imports = new Map();
 const catalog = new Map();
 const overrides = new Map();
@@ -27,6 +28,7 @@ async function initialize() {
   formTools = createFormTools(api, textTools);
   highlightTools = createHighlightTools(api, textTools);
   workbenchTools = createWorkbenchTools(api, textTools);
+  unifiedTextTools = createUnifiedTextTools(api, textTools, workbenchTools);
   stampTools = createStampTools(api, textTools);
   staticImageTools = createStaticImageTools(api, textTools);
 }
@@ -297,11 +299,11 @@ function withPage(buffer, index, action) {
 }
 function textRequest(type, { buffer, pageIndex, pageId, pageOverride, input, remove = false, omitId }) {
   if (type === 'text-context') return withPage(buffer, pageIndex, (page, document) => {
-    const geometry = textTools.geometry(page), notes = textTools.notes(page);
+    const geometry = textTools.geometry(page), notes = unifiedTextTools.groups(document, page, pagePolicy(pageId));
     textTools.repairAppearances(page);
     // Only the temporary rendering copy is changed. This lets an inline editor
     // replace the selected appearance without painting its text twice.
-    if (omitId && notes.some(note => note.id === omitId)) textTools.apply(page, [{ id: omitId, value: null }]);
+    if (omitId && notes.some(note => note.id === omitId)) unifiedTextTools.remove(page, notes.find(note => note.id === omitId));
     return { ...geometry, notes, image: textTools.render(page, 1400, 2, document) };
   });
   const policy = withDocument(handle => protection(handle));
@@ -314,7 +316,7 @@ function textRequest(type, { buffer, pageIndex, pageId, pageOverride, input, rem
     const { position, ...value } = note;
     return value;
   });
-  const value = remove ? null : withPage(buffer, pageIndex, page => textTools.prepare(page, input));
+  const value = remove ? null : withPage(buffer, pageIndex, (page, document) => textTools.prepare(page, unifiedTextTools.compact(document, page, input)));
   return { baseline, value };
 }
 
@@ -394,6 +396,10 @@ function workbenchChange({ buffer, pageIndex, pageId, pageOverride, input }) {
       if (input.operation === 'redact') { /* Sanitized from the complete current document, including form appearances. */ }
       else if (input.operation === 'stamp') stampTools.apply(single, page, input);
       else if (input.operation === 'image') staticImageTools.apply(single, page, input);
+      else if (['object-text-group', 'annotation-text-group'].includes(input.operation)) {
+        if (input.id.startsWith('content-') !== content) throw new Error('Permessi del blocco di testo non validi.');
+        unifiedTextTools.change(single, page, input);
+      }
       else if (input.operation.startsWith('object-')) workbenchTools.mutateObject(single, page, input);
       else workbenchTools.mutateAnnotation(page, input);
     } finally { api.FPDF_ClosePage(page); }
