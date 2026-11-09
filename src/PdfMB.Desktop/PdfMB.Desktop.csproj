@@ -8,7 +8,7 @@
     <Version>0.13.1</Version>
     <ApplicationIcon>Assets\pdfmb.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <WebView2Version>1.0.4022.49</WebView2Version>
+    <WebView2Version>1.0.4314.35</WebView2Version>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Assets\pdfmb.ico" LogicalName="PdfMB.Desktop.AppIcon.ico" />
