@@ -634,7 +634,8 @@ try {
       counts = await images.evaluateAll((images, regions) => {
         const image = images.find(image => {
           const rect = image.getBoundingClientRect();
-          return rect.width >= 100 && rect.width <= 180 && rect.height > 0 && image.complete && image.naturalWidth;
+          // Thumbnails follow the sidebar width (150 to 400 px); the page image is wider.
+          return rect.width >= 100 && rect.width <= 400 && rect.height > 0 && image.complete && image.naturalWidth;
         });
         if (!image) return null;
         const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
