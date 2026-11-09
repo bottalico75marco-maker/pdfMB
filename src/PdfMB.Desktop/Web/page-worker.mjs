@@ -507,7 +507,12 @@ self.onmessage = async ({ data: { id, type, payload } }) => {
       const bytes = extract({ ...payload, buffer });
       result = fields.some(p => p.length) ? await rewriteFormDocument(bytes, fields) : bytes;
     }
-    else if (type === 'prepare-import' && source) { result = prepareImport(payload); pendingImport.buffer = await stripManagedForms(pendingImport.buffer); }
+    else if (type === 'prepare-import' && source) {
+      result = prepareImport(payload);
+      // A failed strip must not keep an orphan buffer the editor never learned about.
+      try { pendingImport.buffer = await stripManagedForms(pendingImport.buffer); }
+      catch (error) { pendingImport = null; throw error; }
+    }
     else if (type === 'register-import' && source) result = registerImport(payload);
     else if (type === 'retain-pages' && source) result = retainPages(payload);
     else if (type === 'cancel-import' && source) { pendingImport = null; result = {}; }

@@ -16,7 +16,11 @@ internal static class MarkdownFile
         if (stream.Length > MaximumBytes) throw new InvalidDataException("Il Markdown supera il limite di 8 MB.");
         var bytes = new byte[checked((int)stream.Length)];
         await stream.ReadExactlyAsync(bytes);
-        return (Utf8.GetString(bytes).TrimStart('\uFEFF'), new FileStamp(true, Convert.ToHexString(SHA256.HashData(bytes))));
+        try { return (Utf8.GetString(bytes).TrimStart('\uFEFF'), new FileStamp(true, Convert.ToHexString(SHA256.HashData(bytes)))); }
+        catch (DecoderFallbackException)
+        {
+            throw new InvalidDataException($"Il file {Path.GetFileName(path)} non è in formato UTF-8. Salvarlo come UTF-8 oppure rinominarlo per generare un nuovo Markdown.");
+        }
     }
 
     public static Task WriteAsync(string path, string text, FileStamp stamp)

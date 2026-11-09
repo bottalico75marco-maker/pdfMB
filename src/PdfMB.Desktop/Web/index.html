@@ -14,7 +14,7 @@
       <button id="text-new" type="button" aria-pressed="false">Nuova casella</button>
       <label class="text-box-picker">Caselle<select id="text-existing" aria-label="Caselle della pagina corrente"><option value="">Nessuna selezione</option></select></label>
       <label>Font<select id="text-font"><option>Helvetica</option><option>Times</option><option>Courier</option></select></label>
-      <label>pt<input id="text-size" type="number" min="6" max="144" step="0.5" value="12" required aria-label="Dimensione carattere in punti"></label>
+      <label>pt<input id="text-size" type="number" min="6" max="144" step="any" value="12" required aria-label="Dimensione carattere in punti"></label>
       <button type="button" id="text-smaller" aria-label="Riduci dimensione" title="Riduci dimensione">A−</button>
       <button type="button" id="text-larger" aria-label="Aumenta dimensione" title="Aumenta dimensione">A+</button>
       <button type="button" id="text-bold" aria-pressed="false" aria-label="Grassetto" title="Grassetto"><b>G</b></button>
@@ -94,6 +94,7 @@
     </aside>
     <main id="viewer-shell" aria-label="Documento PDF">
       <div id="viewer" aria-label="Visualizzatore PDF"></div>
+      <div id="sidebar-grip" hidden role="separator" aria-orientation="vertical" aria-label="Larghezza del pannello miniature" title="Trascina per cambiare la larghezza delle miniature; doppio clic per ripristinare"></div>
       <div id="tools-preview" hidden><canvas id="tools-canvas" hidden aria-hidden="true"></canvas></div>
       <div id="text-surface" aria-label="Modifica caselle di testo sulla pagina" tabindex="0" hidden></div>
     </main>

@@ -75,6 +75,7 @@ function notify() {
   textSurface?.sync();
   formReader?.sync();
   markdown?.sync(editor);
+  syncSidebarGrip();
   bridge.emit('editor.state', state);
   bridge.emit('viewer.state', viewerState());
   return state;
@@ -100,7 +101,79 @@ async function withWorking(action) {
 }
 function uiAction(action) {
   if (locked || working || markdown?.generating) return;
-  enqueue(() => withWorking(action)).catch(showError);
+  // The host may lock the editor while this action waits in the queue: re-check
+  // when it actually runs, or the edit would slip between lock and export.
+  enqueue(() => { if (locked || !editor) return; return withWorking(action); }).catch(showError);
+}
+
+// The viewer ships a 250 px sidebar with 150 px thumbnails whatever the
+// window. Both follow the viewer's width, and the sidebar edge can be dragged:
+// the chosen width is kept for the session and across sessions. The sidebar
+// width is schema, applied to the open one directly; the thumbnail width is
+// plugin configuration this vendored version keeps on the plugin instance, so
+// the change is applied only when that surface is still there.
+const SIDEBAR_KEY = 'pdfmb.sidebarWidth';
+let fittedSidebar = 0, fittedThumbnail = 0, fitFrame = 0, userSidebar = 0;
+try { userSidebar = Math.max(0, Number(localStorage.getItem(SIDEBAR_KEY)) || 0); } catch { /* storage may be unavailable */ }
+const desktopLayout = () => innerWidth >= 768;
+const sidebarBounds = viewerWidth => ({ min: 150, max: Math.max(250, Math.round(viewerWidth * .6)) });
+function sidebarWidthFor(viewerWidth) {
+  const { min, max } = sidebarBounds(viewerWidth);
+  return Math.round(Math.max(min, Math.min(max, userSidebar || Math.max(150, Math.min(250, viewerWidth * .26)))));
+}
+function applySidebar(width) {
+  if (width === fittedSidebar) return;
+  fittedSidebar = width;
+  plugin('ui').mergeSchema({ sidebars: { 'sidebar-panel': { width: `${width}px` } } });
+  const open = document.querySelector('#viewer embedpdf-container')?.shadowRoot?.querySelector('.border-r[style*="width"]');
+  if (open) open.style.width = `${width}px`;
+  document.querySelector('#sidebar-grip').style.left = `${width}px`;
+}
+function applyThumbnails(width) {
+  if (width === fittedThumbnail) return;
+  fittedThumbnail = width;
+  const thumbnails = registry.getPlugin('thumbnail');
+  if (!thumbnails?.cfg || typeof thumbnails.calculateWindowState !== 'function') return;
+  thumbnails.cfg.width = width;
+  thumbnails.taskCaches?.forEach(cache => { cache.forEach(task => task.abort?.({ code: 'cancelled', message: 'Larghezza miniature cambiata.' })); cache.clear(); });
+  if (session?.currentId) thumbnails.calculateWindowState(session.currentId);
+}
+function fitThumbnails() {
+  const viewerWidth = document.querySelector('#viewer').clientWidth;
+  if (!registry || !viewerWidth) return;
+  const desktop = desktopLayout();
+  const sidebar = desktop ? sidebarWidthFor(viewerWidth) : viewerWidth;
+  if (desktop) applySidebar(sidebar);
+  applyThumbnails(Math.max(60, Math.min(desktop ? 400 : 220, sidebar - 34)));
+}
+const scheduleFit = () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fitThumbnails); };
+function installSidebarGrip() {
+  const grip = document.querySelector('#sidebar-grip');
+  let drag = null;
+  grip.onpointerdown = event => {
+    if (event.button !== 0 || locked || working) return;
+    drag = { pointerId: event.pointerId, startX: event.clientX, startWidth: fittedSidebar };
+    grip.setPointerCapture(event.pointerId); grip.classList.add('dragging'); event.preventDefault();
+  };
+  grip.onpointermove = event => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const { min, max } = sidebarBounds(document.querySelector('#viewer').clientWidth);
+    userSidebar = Math.round(Math.max(min, Math.min(max, drag.startWidth + event.clientX - drag.startX)));
+    applySidebar(userSidebar);
+  };
+  const finish = event => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    drag = null; grip.classList.remove('dragging');
+    if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
+    try { localStorage.setItem(SIDEBAR_KEY, String(userSidebar)); } catch { /* keep for the session only */ }
+    scheduleFit();
+  };
+  grip.onpointerup = finish; grip.onpointercancel = finish; grip.onlostpointercapture = finish;
+  grip.ondblclick = () => { userSidebar = 0; try { localStorage.removeItem(SIDEBAR_KEY); } catch { /* ignore */ } fittedSidebar = 0; scheduleFit(); };
+}
+function syncSidebarGrip() {
+  const grip = document.querySelector('#sidebar-grip');
+  grip.hidden = !registry || !session?.currentId || !desktopLayout() || panelOpen || !!textSurface?.active || !!formSurface?.active || !!markdown?.active;
 }
 
 async function waitForLayout(id) {
@@ -412,7 +485,9 @@ try {
     unavailable: () => locked || working,
     suspended: () => !!markdown?.active || !!formSurface?.active || !!textSurface?.active || !!workbench?.active || !!highlightSurface?.active,
     read: action => enqueue(action), run: action => enqueue(() => withWorking(action)), emit: (type, payload) => bridge.emit(type, payload) });
-  plugin('scroll').onLayoutReady(event => layouts.add(event.documentId));
+  plugin('scroll').onLayoutReady(event => { layouts.add(event.documentId); scheduleFit(); });
+  new ResizeObserver(scheduleFit).observe(document.querySelector('#viewer'));
+  installSidebarGrip(); scheduleFit();
   plugin('document-manager').onDocumentClosed(id => layouts.delete(id));
   plugin('scroll').onStateChange(state => { strategy = state.strategy; });
   plugin('scroll').onPageChange(() => { const view = viewerState(); markdown.showPage(view.page); bridge.emit('viewer.state', view); });
@@ -452,6 +527,7 @@ try {
     if (key === 'p') bridge.emit('host.print');
     if (key === 's') bridge.emit(markdown.textEditing ? (event.shiftKey ? 'host.markdownSaveAs' : 'host.markdownSave') : (event.shiftKey ? 'host.saveAs' : 'host.save'));
     if (key === 'z' || key === 'y') enqueue(async () => {
+      if (locked || !editor) return;
       await formSurface.flush();
       if (await textSurface.flush()) await withWorking(async () => { await (key === 'z' ? editor?.undo() : editor?.redo()); await formSurface.refresh(); });
     }).catch(showError);

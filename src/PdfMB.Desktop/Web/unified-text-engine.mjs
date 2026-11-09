@@ -23,8 +23,10 @@ export function createUnifiedTextTools(api, textTools, workbenchTools) {
       }, 0));
     } finally { free(p); api.FPDFFont_Close(font); }
   }
+  // Only native text is placed one padding inside its box; see textLayout.
+  const paddingOf = input => input.source === 'content' ? LAYOUT_PADDING : 0;
   const layout = (document, input, width) =>
-    measured(document, input, measure => textLayout(input.contents, width, input.size, measure));
+    measured(document, input, measure => textLayout(input.contents, width, input.size, measure, paddingOf(input)));
   const natural = (document, input) =>
     measured(document, input, measure => naturalLayout(input.contents, input.size, measure));
   function compact(document, page, input) {
@@ -33,9 +35,15 @@ export function createUnifiedTextTools(api, textTools, workbenchTools) {
     // An unconstrained block, such as a single line the user never resized,
     // grows rightwards and only wraps at the edge of the page.
     const sheet = raw(page, { x: 0, y: 0, ...textTools.geometry(page) });
-    const available = Math.max(12, sheet.x + sheet.width - bounds.x);
+    // The box is rounded up past the lines it holds: leave that room before
+    // the edge, or a line wrapped exactly at the page would be rejected.
+    const available = Math.max(12, sheet.x + sheet.width - bounds.x - .25);
     const measured = layout(document, input, Math.max(12, Math.min(requested, available)));
-    return { ...input, position: screen(page, { ...bounds, width: measured.width, height: measured.height }), layout: measured };
+    // A box sized to its text near the bottom or right edge moves inside the
+    // page instead of failing validation and holding the draft hostage.
+    const x = Math.max(sheet.x, Math.min(bounds.x, sheet.x + sheet.width - measured.width));
+    const y = Math.max(sheet.y, Math.min(bounds.y, sheet.y + sheet.height - measured.height));
+    return { ...input, position: screen(page, { x, y, width: measured.width, height: measured.height }), layout: measured };
   }
   function groups(document, page, { canContent = true, canAnnotate = true } = {}) {
     const items = [];
@@ -50,9 +58,53 @@ export function createUnifiedTextTools(api, textTools, workbenchTools) {
       // artwork stays in the object inspector, rather than being silently flattened.
       if (item.type !== 1 || item.renderMode !== 0 || item.opacity !== 255 || !item.text.trim() || !m || Math.abs(m[1]) > .001 || Math.abs(m[2]) > .001 || m[0] <= 0 || m[3] <= 0 || Math.abs(m[0] - m[3]) > .01) continue;
       items.push({ id: `content-${item.index}`, source: 'content', members: [item.index], contents: item.text.trimEnd(),
-        font: item.fontCode, fontKey: item.fontKey, size: item.size * m[0], color: item.color, rawPosition: item.rawPosition });
+        font: item.fontCode, fontKey: item.fontKey, size: item.size * m[0], color: item.color, rawPosition: item.rawPosition,
+        // Raw space is PDF user space with y negated: the text origin's y is the baseline.
+        baseline: -m[5] });
     }
-    return groupNearbyText(items).map(group => {
+    // The page's text layer, with the spaces PDFium found or inserted, decides
+    // whether two native fragments are separated by a space. Its characters are
+    // located by origin; where it has none, the ink gap decides as before.
+    const characters = [];
+    if (canContent) {
+      const textPage = api.FPDFText_LoadPage(page);
+      if (textPage) {
+        const p = alloc(16);
+        try {
+          for (let i = 0, count = api.FPDFText_CountChars(textPage); i < count; i++) {
+            const code = api.FPDFText_GetUnicode(textPage, i);
+            if (api.FPDFText_GetCharOrigin(textPage, i, p, p + 8))
+              characters.push({ x: api.pdfium.HEAPF64[p / 8], baseline: -api.pdfium.HEAPF64[(p + 8) / 8], space: code === 32 || code === 160 || code === 9 });
+          }
+        } finally { free(p); api.FPDFText_ClosePage(textPage); }
+      }
+    }
+    // Characters are located by origin; a space PDFium inserted has no place
+    // of its own, so the sequence decides: the first glyph of the fragment is
+    // found, and the text layer is read backwards to the previous glyph. A
+    // space on the way separates the two; none means they are joined. When
+    // the previous glyph is not the line's last one the text layer runs in
+    // another order here, and the answer is left to the ink gap.
+    const near = (c, item) => Math.abs(c.baseline - item.baseline) <= item.size * .22;
+    const spaceBetween = (line, item) => {
+      if (item.source !== 'content' || !characters.length) return null;
+      const x = item.rawPosition.x, end = line.rawPosition.x + line.rawPosition.width;
+      let first = -1, distance = Infinity;
+      for (let i = 0; i < characters.length; i++) {
+        const c = characters[i];
+        if (c.space || !near(c, item) || c.x > x + .5 || c.x < x - item.size * .3) continue;
+        if (Math.abs(c.x - x) < distance) { distance = Math.abs(c.x - x); first = i; }
+      }
+      if (first < 0) return null;
+      let separated = false;
+      for (let i = first - 1; i >= 0; i--) {
+        const c = characters[i];
+        if (c.space) { separated = true; continue; }
+        return near(c, item) && c.x <= end + .5 && c.x >= line.rawPosition.x - item.size * .3 ? separated : null;
+      }
+      return null;
+    };
+    return groupNearbyText(items, { spaceBetween }).map(group => {
       const p = group.rawPosition, geometry = textTools.geometry(page);
       let box = p;
       if (group.source === 'content') {
@@ -71,7 +123,10 @@ export function createUnifiedTextTools(api, textTools, workbenchTools) {
       position.x = Math.max(0, position.x); position.y = Math.max(0, position.y);
       position.width = Math.min(position.width, geometry.width - position.x);
       position.height = Math.min(position.height, geometry.height - position.y);
-      return { ...group, position };
+      // Where the text's baseline sits below the box top, in points: the inline
+      // editor aligns its own baseline to it instead of hanging the text lower.
+      const baselineOffset = group.source === 'content' && Number.isFinite(group.baseline) ? group.baseline - box.y : undefined;
+      return { ...group, position, ...(baselineOffset === undefined ? {} : { baselineOffset }) };
     });
   }
   function remove(page, group) {

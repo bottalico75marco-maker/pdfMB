@@ -42,7 +42,8 @@ export class HighlightSurface {
     if (this.active) this.selection?.clear();
   }
   hideMenu() { this.menuRequest++; this.deleteTarget = null; this.deleteMenu.hidePopover(); }
-  suspend() { this.gesture = null; this.hideMenu(); this.selection?.clear(); }
+  // Outside highlight mode the viewer selection belongs to the reader (copying text): keep it.
+  suspend() { this.gesture = null; this.hideMenu(); if (this.active) this.selection?.clear(); }
   async showContext(pageIndex, event) {
     if (event.button !== 2 || this.pending || this.unavailable() || !this.editor()?.canText) return;
     event.preventDefault(); event.stopPropagation();

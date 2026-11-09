@@ -20,7 +20,7 @@ function fixture(rotation = 0) {
     } finally { api.pdfium.wasmExports.free(p); }
     api.FPDFPageObj_Transform(object, 1, 0, 0, 1, x, y); api.FPDFPageObj_SetFillColor(object, ...color, 255); api.FPDFPage_InsertObject(page, object);
   }
-  insert('Buon', 20, 340); insert('giorno', 50, 340); insert('Seconda riga', 20, 325);
+  insert('Buon', 20, 340); insert('giorno', 53, 340); insert('Seconda riga', 20, 325);
   insert('Colonna separata', 230, 340); insert('Titolo', 20, 375, 'Helvetica-Bold');
   assert.ok(api.FPDFPage_GenerateContent(page)); api.FPDFPage_SetRotation(page, rotation);
   return { doc, page, close() { api.FPDF_ClosePage(page); api.FPDF_CloseDocument(doc); } };
@@ -41,7 +41,7 @@ test('nearby native fragments become one block, while columns and different styl
     try {
       api.FPDFPage_SetCropBox(f.page, 10, 10, 390, 390);
       const groups = unified.groups(f.doc, f.page);
-      assert.equal(groups.length, 3);
+      assert.equal(groups.length, 3, JSON.stringify(groups.map(g => g.contents)));
       const paragraph = groups.find(g => g.contents.startsWith('Buon'));
       assert.equal(paragraph.contents, 'Buon giorno\nSeconda riga'); assert.equal(paragraph.members.length, 3);
       assert.equal(groups.find(g => g.contents === 'Titolo').font, 5, 'Bold style is recognized');
@@ -87,7 +87,11 @@ test('wrapping retains long words, Unicode and explicit lines without overflowin
   assert.ok(result.lines.every(line => measure(line) <= 66));
   assert.equal(result.lines.join('').replaceAll(' ', ''), 'Caffèlunghissimaparola€fine');
   const item = (id, x, color = '#000000') => ({ id, members: [id], source: 'annotation', fontKey: '4', size: 12, color, contents: id, rawPosition: { x, y: 0, width: 20, height: 12 } });
-  assert.equal(groupNearbyText([item('a', 0), item('b', 22, '#ff0000')]).length, 2, 'Different colors are never merged');
+  assert.equal(groupNearbyText([item('a', 0), item('b', 22, '#ff0000')]).length, 2, 'Managed boxes of different colours are never merged');
+  const native = (id, x, color = '#000000', font = 4) => ({ ...item(id, x, color), source: 'content', font, fontKey: String(font) });
+  const joined = groupNearbyText([native('aa', 0), native('b', 22, '#ff0000', 5), native('ccc', 44)]);
+  assert.equal(joined.length, 1, 'Native text of one line joins across colours and weights');
+  assert.equal(joined[0].font, 4); assert.equal(joined[0].color, '#000000'); assert.equal(joined[0].mixed, true, 'The block takes the dominant style and says it is mixed');
 });
 
 test('compacted FreeText keeps a short sentence on one line in the saved PDF appearance', () => {
@@ -150,7 +154,10 @@ test('blocks of consecutive lines do not overlap, so a click selects the line it
   const f = stackFixture();
   try {
     const groups = unified.groups(f.doc, f.page);
-    assert.equal(groups.length, 4, 'The paragraph plus three differently coloured lines');
+    // Native lines of different colours now form one block, edited in the dominant style.
+    assert.equal(groups.length, 2, JSON.stringify(groups.map(g => g.contents)));
+    const coloured = groups.find(g => g.contents === 'Riga rossa\nRiga nera\nRiga blu');
+    assert.ok(coloured?.mixed, 'Three colours in one block are reported as mixed');
     const right = p => p.x + p.width, bottom = p => p.y + p.height;
     for (const a of groups) for (const b of groups) {
       if (a === b) continue;
@@ -160,8 +167,7 @@ test('blocks of consecutive lines do not overlap, so a click selects the line it
       // boxes used to stand 4 pt into their neighbour and stole its clicks.
       assert.ok(shared <= a.position.width / 8, `${a.contents} overlaps ${b.contents} by ${shared.toFixed(2)} pt²`);
     }
-    for (const group of groups.filter(group => !group.contents.includes('\n')))
-      assert.ok(Math.abs(group.position.height - 12 * 1.2) < .1, 'A single line is exactly one line of leading tall');
+    assert.ok(Math.abs(coloured.position.height - 3 * 12 * 1.2) < 2.5, `Three lines of leading: ${coloured.position.height}`);
   } finally { f.close(); }
 });
 
@@ -242,4 +248,96 @@ test('a space between runs is restored once, and never invented inside a word', 
       assert.equal(groups[0].contents, word, `${word} must not gain a space`);
     } finally { f.close(); }
   }
+});
+
+// The saved appearance is flowed again by PDFium inside the annotation
+// rectangle. The box must hold exactly the lines PDFium produces: one line
+// fewer clipped the text, one more left a blank band under it, and a box
+// wider than the one drawn ignored the width the user chose.
+test('FreeText boxes hold exactly the lines PDFium lays out and never exceed the requested width', () => {
+  const words = 'il la di che e a un per con non una su le si da come anche più ma dei del nel alla sono casella testo documento pagina modifica salvataggio verifica riga parola lunghissima supercalifragilistichespiralidoso PDF MB editor Windows locale stampa oscuramento modulo campo data firma è perché così 12.345,67 (nota) fine.'.split(' ');
+  let seed = 11; const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const pick = list => list[Math.floor(random() * list.length)];
+  let checked = 0;
+  for (let n = 0; n < 120; n++) {
+    let contents = Array.from({ length: 1 + Math.floor(random() * 30) }, () => pick(words)).join(' ');
+    if (random() < .2) contents = contents.replace(/ /g, (space, index) => index % 7 === 3 ? '\n' : space);
+    const size = pick([6, 8, 9.96, 10, 11.04, 12, 14, 16, 18, 24, 36]), font = Math.floor(random() * 12), width = 30 + Math.floor(random() * 400);
+    const doc = api.FPDF_CreateNewDocument(), page = api.FPDFPage_New(doc, 0, 600, 5000);
+    try {
+      const input = { id: `pdfmb-${crypto.randomUUID()}`, contents, font, size, color: '#000000', position: { x: 10, y: 10, width, height: 60 }, layoutWidth: width };
+      const fitted = unified.compact(doc, page, input);
+      texts.apply(page, [{ id: input.id, value: texts.prepare(page, fitted) }]);
+      const annot = api.FPDFPage_GetAnnot(page, 0), length = api.FPDFAnnot_GetAP(annot, 0, 0, 0), ptr = api.pdfium.wasmExports.malloc(length);
+      api.FPDFAnnot_GetAP(annot, 0, ptr, length);
+      const stream = new TextDecoder('utf-16le').decode(api.pdfium.HEAPU8.slice(ptr, ptr + length - 2));
+      api.pdfium.wasmExports.free(ptr); api.FPDFPage_CloseAnnot(annot);
+      const shown = (stream.match(/[)] Tj/g) ?? []).length;
+      assert.equal(shown, fitted.layout.lines.length, `font ${font} ${size}pt in ${width}pt: ${JSON.stringify(contents)}`);
+      assert.ok(fitted.position.width <= Math.max(12, width) + .25, `box ${fitted.position.width} exceeds requested ${width}`);
+      checked++;
+    } finally { api.FPDF_ClosePage(page); api.FPDF_CloseDocument(doc); }
+  }
+  assert.ok(checked >= 100);
+});
+
+test('a box whose text reaches the bottom or right edge is moved inside the page instead of being rejected', () => {
+  const f = fixture();
+  try {
+    const input = { id: `pdfmb-${crypto.randomUUID()}`, contents: 'riga uno\nriga due\nriga tre', font: 4, size: 12, color: '#000000', position: { x: 50, y: 390, width: 60, height: 40 }, layoutWidth: 1e6 };
+    const fitted = unified.compact(f.doc, f.page, input);
+    assert.ok(fitted.position.y + fitted.position.height <= 400 + .01, 'bottom edge');
+    assert.equal(fitted.layout.lines.length, 3);
+    texts.apply(f.page, [{ id: input.id, value: texts.prepare(f.page, fitted) }]);
+    const wide = { ...input, id: `pdfmb-${crypto.randomUUID()}`, contents: 'una riga lunga che arriva fino al bordo destro e oltre', position: { x: 300, y: 20, width: 60, height: 20 } };
+    const fittedWide = unified.compact(f.doc, f.page, wide);
+    assert.ok(fittedWide.position.x + fittedWide.position.width <= 400 + .01, 'right edge');
+    assert.ok(fittedWide.layout.lines.length > 1, 'wraps at the page edge');
+    texts.apply(f.page, [{ id: wide.id, value: texts.prepare(f.page, fittedWide) }]);
+    assert.equal(texts.notes(f.page).length, 2);
+  } finally { f.close(); }
+});
+
+// The native default-appearance getter only knows /Helv; the other eleven
+// standard fonts came back as -1 and the box could never be edited again.
+test('every standard font of an applied box is read back, so the box stays editable after reopening', () => {
+  for (let font = 0; font < 12; font++) {
+    const f = fixture();
+    try {
+      const id = `pdfmb-${crypto.randomUUID()}`;
+      texts.apply(f.page, [{ id, value: texts.prepare(f.page, { id, contents: 'dfadfa', font, size: 24, color: '#102030', position: { x: 20, y: 20, width: 120, height: 30 } }) }]);
+      reopen(f.doc, (doc, page) => {
+        const note = texts.notes(page)[0];
+        assert.equal(note.font, font); assert.equal(note.size, 24); assert.equal(note.color, '#102030');
+        const group = unified.groups(doc, page).find(group => group.source === 'annotation');
+        unified.change(doc, page, { ...group, contents: 'dfadfa due', position: { ...group.position, width: 60 }, layoutWidth: 60 });
+        assert.equal(texts.notes(page)[0].font, font, 'editing keeps the font');
+      });
+    } finally { f.close(); }
+  }
+});
+
+// PDFs written glyph by glyph (Word, Chromium) place every letter in its own
+// object. Ink boxes differ per letter shape, so rows and lines must follow the
+// text origin, and the page's text layer must decide where the spaces are.
+test('glyph-by-glyph native text groups into one line with the spaces of the text layer only', () => {
+  const doc = api.FPDF_CreateNewDocument(), page = api.FPDFPage_New(doc, 0, 500, 200);
+  function glyph(value, x, y, font, size) {
+    const object = api.FPDFPageObj_NewTextObj(doc, font, size), p = api.pdfium.wasmExports.malloc((value.length + 1) * 2);
+    try { for (let i = 0; i <= value.length; i++) api.pdfium.HEAPU16[p / 2 + i] = value.charCodeAt(i) || 0; assert.ok(api.FPDFText_SetText(object, p)); }
+    finally { api.pdfium.wasmExports.free(p); }
+    api.FPDFPageObj_Transform(object, 1, 0, 0, 1, x, y); api.FPDFPageObj_SetFillColor(object, 0, 51, 89, 255); api.FPDFPage_InsertObject(page, object);
+  }
+  try {
+    // Title: ascenders, a descender, round letters, an em dash and real space glyphs, 24 pt bold.
+    const title = 'Manuale — operativo'; let x = 40;
+    const widths = { M: 20, a: 13.3, n: 14.7, u: 14.7, l: 6.7, e: 13.3, ' ': 6.7, '—': 24, o: 14.7, p: 14.7, r: 9.3, t: 8, i: 6.7, v: 13.3 };
+    for (const ch of title) { glyph(ch, x, 150, 'Helvetica-Bold', 24); x += widths[ch]; }
+    // Monospace path, one glyph per object, no space glyphs anywhere.
+    x = 40; for (const ch of 'docs/a.md') { glyph(ch, x, 100, 'Courier', 9); x += 5.4; }
+    assert.ok(api.FPDFPage_GenerateContent(page));
+    const groups = unified.groups(doc, page);
+    assert.deepEqual(groups.map(g => g.contents).sort(), ['Manuale — operativo', 'docs/a.md']);
+    assert.equal(groups.find(g => g.contents.startsWith('Manuale')).members.length, title.replace(/ /g, '').length, 'every letter object is a member; space glyphs carry no ink and are not');
+  } finally { api.FPDF_ClosePage(page); api.FPDF_CloseDocument(doc); }
 });

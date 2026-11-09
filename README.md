@@ -2,21 +2,23 @@
 
 **Il tuo editor PDF per Windows:** organizza pagine, modifica testi, aggiungi annotazioni, stampa e oscura contenuti. Tutto in locale.
 
-**Versione pubblicata: [PDF MB 0.12.2](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.12.2)** · [Scarica ZIP Windows x64](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.12.2/PDF-MB-0.12.2-win-x64.zip) · [Checksum SHA-256](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.12.2/PDF-MB-0.12.2-win-x64.zip.sha256)
+**Versione pubblicata: [PDF MB 0.13.1](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.13.1)** · [Scarica ZIP Windows x64](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.13.1/PDF-MB-0.13.1-win-x64.zip) · [Checksum SHA-256](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.13.1/PDF-MB-0.13.1-win-x64.zip.sha256)
 
-### Novità della 0.12.2
+### Novità della 0.13.1
 
-- **Editing più stabile:** le modifiche pendenti vengono applicate all’uscita dal campo e il clic sul blocco successivo viene gestito anche durante l’aggiornamento della pagina.
-- **Selezione conservata:** il blocco modificato viene ritrovato dopo l’applicazione; i comandi successivi, compreso Elimina, vengono gestiti in sequenza.
-- **Raggruppamento migliorato:** i frammenti della stessa riga vengono ordinati da sinistra a destra anche con caratteri di altezze diverse. Le parole restano complete e gli spazi tra parole vengono ricostruiti senza aggiungerne al loro interno.
-- **Caselle adattate al contenuto:** una riga originale può crescere fino al bordo pagina; le caselle disegnate o ridimensionate conservano la larghezza scelta per il ritorno a capo.
+- **Casella sempre adeguata al testo:** il ritorno a capo dell’editor riproduce quello che PDFium applica al salvataggio, così l’ultima riga non viene più tagliata; le caselle non superano la larghezza disegnata, si ridispongono subito al ridimensionamento e restano dentro la pagina.
+- **Blocchi completi:** il raggruppamento segue la linea di base del testo e unisce i paragrafi anche se scritti lettera per lettera o con stili misti (grassetto, monospazio, colori), con lo stile prevalente e un avviso alla selezione. Gli spazi tra parole vengono dal livello testo del PDF.
+- **Modifica in ogni font:** le caselle in Courier, grassetto, corsivo o Times rilette dal PDF tornano modificabili; copia e incolla dell’intera casella con Ctrl+C e Ctrl+V; caratteri non supportati elencati alla selezione e spostamenti non applicabili che tornano al loro posto.
+- **Pannello miniature trascinabile:** il bordo destro ne cambia la larghezza, ricordata tra le sessioni; le miniature riempiono il pannello.
+- **Robustezza dell’app Windows:** arresto di WebView2 gestito senza attese di 120 secondi, Markdown non UTF-8 segnalato, salvataggio possibile anche dopo l’arresto del motore di modifica, traduzioni del viewer completate.
 
-La release ha superato 65 test automatici Node/PDFium, i controlli desktop Windows e la prova browser Chromium. [Note complete](docs/releases/0.12.2.md) · [Verifiche e pubblicazione su GitHub Actions](https://github.com/bottalico75marco-maker/pdfMB/actions/runs/40954513366).
+La release ha superato 73 test automatici Node/PDFium, i controlli desktop Windows e la prova browser Chromium. [Note complete](docs/releases/0.13.1.md) · [Verifiche e pubblicazione su GitHub Actions](https://github.com/bottalico75marco-maker/pdfMB/actions/workflows/desktop.yml).
 
 ## Stato del progetto e versione attuale
 
 | Riferimento | Stato |
 | --- | --- |
+| **0.13.1** | Editor testo affidabile: caselle adeguate al testo come lo salva PDFium, blocchi completi anche con stili misti, modifica in ogni font standard, pannello miniature trascinabile e correzioni dell’host Windows. [Release 0.13.1](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.13.1). |
 | **0.12.2** | Editor testo più stabile: modifiche al primo tentativo, selezione conservata e raggruppamento delle parole frammentate con spazi corretti. [Release 0.12.2](https://github.com/bottalico75marco-maker/pdfMB/releases/tag/v0.12.2), build locale in `artifacts/app-0.12.2`. |
 | **0.12.1** | Controllo aggiornamenti da GitHub all’avvio e dal menu Aiuto; avviso con note e download. Release automatiche dai tag `vX.Y.Z`, con test, ZIP, SHA-256 e note incluse. Build locale in `artifacts/app-0.12.1`. |
 | **0.12.0** | Il pulsante Testo unisce inserimento e modifica del testo originale. Frammenti vicini e con stile compatibile raggruppati; caselle adattate al contenuto, salvataggio e cronologia comune. Build locale in `artifacts/app-0.12.0`. |
@@ -41,13 +43,13 @@ La release ha superato 65 test automatici Node/PDFium, i controlli desktop Windo
 | **0.8.0** | Versione storica con strumenti di annotazione, modifica oggetti, stampa, oscuramento e guida Windows, confluita in `main`. |
 | **0.6.5** | Versione storica con correzioni del salvataggio delle caselle di testo; cartella binaria conservata nel repository. |
 
-La versione **0.12.2** migliora la stabilità dell’editor e il raggruppamento dei frammenti di testo. Include il controllo aggiornamenti e le release automatiche della 0.12.1, Testo unificato della 0.12.0 e confronto Markdown/OCR locale della 0.11.0: istruzioni in [Markdown e Ollama](docs/MARKDOWN.md). Tutti i branch sono stati consolidati in `main`, unico ramo di sviluppo del progetto, conservando la cronologia completa. Per usare le nuove funzioni scegliere la build corrispondente.
+La versione **0.13.1** rende affidabile l’editor di testo (caselle adeguate al testo, blocchi completi, tutti i font modificabili) e introduce il pannello miniature trascinabile. Include la stabilità della 0.12.2, il controllo aggiornamenti e le release automatiche della 0.12.1, Testo unificato della 0.12.0 e confronto Markdown/OCR locale della 0.11.0: istruzioni in [Markdown e Ollama](docs/MARKDOWN.md). Tutti i branch sono stati consolidati in `main`, unico ramo di sviluppo del progetto, conservando la cronologia completa. Per usare le nuove funzioni scegliere la build corrispondente.
 
 **Collegamenti:** [Guida Windows](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/GUIDA-WINDOWS.html) · [Checklist unica delle prove](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/CHECKLIST-MANUALE.md) · [Build Windows su GitHub Actions](https://github.com/bottalico75marco-maker/pdfMB/actions) · [Architettura](https://github.com/bottalico75marco-maker/pdfMB/blob/main/docs/ARCHITETTURA.md)
 
 ## Installazione su Windows
 
-1. Scaricare [PDF-MB-0.12.2-win-x64.zip](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.12.2/PDF-MB-0.12.2-win-x64.zip) oppure consultare l’[ultima release pubblica](https://github.com/bottalico75marco-maker/pdfMB/releases/latest). Il [checksum SHA-256 della 0.12.2](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.12.2/PDF-MB-0.12.2-win-x64.zip.sha256) permette di verificare l’integrità del download.
+1. Scaricare [PDF-MB-0.13.1-win-x64.zip](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.13.1/PDF-MB-0.13.1-win-x64.zip) oppure consultare l’[ultima release pubblica](https://github.com/bottalico75marco-maker/pdfMB/releases/latest). Il [checksum SHA-256 della 0.12.2](https://github.com/bottalico75marco-maker/pdfMB/releases/download/v0.12.2/PDF-MB-0.12.2-win-x64.zip.sha256) permette di verificare l’integrità del download.
 2. Estrarre **l’intera cartella** dello ZIP.
 3. Verificare la presenza di **.NET Desktop Runtime 10** e **Microsoft Edge WebView2 Runtime** su Windows a 64 bit.
 4. Avviare **PdfMB.Desktop.exe**.
@@ -60,7 +62,7 @@ Le build dei singoli commit restano disponibili tra gli artefatti della workflow
 
 La guida si apre offline con **Aiuto → Guida Windows** o **F1**, nel browser predefinito. Include istruzioni per tutti gli strumenti e per la risoluzione dei problemi più comuni. La scritta fissa “Gestione pagine” in alto a destra è stata rimossa; il pulsante **Gestisci pagine** resta disponibile.
 
-## Tutte le funzionalità disponibili nella 0.12.2
+## Tutte le funzionalità disponibili nella 0.13.1
 
 ### Aggiornamenti
 
@@ -75,7 +77,7 @@ Ogni tag `vX.Y.Z` avvia test, build e pubblicazione della release con ZIP, check
 - **OCR e descrivi foto** estrae e invia una sola immagine alla volta a Ollama locale, trascrivendo scansioni e descrivendo immagini. Il campo Modello propone i nomi installati; senza servizio e modello visivo locale il comando resta disabilitato.
 - **Interrompi** conserva il risultato parziale. Salvataggio UTF-8, limite 8 MB, controllo delle modifiche esterne e conferma delle modifiche pendenti prima di cambiare documento o uscire.
 
-Istruzioni complete in [Markdown e Ollama](docs/MARKDOWN.md). La build locale completa è in `artifacts/app-0.12.2`; il pacchetto è `artifacts/PDF-MB-0.12.2-win-x64.zip`, accompagnato dal checksum SHA-256.
+Istruzioni complete in [Markdown e Ollama](docs/MARKDOWN.md). La build locale completa è in `artifacts/app-0.13.1`; il pacchetto è `artifacts/PDF-MB-0.13.1-win-x64.zip`, accompagnato dal checksum SHA-256.
 
 ### Nuovo documento e pagine vuote
 
@@ -87,6 +89,7 @@ Istruzioni complete in [Markdown e Ollama](docs/MARKDOWN.md). La build locale co
 
 ### Apertura e consultazione
 
+- Il pannello delle miniature si allarga e si restringe trascinandone il bordo destro (doppio clic per tornare alla larghezza automatica, scelta ricordata tra le sessioni); senza intervento segue la finestra, da 150 a 250 pt. Le miniature riempiono sempre il pannello invece di restare fisse a 150 px. Sotto 768 px il viewer passa al pannello dal basso a tutta larghezza.
 - Apertura mediante dialogo Windows, elenco degli ultimi dieci file, trascinamento di un PDF sulla finestra o percorso passato all’avvio.
 - Registrazione in **Apri con** e comando **Aiuto → Imposta come lettore PDF predefinito…**: Windows permette di scegliere PDF MB per i file `.pdf`; il doppio clic apre il documento nel programma.
 - Un documento alla volta, fino a **64 MB**.
@@ -123,9 +126,9 @@ Il trascinamento delle miniature non è previsto. La sorgente di un inserimento 
 ### Testo: inserimento e modifica
 
 - Il pulsante **Testo** attiva la modifica sulle pagine; la barra contestuale compare solo in questa modalità.
-- Clic sul testo originale o su una casella per modificarlo; clic o trascinamento nello spazio vuoto per inserire testo. **Nuova casella** permette di inserire anche sopra un testo esistente.
-- Frammenti vicini e allineati, con font, dimensione e colore compatibili, selezionabili come un solo blocco. L’ordinamento per riga e posizione ricompone anche parole divise tra oggetti con caratteri di altezze diverse, preservando gli spazi tra parole. Colonne distanti e stili diversi restano separati; il raggruppamento da solo non modifica il documento.
-- Caselle ridotte al contenuto con un piccolo margine. Le righe originali singole possono allungarsi fino al bordo pagina; paragrafi già su più righe e caselle disegnate o ridimensionate mantengono la larghezza prevista per il ritorno a capo. Spostamento dal bordo e ridimensionamento con otto maniglie.
+- Clic sul testo originale o su una casella per modificarlo; clic o trascinamento nello spazio vuoto per inserire testo. Alla selezione la casella si adatta al testo come lo mostra l’editor, con la prima riga allineata alla linea di base del testo originale, così ogni riga resta leggibile e al suo posto anche quando il font originale non è uno dei tre standard. **Nuova casella** permette di inserire anche sopra un testo esistente.
+- Un paragrafo del testo originale è un solo blocco anche quando mescola grassetto, corsivo, monospazio o colori: la barra mostra lo stile prevalente e lo applica a tutto il blocco in caso di modifica, con un avviso alla selezione. Le caselle create da PDF MB si uniscono solo tra loro e a parità di stile. Se il blocco contiene caratteri assenti nei font standard (frecce, lettere greche, emoji) l’avviso li elenca: vanno sostituiti o rimossi prima di applicare, e uno spostamento che non può essere applicato torna al suo posto. Le righe seguono la linea di base del testo, non il contorno dei glifi: anche i PDF scritti lettera per lettera (Word, Chromium) con trattini, discendenti e lettere tonde formano un blocco unico. Gli spazi tra parole vengono presi dal livello testo del PDF, così i caratteri stretti del monospazio non introducono spazi inesistenti. Colonne distanti e stili diversi restano separati; il raggruppamento da solo non modifica il documento.
+- Caselle ridotte al contenuto: l’altezza segue sempre le righe del testo, anche mentre si scrive o si ridimensiona. Le righe originali singole e le caselle create con un clic possono allungarsi fino al bordo pagina; paragrafi già su più righe e caselle disegnate o ridimensionate mantengono la larghezza scelta per il ritorno a capo, senza mai superarla. Il ritorno a capo dell’editor riproduce quello che PDFium applica al salvataggio, così l’ultima riga non viene più tagliata. Spostamento dal bordo e ridimensionamento con otto maniglie.
 - Font **Helvetica, Times e Courier**, dimensioni **6–144 pt**, grassetto, corsivo e colore.
 - Selezione dei caratteri e copia/incolla del testo all’interno della casella.
 - Copia/incolla dell’intera casella dal menu contestuale o da tastiera, con nuovo identificativo e conservazione dello stile.
@@ -254,7 +257,7 @@ Annulla può ripristinare la sorgente nella sessione: condividere soltanto il PD
 - Font remoti di fallback disabilitati: un PDF con font mancanti può richiedere una verifica sull’originale.
 - Fino a 1.000 modifiche a caselle o evidenziazioni per pagina; fino a 1.000 rettangoli per tratto di evidenziatore e pagina.
 - La superficie Strumenti ispeziona pagine con un massimo di 2.000 oggetti/annotazioni.
-- Alcune finestre interne del viewer possono mostrare testo inglese di fallback.
+- Le finestre interne del viewer non ancora tradotte (ad esempio messaggi di errore di EmbedPDF) possono mostrare testo inglese di fallback; ricerca, segnalibri, caricamento ed errori del documento sono in italiano.
 - Nessuna certificazione della validità delle firme digitali o della conformità PDF/A.
 - Dopo ricostruzioni/importazioni verificare segnalibri, link interni, annotazioni e moduli sui PDF effettivamente utilizzati.
 
@@ -264,6 +267,7 @@ La cronologia seguente è ricostruita dai sorgenti, dalla documentazione e dalle
 
 | Versione | Funzionalità e modifiche |
 | --- | --- |
+| **0.13.1** | Ritorno a capo delle caselle identico a quello di PDFium, raggruppamento per linea di base e con stili misti, spazi dal livello testo, font letti dalla stringa DA, copia/incolla da tastiera, pannello miniature trascinabile, correzioni dell’host Windows e igiene del repository. [Note di rilascio](docs/releases/0.13.1.md). |
 | **0.12.2** | Stabilità dell’editing, recupero della selezione e gestione dei comandi durante l’applicazione; raggruppamento dei frammenti per riga e posizione, ricostruzione corretta degli spazi e crescita delle righe originali verso il bordo pagina. [Note di rilascio](docs/releases/0.12.2.md). |
 | **0.12.1** | Controllo aggiornamenti all’avvio e dal menu Aiuto, preferenza persistente e limite giornaliero; release automatiche da tag con test Windows/Chromium, ZIP, checksum e note. [Note di rilascio](docs/releases/0.12.1.md). |
 | **0.12.0** | Testo unificato: inserimento e modifica del testo originale dallo stesso pulsante, raggruppamento dei frammenti compatibili, caselle compatte e cronologia comune. |
@@ -296,15 +300,14 @@ cd pdfMB
 git switch main
 npm ci
 npm run assets
-npm test
-dotnet build PdfMB.sln -c Release
+npm run check   # test Node, build Release e controlli desktop (come in CI)
 dotnet run --project src/PdfMB.Desktop
 ```
 
 Pubblicazione della cartella Windows a 64 bit:
 
 ```powershell
-dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.12.2
+dotnet publish src/PdfMB.Desktop -c Release -r win-x64 --self-contained false -o artifacts/app-0.13.1
 ```
 
 Prova browser facoltativa:

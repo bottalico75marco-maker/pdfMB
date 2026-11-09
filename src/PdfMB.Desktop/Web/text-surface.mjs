@@ -1,4 +1,4 @@
-import { textLayout } from './text-layout.mjs';
+import { LAYOUT_PADDING, textLayout, unsupportedCharacters } from './text-layout.mjs';
 
 const families = { Helvetica: 4, Times: 8, Courier: 0 };
 const fontCss = { Helvetica: 'Arial, sans-serif', Times: '"Times New Roman", serif', Courier: '"Courier New", monospace' };
@@ -327,17 +327,27 @@ export class TextSurface {
   place(element, p) { Object.assign(element.style, { left: `${p.x}px`, top: `${p.y}px`, width: `${p.width}px`, height: `${p.height}px` }); }
   async select(index, note, editing = false) {
     if (this.unavailable() || this.pending || !this.deselect()) { this.status('Attendi l’applicazione della modifica corrente o correggi la casella.'); return; }
-    const input = { id: note.id, contents: note.contents, font: note.font, size: note.size, color: note.color, position: clone(note.position), source: note.source };
+    const input = { id: note.id, contents: note.contents, font: note.font, size: note.size, color: note.color, position: clone(note.position), source: note.source,
+      ...(Number.isFinite(note.baselineOffset) ? { baselineOffset: note.baselineOffset } : {}) };
     this.selected = { index, input, initial: JSON.stringify(input), existing: true, editing: false, ready: false,
-      // Only a block the source already wrapped carries a width to preserve.
-      wrapWidth: note.contents.includes('\n') ? (this.records.get(index)?.context?.rotation % 2 ? note.position.height : note.position.width) : undefined };
+      // Only a box this editor wrapped carries a width to preserve. Original
+      // paragraphs keep their own line breaks and run to the page edge: the
+      // standard font that replaces theirs is wider, and wrapping at the old
+      // width pushed a line out of the box, over the paragraph below.
+      wrapWidth: note.source === 'annotation' && note.contents.includes('\n') ? (this.records.get(index)?.context?.rotation % 2 ? note.position.height : note.position.width) : undefined };
     this.reselect = null;
     this.currentPage = index; this.onPage(index); this.setStyles(input); this.drawBoxes(index); this.updateControls(); this.notify();
+    const unsupported = unsupportedCharacters(note.contents);
+    if (unsupported.length) this.status(`Il blocco contiene caratteri che i font standard non hanno (${unsupported.join(' ')}): per applicare una modifica vanno sostituiti o rimossi.`);
+    else if (note.mixed) this.status('Il blocco unisce stili diversi (grassetto, corsivo, monospazio o colori): applicando una modifica tutto il testo prende lo stile prevalente mostrato nella barra.');
     const selection = this.selected, generation = this.generation;
     try {
       const context = await this.read(index, note.id);
       if (this.selected !== selection || generation !== this.generation) return;
       this.draw(this.records.get(index), context.image); selection.ready = true; this.drawBoxes(index);
+      // Size the box to the text as this editor renders it, so every line is
+      // readable; selecting alone is not an edit, so the fitted box is the baseline.
+      this.fitSelection(); selection.initial = JSON.stringify(selection.input); this.updateControls(); this.notify();
       if (selection.wantsCommit) this.commit(false);
       else if (editing || selection.wantsEdit) this.editText(); else this.selected.element?.focus({ preventScroll: true });
     } catch (error) { if (this.selected === selection) { this.deselect(true); this.status(error.message); } }
@@ -368,9 +378,20 @@ export class TextSurface {
     const family = input.font >= 8 ? 'Times' : input.font >= 4 ? 'Helvetica' : 'Courier';
     const r = this.records.get(selection.index).context.rotation;
     const { width: w, height: h } = input.position;
-    Object.assign(textarea.style, { fontFamily: fontCss[family], fontSize: `${input.size}px`,
+    // Match the worker's box: native text sits one padding inside it, a
+    // FreeText annotation starts at its edge, exactly where PDFium draws it.
+    const padding = input.source === 'content' ? LAYOUT_PADDING : 0;
+    // The box holds exactly the flowed lines below the top padding, so the
+    // field extends past the box by that padding instead of clipping the
+    // descenders of the last line.
+    // Put the first baseline of the field on the original text's baseline, so
+    // the words do not drop when a block is selected. The system fonts place
+    // their baseline this far below the top of a 1.2 line box.
+    const ascent = { Helvetica: .9465, Times: .9375, Courier: .8665 }[family];
+    const top = Number.isFinite(input.baselineOffset) ? input.baselineOffset - padding - ascent * input.size : 0;
+    Object.assign(textarea.style, { fontFamily: fontCss[family], fontSize: `${input.size}px`, padding: `${padding}px ${padding}px 0`, top: `${top}px`,
       fontWeight: [1, 2].includes(variant) ? 'bold' : 'normal', fontStyle: [2, 3].includes(variant) ? 'italic' : 'normal', color: input.color,
-      width: `${r % 2 ? h : w}px`, height: `${r % 2 ? w : h}px`,
+      width: `${r % 2 ? h : w}px`, height: `${(r % 2 ? w : h) + padding + Math.max(0, -top)}px`,
       lineHeight: '1.2', transform: ['none', `translateX(${w}px) rotate(90deg)`, `translate(${w}px, ${h}px) rotate(180deg)`, `translateY(${h}px) rotate(270deg)`][r] });
     selection.element.classList.toggle('editing', selection.editing);
   }
@@ -389,7 +410,8 @@ export class TextSurface {
     const room = [record.width - p.x, record.height - p.y, p.x + p.width, p.y + p.height][r];
     const wrapWidth = selection.wrapWidth ?? Math.max(12, room);
     selection.input.layoutWidth = selection.wrapWidth ?? UNBOUNDED;
-    const measured = textLayout(selection.input.contents, wrapWidth, selection.input.size, text => context.measureText(text).width);
+    const measured = textLayout(selection.input.contents, wrapWidth, selection.input.size, text => context.measureText(text).width,
+      selection.input.source === 'content' ? LAYOUT_PADDING : 0);
     const width = r % 2 ? measured.height : measured.width, height = r % 2 ? measured.width : measured.height;
     // Preserve the text's starting corner through permanent page rotations.
     if (r === 1 || r === 2) p.x += p.width - width;
@@ -480,7 +502,11 @@ export class TextSurface {
         position = { x: left, y: top, width: right - left, height: bottom - top };
       }
       this.selected.input.position = position; this.place(this.selected.element, position); this.applyInlineStyle();
-      if (d.kind !== 'move') this.selected.wrapWidth = record.context.rotation % 2 ? position.height : position.width;
+      // A resized box takes the dragged width as its wrap width and reflows at
+      // once, so the text is never hidden behind a box of the wrong height and
+      // the width actually chosen reaches the worker (a typed box had already
+      // declared itself unbounded, which a late resize must override).
+      if (d.kind !== 'move') { this.selected.wrapWidth = record.context.rotation % 2 ? position.height : position.width; this.fitSelection(); }
     }
   }
   pointerUp(index, event) {
@@ -493,8 +519,10 @@ export class TextSurface {
       const p = drag.position;
       if (p && p.width >= 12 && p.height >= 12) this.newBox(index, p);
       else {
+        // A click chose a starting point, not a width: let the text run to the
+        // edge of the page, as an unresized original line does.
         const record = this.records.get(index), width = Math.max(12, Math.min(200, record.width - drag.start.x)), height = Math.max(12, Math.min(40, record.height - drag.start.y));
-        this.newBox(index, { x: clamp(drag.start.x, 0, record.width - width), y: clamp(drag.start.y, 0, record.height - height), width, height });
+        this.newBox(index, { x: clamp(drag.start.x, 0, record.width - width), y: clamp(drag.start.y, 0, record.height - height), width, height }, undefined, false, false);
       }
     } else {
       this.updateControls(); this.notify();
@@ -529,12 +557,12 @@ export class TextSurface {
   }
   toggleStyle(button) { button.setAttribute('aria-pressed', String(button.getAttribute('aria-pressed') !== 'true')); this.styleChanged(); }
   resizeFont(delta) { this.size.value = clamp((Number(this.size.value) || 12) + delta, 6, 144); this.styleChanged(); }
-  newBox(index, position, template, commit = false) {
+  newBox(index, position, template, commit = false, sized = true) {
     if (this.unavailable() || !this.deselect()) return;
     // A pasted box always receives a fresh stable identifier.
     const input = { contents: '', ...this.style(), ...template, id: `pdfmb-${crypto.randomUUID()}`, position: clone(position) };
     this.selected = { index, input, initial: '', existing: false, editing: !commit, ready: true,
-      wrapWidth: this.records.get(index)?.context?.rotation % 2 ? position.height : position.width };
+      wrapWidth: sized ? (this.records.get(index)?.context?.rotation % 2 ? position.height : position.width) : undefined };
     this.reselect = null;
     this.creating = false; this.currentPage = index; this.onPage(index); this.setStyles(input); this.drawBoxes(index);
     this.updateControls(); this.notify();
@@ -558,11 +586,12 @@ export class TextSurface {
   }
   pasteEvent(event) {
     if (!this.active || inputTarget(event.composedPath()[0]) || this.unavailable()) return;
+    clearTimeout(this.pendingPaste); this.pendingPaste = null;
     const custom = event.clipboardData.getData('application/x-pdfmb-text');
     const text = event.clipboardData.getData('text/plain');
     let box;
     try { if (custom) box = JSON.parse(custom); } catch { /* plain text fallback */ }
-    if (!box && this.clipboard?.contents === text) box = this.clipboard;
+    if (!box && (!text || this.clipboard?.contents === text)) box = this.clipboard;
     if (!box && text) box = { contents: text, ...this.style(), width: 200, height: 70 };
     if (!box) return;
     event.preventDefault(); this.pasteBox(box);
@@ -624,7 +653,12 @@ export class TextSurface {
     if (!this.selected.ready) return false;
     // Empty new outlines are placeholders, never blank PDF annotations.
     if (!remove && !this.selected.existing && !this.selected.input.contents.trim()) { this.deselect(true); return true; }
-    if (!remove && !this.size.reportValidity()) return false;
+    // Existing text keeps its own size (11.04 pt, 9.96 pt…): validate the range,
+    // not a step, or such a block could never be applied or saved again.
+    const size = Number(this.size.value);
+    if (!remove && (!this.size.reportValidity() || !(size >= 6 && size <= 144))) {
+      this.status('Dimensione carattere tra 6 e 144 pt.'); return false;
+    }
     if (remove && !this.selected.existing) { this.deselect(true); return true; }
     if (remove && !confirm('Eliminare la casella selezionata? L’operazione può essere annullata.')) return false;
     const selection = this.selected, generation = this.generation;
@@ -643,6 +677,13 @@ export class TextSurface {
       return true;
     } catch (error) {
       if (this.generation === generation) this.selected = selection;
+      // A move or resize that cannot be applied goes back where the block was,
+      // instead of leaving the box stranded with its text hidden underneath.
+      const initial = selection.initial ? JSON.parse(selection.initial) : null;
+      if (initial && selection.input.contents === initial.contents && selection.element) {
+        selection.input.position = clone(initial.position); selection.input.layoutWidth = initial.layoutWidth;
+        this.place(selection.element, selection.input.position); this.applyInlineStyle();
+      }
       this.updateControls(); this.notify(); this.status(error.message);
       this.editText();
       return false;
@@ -703,11 +744,28 @@ export class TextSurface {
       const index = this.selected?.index ?? this.pointer?.index ?? this.currentPage;
       this.showContextMenu(index, event, true); return;
     }
+    // Modal dialogs of the pages panel own the keyboard while open; Enter and
+    // Delete elsewhere (page tiles, toolbar buttons) keep their native meaning.
+    if (document.querySelector('dialog[open]')) return;
     const target = event.composedPath()[0], typing = inputTarget(target);
+    const inside = target === document.body || this.surface.contains(target) || document.querySelector('#text-toolbar').contains(target);
     if (event.key === 'Escape') { event.preventDefault(); this.cancel(); return; }
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && this.selected) { event.preventDefault(); this.commit(false); return; }
-    if (!typing && (event.key === 'Delete' || event.key === 'Backspace') && this.selected) { event.preventDefault(); this.commit(true); return; }
-    if (!typing && event.key === 'Enter' && this.selected) { event.preventDefault(); this.editText(); }
+    // Chromium raises no copy event for Ctrl+C while a non-editable box has the
+    // focus, and no paste event when the system clipboard is empty: the whole
+    // box is copied and pasted from here, the clipboard events refine it.
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && !typing && inside && event.key.toLowerCase() === 'c' && this.selected && !this.unavailable()) {
+      const box = this.copyBox();
+      if (box) { event.preventDefault(); navigator.clipboard?.writeText(box.contents).catch(() => {}); }
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && !typing && inside && event.key.toLowerCase() === 'v' && this.clipboard && !this.unavailable()) {
+      clearTimeout(this.pendingPaste);
+      this.pendingPaste = setTimeout(() => { this.pendingPaste = null; this.pasteBox(); }, 80);
+      return;
+    }
+    if (!typing && inside && (event.key === 'Delete' || event.key === 'Backspace') && this.selected) { event.preventDefault(); this.commit(true); return; }
+    if (!typing && inside && event.key === 'Enter' && this.selected) { event.preventDefault(); this.editText(); }
   }
   updateList() {
     const selected = this.selected?.input.id ?? '';

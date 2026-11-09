@@ -64,7 +64,7 @@ internal sealed partial class MainForm
         finally
         {
             _updateChecking = false;
-            if (!IsDisposed) _checkUpdates.Enabled = true;
+            UpdateControls();
         }
     }
 

@@ -111,7 +111,9 @@ export class WorkbenchSurface {
       pointermove: event => this.pointerMove(pageIndex, event),
       pointerup: event => this.pointerUp(pageIndex, event),
       pointercancel: () => this.cancelGesture(),
-      lostpointercapture: () => { if (this.drag != null) this.cancelGesture(); }
+      // A click released while its page is still loading has already ended:
+      // cancelling here would drop it and force the user to click again.
+      lostpointercapture: () => { if (this.drag != null && !this.gesture?.ended) this.cancelGesture(); }
     };
     for (const [type, handler] of Object.entries(handlers)) host.addEventListener(type, handler);
     this.disposers.push(() => {

@@ -83,9 +83,15 @@ export class PageEditor {
       this.worker = new EditingWorker();
       const workerSource = source.slice(0);
       this.policy = await this.worker.request('load', workerSource, [workerSource]);
-      this.legacyTextSource = this.textRepairPending = !!this.policy.textRepairNeeded;
+      this.textRepairPending = !!this.policy.textRepairNeeded;
       this.formRepairPending = !!this.policy.formRepairNeeded;
-    } catch { this.worker?.dispose(); }
+      // Undo back to the initial state must regenerate repaired appearances
+      // and form scripts, never restore the defective source bytes.
+      this.legacySource = this.textRepairPending || this.formRepairPending;
+    } catch (error) {
+      this.worker?.dispose();
+      if (error?.message) this.policy.blockedReason = `${error.message} Sola consultazione.`;
+    }
   }
   finishOpen(pageCount) {
     this.pages = Array.from({ length: pageCount }, (_, id) => ({ id, rotation: 0, formFields: this.policy.formPages?.[id] ?? [] }));
@@ -129,7 +135,7 @@ export class PageEditor {
   }
   async apply(target) {
     if (!this.canEdit) throw new Error(this.blockedReason);
-    const bytes = key(target.pages) === this.initialKey && !this.legacyTextSource ? this.source : await this.worker.request('rebuild', target.pages);
+    const bytes = key(target.pages) === this.initialKey && !this.legacySource ? this.source : await this.worker.request('rebuild', target.pages);
     if (bytes.byteLength > MAX_BYTES) throw new Error('Il risultato supera il limite di 64 MB.');
     let index = target.pages.findIndex(page => page.id === target.focus);
     if (index < 0) index = Math.min(target.pageIndex, target.pages.length - 1);
@@ -410,7 +416,11 @@ export class PageEditor {
     // when the user simply reopens and saves an otherwise unchanged form.
     // Repair even when the user simply reopens and saves, preserving source
     // bytes and undo history. Only a successful disk write clears the flag.
-    if (this.textRepairPending || this.formRepairPending) {
+    // A stopped Worker must not block saving the result already committed:
+    // the repair is skipped (the flag stays pending) and encryption runs in a
+    // throwaway Worker, exactly as opening a protected PDF does.
+    const alive = !!this.worker?.alive;
+    if ((this.textRepairPending || this.formRepairPending) && alive) {
       const bytes = await this.worker.request('rebuild', this.pages);
       if (bytes.byteLength > MAX_BYTES) throw new Error('Il risultato supera il limite di 64 MB.');
       await this.replaceView(bytes, this.name, Math.max(1, this.currentPage()));
@@ -419,7 +429,9 @@ export class PageEditor {
     let bytes = this.bytes;
     if (this.password) {
       const buffer = bytes.slice(0);
-      bytes = (await this.worker.request('security', { buffer, password: this.password, encrypt: true }, [buffer])).buffer;
+      const worker = alive ? this.worker : new EditingWorker();
+      try { bytes = (await worker.request('security', { buffer, password: this.password, encrypt: true }, [buffer])).buffer; }
+      finally { if (!alive) worker.dispose(); }
     }
     return { token: this.token, revision: this.revision, base64: encodePdf(bytes) };
   }
@@ -428,6 +440,7 @@ export class PageEditor {
     this.savedKey = key(this.pages);
     this.savedPassword = this.password;
     this.unsavedDocument = false;
+    // Reopening the saved file detects any repair that a stopped Worker skipped.
     this.textRepairPending = false;
     this.formRepairPending = false;
     this.name = name;

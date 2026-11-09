@@ -5,6 +5,8 @@ body { display: flex; flex-direction: column; }
 #workspace { display: flex; width: 100%; flex: 1; min-height: 0; overflow: hidden; }
 #viewer-shell { position: relative; flex: 1; min-width: 0; height: 100%; overflow: hidden; }
 #viewer { flex: 1; height: 100%; min-width: 0; overflow: hidden; }
+#sidebar-grip { position: absolute; top: 49px; bottom: 0; left: 250px; width: 8px; margin-left: -4px; cursor: col-resize; z-index: 3; touch-action: none; }
+#sidebar-grip:hover, #sidebar-grip.dragging { background: #1d5eaa33; }
 embedpdf-container { display: block; height: 100%; }
 #markdown-panel { flex: 0 0 48%; min-width: 340px; max-width: 70%; display: flex; flex-direction: column; gap: 7px; padding: 12px; background: #fff; border-left: 2px solid #bacbdf; overflow: auto; }
 #markdown-panel header { display: flex; align-items: center; gap: 10px; }

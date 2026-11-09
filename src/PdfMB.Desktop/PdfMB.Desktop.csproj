@@ -5,10 +5,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.12.2</Version>
+    <Version>0.13.1</Version>
     <ApplicationIcon>Assets\pdfmb.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <NuGetAudit>false</NuGetAudit>
     <WebView2Version>1.0.4022.49</WebView2Version>
   </PropertyGroup>
   <ItemGroup>

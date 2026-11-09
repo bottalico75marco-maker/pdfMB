@@ -21,10 +21,15 @@ internal sealed partial class MainForm
         _markdownButton.Click += async (_, _) => await RunHostAsync(OpenMarkdownCoreAsync);
         _ocrButton.Click += async (_, _) =>
         {
-            await RunHostAsync(OpenMarkdownCoreAsync);
-            await ConvertMarkdownAsync(true);
+            // async void handler: an exception escaping here would surface as an unhandled thread exception.
+            try
+            {
+                await RunHostAsync(OpenMarkdownCoreAsync);
+                await ConvertMarkdownAsync(true);
+            }
+            catch (Exception ex) { ShowError(ex); }
         };
-        _ocrTimer.Tick += async (_, _) => { if (_initialized && !_markdownConverting) await CheckOcrAsync(_markdownModel); };
+        _ocrTimer.Tick += async (_, _) => { if (_initialized && !_markdownConverting && !_viewerFaulted) await CheckOcrAsync(_markdownModel); };
         _ocrTimer.Start();
         Disposed += (_, _) => { _ocrTimer.Dispose(); _markdownCancellation?.Cancel(); _ocr.Dispose(); };
     }
@@ -32,7 +37,7 @@ internal sealed partial class MainForm
     private async Task CheckOcrAsync(string model)
     {
         _markdownModel = model;
-        if (_ocrChecking || _markdownConverting || _bridge is null || IsDisposed) return;
+        if (_ocrChecking || _markdownConverting || _bridge is null || IsDisposed || _viewerFaulted) return;
         _ocrChecking = true;
         _ocrAvailable = false; UpdateControls();
         try
@@ -44,8 +49,8 @@ internal sealed partial class MainForm
             _ocrButton.ToolTipText = result.Message;
             await _bridge.RequestAsync("markdown.availability", new { available = result.Available, message = result.Message, models = result.Models });
         }
-        catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or TaskCanceledException)
-        { _ocrAvailable = false; }
+        // Reached from timer ticks and fire-and-forget paths: nothing above can handle a failure.
+        catch (Exception) { _ocrAvailable = false; }
         finally
         {
             _ocrChecking = false; UpdateControls();
@@ -140,7 +145,8 @@ internal sealed partial class MainForm
         finally
         {
             _markdownCancellation = null;
-            try { if (!IsDisposed) ReadEditorState(await _bridge!.RequestAsync("markdown.finish", new { message })); }
+            try { if (!IsDisposed && !_viewerFaulted) ReadEditorState(await _bridge!.RequestAsync("markdown.finish", new { message })); }
+            catch (Exception ex) { message = ex.Message; ShowError(ex); }
             finally { _markdownConverting = false; UpdateControls(); }
         }
         _status.Text = message;

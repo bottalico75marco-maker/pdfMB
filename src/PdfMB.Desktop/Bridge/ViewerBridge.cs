@@ -57,6 +57,13 @@ internal sealed class ViewerBridge(CoreWebView2 core) : IDisposable
         { /* Ignore malformed messages; never interpret them as filesystem commands. */ }
     }
 
+    /// <summary>Fails every in-flight request at once, instead of letting each one wait out its timeout.</summary>
+    public void FailAll(Exception error)
+    {
+        foreach (var pending in _pending.Values) pending.TrySetException(error);
+        _pending.Clear();
+    }
+
     public void Dispose()
     {
         core.WebMessageReceived -= OnMessage;

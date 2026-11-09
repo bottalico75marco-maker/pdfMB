@@ -270,6 +270,8 @@ internal sealed partial class MainForm : Form
         bool available = !IsBusy && _initialized;
         bool hasDocument = available && _document is not null;
         _new.Enabled = _open.Enabled = _recent.Enabled = available;
+        // A manual check while busy would run and then silently drop its dialog.
+        _checkUpdates.Enabled = available && !_updateChecking;
         _save.Enabled = hasDocument && !_readOnly && _dirty;
         _protect.Enabled = hasDocument && _canEdit;
         string protectionAction = _passwordProtected ? "Rimuovi password" : "Proteggi con password";
@@ -497,12 +499,18 @@ internal sealed partial class MainForm : Form
             {
                 token = _token, importToken, pageIndexes = options.PageIndexes, position = options.Position
             }));
+            // The viewer releases the import on a successful insert: nothing left to cancel.
+            importToken = null;
             _status.Text = $"Inserite {options.PageIndexes.Length} pagine · {_document.Name}";
         }
         finally
         {
             if (importToken is not null && !_viewerFaulted)
-                ReadEditorState(await _bridge!.RequestAsync("editor.cancelInsert", new { token = _token, importToken }));
+            {
+                // Releasing the import must not replace the exception that interrupted the insert.
+                try { ReadEditorState(await _bridge!.RequestAsync("editor.cancelInsert", new { token = _token, importToken })); }
+                catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or TaskCanceledException) { }
+            }
         }
     }
 
@@ -699,14 +707,20 @@ internal sealed partial class MainForm : Form
 
     private void FaultViewer(string message)
     {
-        _ready.TrySetException(new InvalidOperationException(message));
+        var error = new InvalidOperationException(message);
+        _ready.TrySetException(error);
         _viewerFaulted = true;
+        // Requests already waiting on the dead viewer would otherwise block the
+        // caller for the full 120 s timeout; fail them now, and stop probing OCR.
+        _ocrTimer.Stop();
+        _bridge?.FailAll(error);
         _status.Text = "Il visualizzatore si è arrestato. Chiudere e riaprire PDF MB.";
         UpdateControls();
     }
 
     private void ShowError(Exception ex)
     {
+        if (IsDisposed) return;
         if (ex is TimeoutException) FaultViewer(ex.Message);
         else _status.Text = _document?.Name ?? "Nessun documento aperto";
         MessageBox.Show(this, ex.Message, "PDF MB", MessageBoxButtons.OK, MessageBoxIcon.Error);

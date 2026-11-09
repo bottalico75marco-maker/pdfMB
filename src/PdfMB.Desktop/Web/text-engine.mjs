@@ -1,3 +1,8 @@
+import { standardFonts, unsupportedCharacters } from './text-layout.mjs';
+
+// PDF default-appearance abbreviations of the standard 14 fonts.
+const abbreviatedFonts = { Helv: 4, HeBo: 5, HeBO: 6, HeOb: 7, Cour: 0, CoBo: 1, CoBO: 2, CoOb: 3, TiRo: 8, TiBo: 9, TiBI: 10, TiIt: 11 };
+
 // FreeText authoring is kept in the same local PDFium Worker as page editing.
 export function createTextTools(api) {
   const limit = 10000;
@@ -60,7 +65,16 @@ export function createTextTools(api) {
       checked(api.FPDFAnnot_GetRect(annot, ptr));
       const rect = Array.from(api.pdfium.HEAPF32.slice(ptr / 4, ptr / 4 + 4));
       checked(api.EPDFAnnot_GetDefaultAppearance(annot, ptr + 16, ptr + 20, ptr + 24, ptr + 28, ptr + 32));
-      const font = api.pdfium.HEAP32[(ptr + 16) / 4], size = api.pdfium.HEAPF32[(ptr + 20) / 4];
+      let font = api.pdfium.HEAP32[(ptr + 16) / 4], size = api.pdfium.HEAPF32[(ptr + 20) / 4];
+      // The native getter only recognises /Helv: every other standard font comes
+      // back as -1, which made a Courier, bold or Times box impossible to edit
+      // again once applied. Read the font the DA string actually names.
+      if (!(font >= 0 && font < standardFonts.length) || !(size > 0)) {
+        const match = /\/(?:FXF_)?([A-Za-z-]+)\s+(\d*\.?\d+)\s+Tf/.exec(readString(annot, 'DA'));
+        const named = match ? (standardFonts.indexOf(match[1]) >= 0 ? standardFonts.indexOf(match[1]) : (abbreviatedFonts[match[1]] ?? -1)) : -1;
+        if (named >= 0) font = named;
+        if (!(size > 0) && match) size = parseFloat(match[2]);
+      }
       const color = '#' + [24, 28, 32].map(offset => (api.pdfium.HEAP32[(ptr + offset) / 4] & 255).toString(16).padStart(2, '0')).join('');
       return { id, contents: readString(annot, 'Contents'), font, size, color, rect };
     } finally { free(ptr); }
@@ -83,8 +97,8 @@ export function createTextTools(api) {
     checked(value && /^pdfmb-[0-9a-f-]{36}$/.test(value.id), 'Identificativo testo non valido.');
     checked(typeof value.contents === 'string' && value.contents.trim() && value.contents.length <= limit, 'Inserire da 1 a 10.000 caratteri.');
     // These standard fonts cover Western text. Never save missing glyphs silently.
-    checked(!/[^\u0020-\u007e\u00a0-\u00ff\u0152\u0153\u0160\u0161\u0178\u017d\u017e\u0192\u02c6\u02dc\u2013-\u201a\u201c-\u201e\u2020-\u2022\u2026\u2030\u2039\u203a\u20ac\u2122\n]/u.test(value.contents),
-      'I font disponibili supportano testo occidentale, accenti e simbolo €. Rimuovere i caratteri non supportati.');
+    const unsupported = unsupportedCharacters(value.contents);
+    checked(!unsupported.length, `I font disponibili supportano testo occidentale, accenti e simbolo €. Caratteri non supportati: ${unsupported.join(' ')}`);
     checked(Number.isInteger(value.font) && value.font >= 0 && value.font <= 11, 'Font non valido.');
     checked(Number.isFinite(value.size) && value.size >= 6 && value.size <= 144, 'Indicare una dimensione da 6 a 144 pt.');
     checked(/^#[0-9a-f]{6}$/i.test(value.color), 'Colore non valido.');

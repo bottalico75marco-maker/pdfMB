@@ -1,12 +1,17 @@
 {
   "name": "pdfmb-desktop",
-  "version": "0.1.0",
+  "version": "0.13.1",
   "private": true,
   "type": "module",
   "scripts": {
     "assets": "node scripts/copy-assets.mjs",
     "test": "node --test tests/*.test.mjs",
-    "test:browser": "node tests/browser-smoke.mjs"
+    "test:browser": "node tests/browser-smoke.mjs",
+    "check": "npm test && dotnet build PdfMB.sln -c Release --nologo && dotnet run --project tests/DesktopChecks -c Release",
+    "release:check": "pwsh ./scripts/prepare-release.ps1 -MetadataOnly"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dependencies": {
     "@embedpdf/pdfium": "2.15.1",
